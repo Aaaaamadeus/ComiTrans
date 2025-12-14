@@ -1,0 +1,11 @@
+
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+.env.local
+nginx/certs/*.key
+nginx/certs/*.pem

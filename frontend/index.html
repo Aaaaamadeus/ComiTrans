@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amadeus Comic Translator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .upload-area {
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 40px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            border-color: #4299e1;
+        }
+
+        button {
+            background-color: #4299e1;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #3182ce;
+        }
+
+        button:disabled {
+            background-color: #a0aec0;
+            cursor: not-allowed;
+        }
+
+        #resultImage {
+            max-width: 100%;
+            margin-top: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: none; /* 默认隐藏 */
+        }
+
+        /* --- 加载动画遮罩层 CSS --- */
+        #loadingOverlay {
+            display: none; /* 默认不显示 */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); /* 半透明黑色背景 */
+            z-index: 9999; /* 保证在最上层 */
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #4299e1; /* 蓝色旋转头 */
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 18px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">正在识别并翻译中...<br>请稍候 (可能需要 10-30 秒)</div>
+    </div>
+
+    <h1>Amadeus 漫画汉化助手</h1>
+
+    <div class="container">
+        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+        
+        <div class="upload-area" onclick="document.getElementById('imageInput').click()">
+            <p style="color: #718096; font-size: 18px;">点击选择漫画图片</p>
+            <p id="fileName" style="color: #4a5568; font-size: 14px; margin-top: 10px;"></p>
+        </div>
+
+        <button id="uploadBtn" onclick="uploadAndProcess()">开始汉化</button>
+
+        <div id="errorMsg" style="color: red; margin-top: 10px; display: none;"></div>
+        
+        <img id="resultImage" alt="汉化结果">
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('imageInput');
+        const fileNameDisplay = document.getElementById('fileName');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const resultImg = document.getElementById('resultImage');
+        const errorMsg = document.getElementById('errorMsg');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        // 显示选中的文件名
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                fileNameDisplay.textContent = "已选择: " + this.files[0].name;
+            }
+        });
+
+        async function uploadAndProcess() {
+            if (!fileInput.files[0]) {
+                alert("请先选择一张图片！");
+                return;
+            }
+
+            // 1. 显示加载遮罩层
+            loadingOverlay.style.display = 'flex';
+            // 禁用按钮防止重复提交
+            uploadBtn.disabled = true;
+            errorMsg.style.display = 'none';
+            resultImg.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append("image", fileInput.files[0]);
+
+            try {
+                // 2. 发起请求
+                const response = await fetch('/process-image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`服务器错误: ${response.status}`);
+                }
+
+                // 3. 处理返回的图片 Blob
+                const blob = await response.blob();
+                const imageUrl = URL.createObjectURL(blob);
+                
+                resultImg.src = imageUrl;
+                resultImg.style.display = 'block';
+
+            } catch (error) {
+                console.error("Error:", error);
+                errorMsg.textContent = "处理失败: " + error.message + " (请检查后端日志)";
+                errorMsg.style.display = 'block';
+            } finally {
+                // 4. 无论成功还是失败，都隐藏加载遮罩层，并恢复按钮
+                loadingOverlay.style.display = 'none';
+                uploadBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

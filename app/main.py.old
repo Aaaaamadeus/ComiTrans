@@ -1,0 +1,175 @@
+import os
+import io
+import json
+import cv2
+import numpy as np
+import httpx
+import asyncio
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import Response
+from PIL import Image, ImageDraw, ImageFont
+from paddleocr import PaddleOCR
+# 引入 OpenAI 的异步客户端
+from openai import AsyncOpenAI
+
+app = FastAPI()
+
+# --- 配置区 ---
+API_KEY = "sk-CISjk5qJCF4e83C3181bT3BLbkFJ0573FB58E5E7403e905f"
+FONT_PATH = "./font.ttf"
+
+if not os.path.exists(FONT_PATH):
+    print("【警告】未找到字体文件 font.ttf，文字将无法显示！")
+
+# --- 初始化 OpenAI 客户端 ---
+
+client = AsyncOpenAI(
+    base_url="https://api.ohmygpt.com/v1",
+    api_key=API_KEY,
+    http_client=http_client,  # 注入代理客户端
+)
+
+# --- 初始化 PaddleOCR (只在启动时加载一次，比较耗内存) ---
+ocr_engine = PaddleOCR(use_angle_cls=True, lang="ch")
+
+
+# --- LLM 调用函数 (修改部分) ---
+async def translate_text_with_llm(text_list):
+    """
+    使用 OpenAI SDK (OhMyGPT) 进行翻译
+    """
+    if not text_list:
+        return []
+
+    # 构建 System Prompt 和 User Prompt
+    system_prompt = (
+        "你是一个专业漫画汉化组翻译。你的任务是将用户提供的日语/英语文本列表翻译成流畅的中文。\n"
+        "要求：\n"
+        "1. 保持语气符合漫画语境。\n"
+        "2. 严禁输出任何 Markdown 格式（如 ```json ... ```）。\n"
+        "3. 必须且只能返回一个纯 JSON 字符串数组。\n"
+        "4. 数组长度必须与输入列表长度一致。"
+    )
+
+    user_content = json.dumps(text_list, ensure_ascii=False)
+
+    try:
+        # 调用 Chat Completions API
+        response = await client.chat.completions.create(
+            model="gpt-4o",  # 指定模型
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"原文列表: {user_content}"}
+            ],
+            temperature=0.7,  # 稍微降低随机性以保证格式稳定
+        )
+
+        # 获取返回内容
+        ai_text = response.choices[0].message.content.strip()
+
+        # 清理可能存在的 Markdown 代码块标记 (GPT-4o 有时很喜欢加这个)
+        ai_text = ai_text.replace("```json", "").replace("```", "").strip()
+
+        # 解析 JSON
+        translated_list = json.loads(ai_text)
+
+        # 容错：如果长度不一致，返回原文
+        if len(translated_list) != len(text_list):
+            print("【警告】翻译结果数量与原文不一致，回退到原文")
+            return text_list
+
+        return translated_list
+
+    except Exception as e:
+        print(f"翻译失败: {e}")
+        return text_list  # 降级处理：返回原文
+
+
+# --- 图像处理核心逻辑 (保持不变，只是函数名变了) ---
+@app.post("/process-image")
+async def process_image_endpoint(image: UploadFile = File(...)):
+    # 1. 读取图片
+    image_bytes = await image.read()
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    img_cv = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    if img_cv is None:
+        raise HTTPException(status_code=400, detail="Invalid image")
+
+    # 2. OCR 识别
+    ocr_result = ocr_engine.ocr(img_cv, cls=True)
+
+    if not ocr_result or ocr_result[0] is None:
+        return Response(content=image_bytes, media_type="image/jpeg")
+
+    # 提取所有文本和坐标
+    text_blocks = []
+    original_texts = []
+
+    for line in ocr_result[0]:
+        coords = line[0]
+        text = line[1][0]
+        original_texts.append(text)
+        text_blocks.append({
+            "coords": coords,
+            "text": text
+        })
+
+    # 3. 调用 LLM 批量翻译 (修改为调用新的函数)
+    translated_texts = await translate_text_with_llm(original_texts)
+
+    # 4. 图像处理：涂白 + 嵌字
+    img_pil = Image.fromarray(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(FONT_PATH, size=20)
+    except:
+        font = ImageFont.load_default()
+
+    for i, block in enumerate(text_blocks):
+        # 防止翻译列表越界（双重保险）
+        if i >= len(translated_texts):
+            trans_text = block["text"]
+        else:
+            trans_text = translated_texts[i]
+
+        coords = block["coords"]
+
+        # A. 计算涂白区域
+        pts = np.array(coords, np.int32)
+        x, y, w, h = cv2.boundingRect(pts)
+        draw.rectangle([x - 2, y - 2, x + w + 2, y + h + 2], fill=(255, 255, 255))
+
+        # B. 排版
+        font_size = max(12, int(h * 0.8))
+        try:
+            current_font = ImageFont.truetype(FONT_PATH, size=font_size)
+        except:
+            current_font = font
+
+        draw.text((x, y), trans_text, font=current_font, fill=(0, 0, 0))
+
+    # 5. 导出结果
+    output_buffer = io.BytesIO()
+    img_pil.save(output_buffer, format="JPEG", quality=95)
+
+    return Response(content=output_buffer.getvalue(), media_type="image/jpeg")
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ready"}
+
+
+
+
+
+
+
+
+
+
+
+
+

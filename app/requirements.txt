@@ -1,0 +1,6 @@
+opencv-python-headless
+ultralytics
+manga-ocr 
+paddlepaddle 
+paddleocr 
+simple-lama-inpainting
