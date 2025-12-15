@@ -9,16 +9,16 @@ services:
     volumes:
       - /app:/app
     restart: always
-  nginx:
-    image: nginx:latest
-    container_name: amadeuscomic_nginx
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/certs:/etc/nginx/certs
-      - ./frontend:/usr/share/nginx/html
-    ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      - amadeuscomic-app
-    restart: always
+#  nginx:
+#    image: nginx:latest
+#    container_name: amadeuscomic_nginx
+#    volumes:
+#      - ./nginx/conf.d:/etc/nginx/conf.d
+#      - ./nginx/certs:/etc/nginx/certs
+#      - ./frontend:/usr/share/nginx/html
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#    depends_on:
+#      - amadeuscomic-app
+#    restart: always
