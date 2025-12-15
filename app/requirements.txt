@@ -1,6 +1,13 @@
+#必须锁定<2.0.0
+numpy<2.0.0
 opencv-python-headless
+Pillow
+torch
+torchvision
+paddlepaddle
+paddleocr
 ultralytics
-manga-ocr 
-paddlepaddle 
-paddleocr 
 simple-lama-inpainting
+requests
+manga-ocr
+openai
