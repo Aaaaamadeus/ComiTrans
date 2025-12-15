@@ -4,8 +4,6 @@ services:
   amadeuscomic-app:
     build: ./app
     container_name: amadeuscomic_backend
-    environment:
-      - OHMYGPT_API_KEY=sk-CISjk5qJCF4e83C3181bT3BLbkFJ0573FB58E5E7403e905f
     volumes:
       - /app:/app
     restart: always

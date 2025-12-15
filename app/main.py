@@ -1,18 +1,18 @@
 import cv2
 import numpy as np
 import torch
+from openai import OpenAI
 import os
+import base64
 from ultralytics import YOLO
 from manga_ocr import MangaOcr
 from paddleocr import PaddleOCR
 from simple_lama_inpainting import SimpleLama
 from PIL import Image, ImageDraw, ImageFont
 
-# ==========================================
 # 模块 1: 竖排嵌字器 (Vertical Typesetter)
-# ==========================================
 class VerticalTypesetter:
-    def __init__(self, font_path, font_size=24, color=(0, 0, 0)):
+    def __init__(self, font_path, font_size, color=(0, 0, 0)):
         self.font_path = font_path
         self.base_font_size = font_size
         self.color = color
@@ -139,17 +139,13 @@ class VerticalTypesetter:
             
         return image
 
-
-# ==========================================
 # 模块 2: 漫画处理管线 (Comic Pipeline)
-# ==========================================
 class ComicTranslatorPipeline:
     def __init__(self, 
-                 det_model_path='ogkalu/comic-speech-bubble-detector-yolov8m',
-                 font_path='font.ttf', #这里必须指定你的字体文件路径
-                 font_size=28,
-                 use_gpu=True):
-        
+                 det_model_path,
+                 font_path, #这里必须指定你的字体文件路径
+                 font_size,
+                 use_gpu):
         self.device = 'cuda' if torch.cuda.is_available() and use_gpu else 'cpu'
         print("初始化管线")
 
@@ -160,9 +156,9 @@ class ComicTranslatorPipeline:
         # 2. OCR 模型
         print("加载 Manga-OCR...")
         self.manga_ocr = MangaOcr()
-        
+        #删除了show_log=False
         print("加载 PaddleOCR...")
-        self.paddle_ocr = PaddleOCR(use_angle_cls=True, lang="ch", show_log=False)
+        self.paddle_ocr = PaddleOCR(use_angle_cls=True, lang="ch")
 
         # 3. 图像修补
         print("加载 LaMa Inpainting...")
@@ -226,12 +222,48 @@ class ComicTranslatorPipeline:
         clean_img_pil = self.inpainter(img_pil, mask_pil)
         return clean_img_pil
 
-    def translate_text(self, text):
+    def translate_with_image(self, text,image_path):
         """翻译接口"""
+        #改为中转模式
+        BASE_URL = "https://中转服务商/v1"
+        API_KEY = "Your_API_Key"
         if not text.strip(): return ""
-        # TODO: 在此处接入 Gemini / ChatGPT / SakuraLLM API
-        # 模拟翻译：
-        return f"[译]{text}"
+        client = OpenAI(
+            api_key=API_KEY,
+            base_url=BASE_URL
+        )
+        # 构造Prompt：
+        system_prompt = """
+        你是一位专业的日漫汉化组翻译，结合文字
+        请将用户的日文文本翻译成地道、流畅的中文。
+        要求：
+        1. 保持二次元口语风格，不要翻译腔
+        2. 如果遇到拟声词，请根据语境意译或保留
+        3. 直接输出翻译后的内容，不要加引号，不要带任何解释
+        """
+
+        try:
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            response = client.chat.completions.create(
+                model="gemini-1.5-flash-latest",
+                messages=[
+                    {"role": "system","content": f"{system_prompt}"},
+                    {"role": "user",
+                        "content": [
+                            {"type": "text", "text": f"原文OCR参考：{text}"},
+                            {"type": "image_url","image_url":
+                                {"url": f"data:image/jpeg;base64,{base64_image}"}
+                             }
+                        ]
+                    }
+                ]
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as a:
+            print(f"翻译出错{a}")
+            exit()
+        return f"{text}"
 
     def process_comic_page(self, input_path, output_path):
         # 1. 读取原始图像 (OpenCV 格式用于裁剪 OCR)
@@ -246,12 +278,15 @@ class ComicTranslatorPipeline:
         # 3. OCR 与 翻译 (并行处理数据)
         processed_data = []
         for i, box in enumerate(boxes):
-            # 策略：先用 manga-ocr，如果太短或失败则用 paddle
+            x1, y1, x2, y2 = map(int, box)
+            crop_img = img_cv[y1:y2, x1:x2]
+            # 先用 manga-ocr，如果太短或失败则用 paddle
             raw_text = self.run_ocr(img_cv, box, method='manga-ocr')
             if len(raw_text) < 2:
                 raw_text = self.run_ocr(img_cv, box, method='paddle')
-            
-            trans_text = self.translate_text(raw_text)
+            temp_bubble_path = "temp_bubble.jpg"
+            cv2.imwrite(temp_bubble_path, crop_img)
+            trans_text = self.translate_with_image(raw_text, image_path=temp_bubble_path)
             
             processed_data.append({
                 "box": box,
@@ -280,14 +315,12 @@ class ComicTranslatorPipeline:
         print(f"处理完成！已保存至: {output_path}")
 
 
-# ==========================================
 # 主程序入口
-# ==========================================
 if __name__ == "__main__":
     # 配置区：请修改为你本地的路径
-    # 1. 准备一张测试图片
+    # 准备一张测试图片
     TEST_IMAGE = "test_page.jpg" 
-    # 2. 准备中文字体
+    # 准备中文字体
     FONT_PATH = "./font.ttf"  
     
     # 检查文件是否存在
@@ -296,10 +329,11 @@ if __name__ == "__main__":
     else:
         try:
             # 初始化管线
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
             pipeline = ComicTranslatorPipeline(
-                det_model_path='ogkalu/comic-speech-bubble-detector-yolov8m',
+                det_model_path= os.path.join(BASE_DIR, 'models','ogkalucomic-speech-bubble-detector-yolov8m', 'comic-speech-bubble-detector.pt'),
                 font_path=FONT_PATH,
-                font_size=30,  # 基础字号
+                font_size=20,  # 基础字号
                 use_gpu=True   # 是否使用 GPU
             )
             
