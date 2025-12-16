@@ -11,3 +11,4 @@ simple-lama-inpainting
 requests
 manga-ocr
 openai
+python-dotenv
