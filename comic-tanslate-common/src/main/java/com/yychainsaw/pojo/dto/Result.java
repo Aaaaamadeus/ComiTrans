@@ -1,4 +1,4 @@
-package com.yychainsaw.pojo;
+package com.yychainsaw.pojo.dto;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
