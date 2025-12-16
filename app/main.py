@@ -1,14 +1,17 @@
 import cv2
 import numpy as np
 import torch
-from openai import OpenAI
 import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import base64
+from dotenv import load_dotenv
+from openai import OpenAI
 from ultralytics import YOLO
 from manga_ocr import MangaOcr
 from paddleocr import PaddleOCR
 from simple_lama_inpainting import SimpleLama
 from PIL import Image, ImageDraw, ImageFont
+load_dotenv()
 
 # 模块 1: 竖排嵌字器 (Vertical Typesetter)
 class VerticalTypesetter:
@@ -152,21 +155,27 @@ class ComicTranslatorPipeline:
         # 1. 气泡检测
         print("加载 YOLOv8 检测模型...")
         self.detector = YOLO(det_model_path)
+        print("成功！")
 
         # 2. OCR 模型
         print("加载 Manga-OCR...")
         self.manga_ocr = MangaOcr()
+        print("成功！")
+
         #删除了show_log=False
         print("加载 PaddleOCR...")
         self.paddle_ocr = PaddleOCR(use_angle_cls=True, lang="ch")
+        print("成功！")
 
         # 3. 图像修补
         print("加载 LaMa Inpainting...")
         self.inpainter = SimpleLama()
+        print("成功！")
         
         # 4. 嵌字器
         print("初始化嵌字器")
         self.typesetter = VerticalTypesetter(font_path, font_size)
+        print("成功！")
 
     def detect_bubbles(self, image_path):
         """YOLOv8 检测"""
@@ -200,33 +209,99 @@ class ComicTranslatorPipeline:
                 return "".join([line[1][0] for line in result[0]])
         return ""
 
+    #气泡背景判断函数，决定是否调用lama模型进行背景填充
+    def is_simple_bubble(self, roi_img):
+        #判断是否存在气泡
+        if roi_img is None or roi_img.size == 0:
+            return False
+        #转换成灰度
+        gray = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
+        #计算均值和标准差
+        mean,std = cv2.meanStdDev(gray)
+        mean_val = mean[0][0]
+        std_val = std[0][0]
+        #阈值参数设置
+        white = mean_val > 160 and std_val < 90
+        print(f"亮度:{mean_val:.2f},标准差:{std_val:.2f}->{'白气泡' if white else '复杂背景'}")
+        return white
+
     def inpaint_bubbles(self, img_path, boxes):
         """LaMa 去除气泡文字 (生成底图)"""
         print("正在执行图像修补...")
-        # 读取为 RGB PIL 用于 LaMa
-        img_pil = Image.open(img_path).convert("RGB")
-        w, h = img_pil.size
-        
-        # 创建 Mask (numpy 格式 L 模式)
-        mask_np = np.zeros((h, w), dtype=np.uint8)
-        
-        # 适当缩小 mask 范围，只涂抹中间，避免把气泡边框也擦了
-        # 这里为了演示，简单涂抹整个检测框
-        padding = 0 
+        #opencv格式
+        img_cv = cv2.imread(img_path)
+        h,w = img_cv.shape[:2]
+        #记录ai需要修复的区域
+        lama_mask = np.zeros((h, w), dtype=np.uint8)
+        #用来判断是否存在需要模型的区域
+        needs_ai_inpainting = False
         for (x1, y1, x2, y2) in boxes:
-            cv2.rectangle(mask_np, (x1+padding, y1+padding), (x2-padding, y2-padding), 255, -1)
+            paddle = 2
+            safe_x1 = max(0, x1 - paddle)
+            safe_y1 = max(0, y1 - paddle)
+            safe_x2 = min(w, x2 + paddle)
+            safe_y2 = min(h, y2 + paddle)
+            if safe_x2 <= safe_x1 or safe_y2 <= safe_y1:
+                continue
+            #引用切片
+            roi_img = img_cv[safe_y1:safe_y2, safe_x1:safe_x2]
+            #生成掩膜，提取黑色文字
+            gray_roi = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
+            #二值化
+            _, initial_mask = cv2.threshold(gray_roi, 200, 255, cv2.THRESH_BINARY_INV)
+            #查找所有黑色连通块
+            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(initial_mask, connectivity=8)
+            #创建mask只掩盖字
+            text_mask = np.zeros_like(initial_mask)
 
-        mask_pil = Image.fromarray(mask_np)
-        
-        # SimpleLama 输入 PIL，返回 PIL
-        clean_img_pil = self.inpainter(img_pil, mask_pil)
-        return clean_img_pil
+            for i in range(1, num_labels):
+                x, y, w_box, h_box, area = stats[i]
+                #边界触碰检测
+                is_touching_border = (x <= 1) or (y <= 1) or (x + w_box >= w - 1) or (y + h_box >= h - 1)
+                if is_touching_border:
+                    continue
+                #筛选规则
+                # 比较面积和长宽，基于 h/w
+                # 如果一个块的面积超过了“当前切片”总面积的 50%
+                if area > (h * w) * 0.5:
+                    continue
+                # 如果一个块的宽或高占据了“当前切片”的 90% 以上
+                if w_box > w * 0.9 or h_box > h * 0.9:
+                    continue
+                # 去除微小噪点
+                if area < 5:
+                    continue
+                # 将通过筛选的画到mask上
+                text_mask[labels == i] = 255
+            #只对筛选后的文字进行膨胀
+            kernel = np.ones((2, 2), np.uint8)
+            text_mask_dilated = cv2.dilate(text_mask, kernel, iterations=1)
+
+            #分流处理
+            if self.is_simple_bubble(roi_img):
+                #直接涂白
+                roi_img[text_mask_dilated == 255] = [255,255,255]
+            else:
+                #调用模型处理
+                needs_ai_inpainting = True
+                lama_mask[safe_y1:safe_y2, safe_x1:safe_x2] = text_mask_dilated
+        #将opencv格式转为PIL格式
+        img_cv_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
+        img_pil_final = Image.fromarray(img_cv_rgb)
+        if needs_ai_inpainting:
+            print("存在复杂背景，调用lama模型修复...")
+            mask_pil = Image.fromarray(lama_mask)
+            #lama接收
+            img_pil_final = self.inpainter(img_pil_final, mask_pil)
+        else:
+            print("无复杂背景，已全部处理")
+        return img_pil_final
 
     def translate_with_image(self, text,image_path):
         """翻译接口"""
         #改为中转模式
-        BASE_URL = "https://中转服务商/v1"
-        API_KEY = "Your_API_Key"
+        BASE_URL = "https://api.ohmygpt.com/v1"
+        API_KEY = os.getenv("API_KEY")
         if not text.strip(): return ""
         client = OpenAI(
             api_key=API_KEY,
@@ -235,18 +310,19 @@ class ComicTranslatorPipeline:
         # 构造Prompt：
         system_prompt = """
         你是一位专业的日漫汉化组翻译，结合文字
-        请将用户的日文文本翻译成地道、流畅的中文。
+        请将用户的日文文本翻译成地流畅的中文。
         要求：
-        1. 保持二次元口语风格，不要翻译腔
+        1. 保持二次元口语风格，不要过度本土化！保持日漫汉化的习惯！不要翻译腔
         2. 如果遇到拟声词，请根据语境意译或保留
-        3. 直接输出翻译后的内容，不要加引号，不要带任何解释
+        3. 直接输出翻译后的内容，不要加引号，不要带任何解释，不要最后一句末尾的句号
+        4. 姓名输出不要为罗马音
         """
 
         try:
             with open(image_path, "rb") as image_file:
                 base64_image = base64.b64encode(image_file.read()).decode('utf-8')
             response = client.chat.completions.create(
-                model="gemini-1.5-flash-latest",
+                model="gemini-2.5-flash",
                 messages=[
                     {"role": "system","content": f"{system_prompt}"},
                     {"role": "user",
@@ -262,7 +338,6 @@ class ComicTranslatorPipeline:
             return response.choices[0].message.content.strip()
         except Exception as a:
             print(f"翻译出错{a}")
-            exit()
         return f"{text}"
 
     def process_comic_page(self, input_path, output_path):
@@ -321,8 +396,8 @@ if __name__ == "__main__":
     # 准备一张测试图片
     TEST_IMAGE = "test_page.jpg" 
     # 准备中文字体
-    FONT_PATH = "./font.ttf"  
-    
+    FONT_PATH = "./font.ttf"
+
     # 检查文件是否存在
     if not os.path.exists(TEST_IMAGE):
         print(f"找不到测试图片 {TEST_IMAGE}，请先准备一张图片。")
