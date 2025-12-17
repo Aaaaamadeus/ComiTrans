@@ -425,7 +425,7 @@ def run_worker(user_input, output_name):
 # 主程序入口
 if __name__ == "__main__":
     # 字体
-    FONT_PATH = "./font.ttf"
+    FONT_PATH = "./font_file/font.ttf"
     try:
         # 初始化管线
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
