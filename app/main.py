@@ -1,17 +1,25 @@
+import os
+import time
+import base64
+from functools import partial
+from concurrent.futures import ProcessPoolExecutor
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+from dotenv import load_dotenv
+load_dotenv()
 import cv2
 import numpy as np
 import torch
-import os
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-import base64
-from dotenv import load_dotenv
+from PIL import Image, ImageDraw, ImageFont
 from openai import OpenAI
 from ultralytics import YOLO
 from manga_ocr import MangaOcr
 from paddleocr import PaddleOCR
 from simple_lama_inpainting import SimpleLama
-from PIL import Image, ImageDraw, ImageFont
-load_dotenv()
+from paddle.dataset.movielens import user_info
+pipeline = None
 
 # 模块 1: 竖排嵌字器 (Vertical Typesetter)
 class VerticalTypesetter:
@@ -204,7 +212,7 @@ class ComicTranslatorPipeline:
             pil_crop = Image.fromarray(cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB))
             return self.manga_ocr(pil_crop)
         elif method == 'paddle':
-            result = self.paddle_ocr.ocr(crop_img, cls=True)
+            result = self.paddle_ocr.ocr(crop_img)
             if result and result[0]:
                 return "".join([line[1][0] for line in result[0]])
         return ""
@@ -390,32 +398,65 @@ class ComicTranslatorPipeline:
         print(f"处理完成！已保存至: {output_path}")
 
 
+def init_worker(base_dir, font_path):
+    global pipeline
+    pipeline = ComicTranslatorPipeline(
+        det_model_path=os.path.join(base_dir, 'models', 'ogkalucomic-speech-bubble-detector-yolov8m',
+                                    'comic-speech-bubble-detector.pt'),
+        font_path=font_path,
+        font_size=20,
+        use_gpu=False
+    )
+# Linux专用模块
+def init_pipeline_linux(base_dir, font_path):
+    global pipeline
+    pipeline = ComicTranslatorPipeline(
+        det_model_path=os.path.join(base_dir, 'models', 'ogkalucomic-speech-bubble-detector-yolov8m',
+                                    'comic-speech-bubble-detector.pt'),
+        font_path=font_path,
+        font_size=20,
+        use_gpu=False
+    )
+def run_worker(user_input, output_name):
+    global pipeline
+    pipeline.process_comic_page(user_input, output_name)
+    return f"处理完成: {user_input}"
+
 # 主程序入口
 if __name__ == "__main__":
-    # 配置区：请修改为你本地的路径
-    # 准备一张测试图片
-    TEST_IMAGE = "test_page.jpg" 
-    # 准备中文字体
+    # 字体
     FONT_PATH = "./font.ttf"
+    try:
+        # 初始化管线
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        if os.name == 'posix':
+            init_pipeline_linux(BASE_DIR, FONT_PATH)
+            worker_init_fn = None
+        else:
+            worker_init_fn = partial(init_worker, BASE_DIR, FONT_PATH)
 
-    # 检查文件是否存在
-    if not os.path.exists(TEST_IMAGE):
-        print(f"找不到测试图片 {TEST_IMAGE}，请先准备一张图片。")
-    else:
-        try:
-            # 初始化管线
-            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-            pipeline = ComicTranslatorPipeline(
-                det_model_path= os.path.join(BASE_DIR, 'models','ogkalucomic-speech-bubble-detector-yolov8m', 'comic-speech-bubble-detector.pt'),
-                font_path=FONT_PATH,
-                font_size=20,  # 基础字号
-                use_gpu=True   # 是否使用 GPU
-            )
-            
-            # 运行处理
-            pipeline.process_comic_page(TEST_IMAGE, "final_translated_page.jpg")
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            print(f"运行过程中发生错误: {e}")
+#       max_processes = max(1, (os.cpu_count() or 4) - 1)
+        max_processes = max(1,2)
+        print(f"最大并发数: {max_processes}")
+        with ProcessPoolExecutor(max_workers=max_processes,initializer=worker_init_fn) as executor:
+            print("输入图片路径，按Enter开始处理。输入'exit'退出。")
+            while True:
+                TEST_IMAGE = input("请输入测试图片路径")
+                user_input = TEST_IMAGE
+                if user_input.strip().lower() == 'exit':
+                    print("正在等待所有后台进程结束...")
+                    break
+                if not user_input.strip():
+                    continue
+                if not os.path.exists(user_input):
+                    print("文件不存在，请检查路径")
+                    continue
+                # 提交任务
+                base_name = os.path.basename(user_input)
+                output_name = f"translated_{base_name}"
+                executor.submit(run_worker, user_input, output_name)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"运行过程中发生错误: {e}")
