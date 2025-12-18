@@ -1,11 +1,9 @@
 import os
 import time
 import base64
-from functools import partial
-from concurrent.futures import ProcessPoolExecutor
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
+import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 from dotenv import load_dotenv
 load_dotenv()
@@ -19,7 +17,9 @@ from manga_ocr import MangaOcr
 from paddleocr import PaddleOCR
 from simple_lama_inpainting import SimpleLama
 from paddle.dataset.movielens import user_info
-pipeline = None
+#使用多核单线程时使用
+#pipeline = None
+#from functools import partial
 
 # 模块 1: 竖排嵌字器 (Vertical Typesetter)
 class VerticalTypesetter:
@@ -185,6 +185,9 @@ class ComicTranslatorPipeline:
         self.typesetter = VerticalTypesetter(font_path, font_size)
         print("成功！")
 
+        # 线程锁
+        self.lock = threading.Lock()
+
     def detect_bubbles(self, image_path):
         """YOLOv8 检测"""
         print("检测气泡中")
@@ -212,7 +215,9 @@ class ComicTranslatorPipeline:
             pil_crop = Image.fromarray(cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB))
             return self.manga_ocr(pil_crop)
         elif method == 'paddle':
-            result = self.paddle_ocr.ocr(crop_img)
+            #ocr线程锁
+            with self.lock:
+                result = self.paddle_ocr.ocr(crop_img)
             if result and result[0]:
                 return "".join([line[1][0] for line in result[0]])
         return ""
@@ -305,50 +310,137 @@ class ComicTranslatorPipeline:
             print("无复杂背景，已全部处理")
         return img_pil_final
 
-    def translate_with_image(self, text,image_path):
-        """翻译接口"""
-        #改为中转模式
-        BASE_URL = "https://api.ohmygpt.com/v1"
+    # def translate_with_image(self, text,image_path):
+    #     """翻译接口"""
+    #     #改为中转模式
+    #     BASE_URL = "http://43.133.176.18:8000/v1"
+    #     API_KEY = os.getenv("API_KEY")
+    #     if not text.strip(): return ""
+    #     client = OpenAI(
+    #         api_key=API_KEY,
+    #         base_url=BASE_URL
+    #     )
+    #     # 构造Prompt：
+    #     system_prompt = """
+    #     你是一位专业的日漫汉化组翻译，结合文字
+    #     请将用户的日文文本翻译成地流畅的中文。
+    #     要求：
+    #     1. 保持二次元口语风格，不要过度本土化！保持日漫汉化的习惯！不要翻译腔
+    #     2. 如果遇到拟声词，请根据语境意译或保留
+    #     3. 直接输出翻译后的内容，不要加引号，不要带任何解释，不要最后一句末尾的句号
+    #     4. 姓名输出不要为罗马音
+    #     """
+    #
+    #     try:
+    #         with open(image_path, "rb") as image_file:
+    #             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+    #         response = client.chat.completions.create(
+    #             model="gemini-2.5-flash",
+    #             messages=[
+    #                 {"role": "system","content": f"{system_prompt}"},
+    #                 {"role": "user",
+    #                     "content": [
+    #                         {"type": "text", "text": f"原文OCR参考：{text}"},
+    #                         {"type": "image_url","image_url":
+    #                             {"url": f"data:image/jpeg;base64,{base64_image}"}
+    #                          }
+    #                     ]
+    #                 }
+    #             ]
+    #         )
+    #         return response.choices[0].message.content.strip()
+    #     except Exception as a:
+    #         print(f"翻译出错{a}")
+    #     return f"{text}"
+    def translate_page_batch(self, ocr_texts, image_path):
+        # 0. 边界检查：如果这页没字，直接返回空
+        if not ocr_texts: return []
+
+        # 1. 准备 API
+        BASE_URL = "http://43.133.176.18:8000/v1"
         API_KEY = os.getenv("API_KEY")
-        if not text.strip(): return ""
-        client = OpenAI(
-            api_key=API_KEY,
-            base_url=BASE_URL
-        )
-        # 构造Prompt：
+        client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+
+        # 2. 构造带序号的文本清单，方便 AI 对照
+        text_list_str = "\n".join([f"[{i}] {text}" for i, text in enumerate(ocr_texts)])
+
+        # 3. 构造 Prompt：强制要求返回纯 JSON 数组
         system_prompt = """
-        你是一位专业的日漫汉化组翻译，结合文字
-        请将用户的日文文本翻译成地流畅的中文。
-        要求：
-        1. 保持二次元口语风格，不要过度本土化！保持日漫汉化的习惯！不要翻译腔
-        2. 如果遇到拟声词，请根据语境意译或保留
-        3. 直接输出翻译后的内容，不要加引号，不要带任何解释，不要最后一句末尾的句号
-        4. 姓名输出不要为罗马音
+        你是一位专业的日漫汉化组翻译。
+        请结合提供的【整页漫画图片】作为视觉上下文，将给出的【OCR日文列表】翻译成流畅的中文。
+
+        【严格要求】：
+        1. 必须返回一个纯 JSON 字符串数组，格式如：["翻译1", "翻译2", "翻译3"]
+        2. 数组中的元素数量、顺序必须与输入的 OCR 文本列表完全一致。
+        3. 如果某行 OCR 是乱码或无需翻译，请在对应位置填入空字符串 "" 或原样保留，不要跳过。
+        4. 保持二次元口语风格，不要翻译腔。
+        5. 不要使用 Markdown 格式（如 ```json），直接返回数组字符串。
+        6. 最后一句句尾不要带句号
         """
 
+        user_prompt = f"请按顺序翻译以下 {len(ocr_texts)} 条日文文本：\n{text_list_str}"
+
         try:
+            # 读取整页图片
             with open(image_path, "rb") as image_file:
                 base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+
             response = client.chat.completions.create(
                 model="gemini-2.5-flash",
                 messages=[
-                    {"role": "system","content": f"{system_prompt}"},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user",
-                        "content": [
-                            {"type": "text", "text": f"原文OCR参考：{text}"},
-                            {"type": "image_url","image_url":
-                                {"url": f"data:image/jpeg;base64,{base64_image}"}
-                             }
-                        ]
-                    }
-                ]
+                     "content": [
+                         {"type": "text", "text": user_prompt},
+                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                     ]
+                     }
+                ],
+                # 如果模型支持 json_object 模式最好开启，不支持也没关系，prompt 已经约束了
+                response_format={"type": "json_object"}
             )
-            return response.choices[0].message.content.strip()
-        except Exception as a:
-            print(f"翻译出错{a}")
-        return f"{text}"
+
+            content = response.choices[0].message.content.strip()
+
+            # 4. 清洗与解析数据
+            # 去除可能存在的 markdown 标记
+            content = content.replace("```json", "").replace("```", "").strip()
+
+            try:
+                data = json.loads(content)
+                # 兼容处理：有时候模型会返回 {"translations": [...]} 有时候直接返回 [...]
+                if isinstance(data, list):
+                    translations = data
+                elif isinstance(data, dict):
+                    # 尝试取字典里的第一个列表值
+                    translations = list(data.values())[0] if data else []
+                else:
+                    translations = []
+
+                # 5. 数量对齐检查
+                # 如果 AI 返回的数量不对，程序后续会崩，所以必须在这里兜底
+                if len(translations) != len(ocr_texts):
+                    print(f"数量不匹配 (发:{len(ocr_texts)} vs 收:{len(translations)})，尝试自动补齐")
+                    if len(translations) < len(ocr_texts):
+                        # 少了就补空
+                        translations.extend([ocr_texts[i] for i in range(len(translations), len(ocr_texts))])
+                    else:
+                        # 多了就截断
+                        translations = translations[:len(ocr_texts)]
+
+                return translations
+
+            except json.JSONDecodeError:
+                print(f"JSON解析失败: {content}")
+                return ocr_texts  # 失败返回原文
+
+        except Exception as e:
+            print(f"PI请求出错: {e}")
+            return ocr_texts
 
     def process_comic_page(self, input_path, output_path):
+        t_name = threading.current_thread().name
+        print(f"{t_name}开始")
         # 1. 读取原始图像 (OpenCV 格式用于裁剪 OCR)
         img_cv = cv2.imread(input_path)
         if img_cv is None:
@@ -356,7 +448,11 @@ class ComicTranslatorPipeline:
 
         # 2. 检测
         boxes = self.detect_bubbles(input_path)
-        print(f"检测到 {len(boxes)} 个气泡")
+        print(f"{t_name}检测到 {len(boxes)} 个气泡")
+
+        # 暂存数据
+        bubble_metadata = []
+        ocr_text_only = []
 
         # 3. OCR 与 翻译 (并行处理数据)
         processed_data = []
@@ -367,16 +463,41 @@ class ComicTranslatorPipeline:
             raw_text = self.run_ocr(img_cv, box, method='manga-ocr')
             if len(raw_text) < 2:
                 raw_text = self.run_ocr(img_cv, box, method='paddle')
-            temp_bubble_path = "temp_bubble.jpg"
-            cv2.imwrite(temp_bubble_path, crop_img)
-            trans_text = self.translate_with_image(raw_text, image_path=temp_bubble_path)
-            
-            processed_data.append({
+            # thread_id = threading.get_ident()
+            # temp_bubble_path = f"page/bubble_page/temp_bubble_{thread_id}.jpg"
+            # cv2.imwrite(temp_bubble_path, crop_img)
+            # trans_text = self.translate_with_image(raw_text, image_path=temp_bubble_path)
+            # #清除临时文件
+            # if os.path.exists(temp_bubble_path):
+            #     os.remove(temp_bubble_path)
+            # processed_data.append({
+            #     "box": box,
+            #     "raw": raw_text,
+            #     "trans": trans_text
+            # })
+            # print(f"   [{i}] 原文: {raw_text} -> 译文: {trans_text}")
+            bubble_metadata.append({
                 "box": box,
-                "raw": raw_text,
+                "raw": raw_text
+            })
+            ocr_text_only.append(raw_text)
+
+        # 批处理阶段
+        print(f"{t_name} 正在批量翻译 {len(ocr_text_only)} 条文本...")
+        # 调用新写的批量函数，传入整页路径 input_path
+        translated_list = self.translate_page_batch(ocr_text_only, input_path)
+        # 重组数据
+        processed_data = []
+        for i, item in enumerate(bubble_metadata):
+            # 从翻译结果列表中取值
+            trans_text = translated_list[i]
+
+            processed_data.append({
+                "box": item['box'],
+                "raw": item['raw'],
                 "trans": trans_text
             })
-            print(f"   [{i}] 原文: {raw_text} -> 译文: {trans_text}")
+            print(f"   [{i}] 原文: {item['raw']} -> 译文: {trans_text}")
 
         # 4. 图像修补 (获得干净的 PIL 画布)
         # 这一步会去除原有文字，生成适合嵌字的底图
@@ -397,29 +518,30 @@ class ComicTranslatorPipeline:
         final_canvas.save(output_path)
         print(f"处理完成！已保存至: {output_path}")
 
-
-def init_worker(base_dir, font_path):
-    global pipeline
-    pipeline = ComicTranslatorPipeline(
-        det_model_path=os.path.join(base_dir, 'models', 'ogkalucomic-speech-bubble-detector-yolov8m',
-                                    'comic-speech-bubble-detector.pt'),
-        font_path=font_path,
-        font_size=20,
-        use_gpu=False
-    )
-# Linux专用模块
-def init_pipeline_linux(base_dir, font_path):
-    global pipeline
-    pipeline = ComicTranslatorPipeline(
-        det_model_path=os.path.join(base_dir, 'models', 'ogkalucomic-speech-bubble-detector-yolov8m',
-                                    'comic-speech-bubble-detector.pt'),
-        font_path=font_path,
-        font_size=20,
-        use_gpu=False
-    )
-def run_worker(user_input, output_name):
-    global pipeline
-    pipeline.process_comic_page(user_input, output_name)
+#使用多核单线程时使用
+# def init_worker(base_dir, font_path):
+#     global pipeline
+#     pipeline = ComicTranslatorPipeline(
+#         det_model_path=os.path.join(base_dir, 'models', 'ogkalucomic-speech-bubble-detector-yolov8m',
+#                                     'comic-speech-bubble-detector.pt'),
+#         font_path=font_path,
+#         font_size=20,
+#         use_gpu=False
+#     )
+# Linux专用模块(多核单线程)
+# def init_pipeline_linux(base_dir, font_path):
+#     global pipeline
+#     pipeline = ComicTranslatorPipeline(
+#         det_model_path=os.path.join(base_dir, 'models', 'ogkalucomic-speech-bubble-detector-yolov8m',
+#                                     'comic-speech-bubble-detector.pt'),
+#         font_path=font_path,
+#         font_size=20,
+#         use_gpu=False
+#     )
+def run_worker_thread(pipeline_instance, user_input, output_name):
+    # 使用多核单线程时使用
+    #global pipeline
+    global_pipeline.process_comic_page(user_input, f"page/test_page_output/{output_name}")
     return f"处理完成: {user_input}"
 
 # 主程序入口
@@ -429,32 +551,43 @@ if __name__ == "__main__":
     try:
         # 初始化管线
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        if os.name == 'posix':
-            init_pipeline_linux(BASE_DIR, FONT_PATH)
-            worker_init_fn = None
-        else:
-            worker_init_fn = partial(init_worker, BASE_DIR, FONT_PATH)
-
-#       max_processes = max(1, (os.cpu_count() or 4) - 1)
-        max_processes = max(1,2)
-        print(f"最大并发数: {max_processes}")
-        with ProcessPoolExecutor(max_workers=max_processes,initializer=worker_init_fn) as executor:
-            print("输入图片路径，按Enter开始处理。输入'exit'退出。")
-            while True:
-                TEST_IMAGE = input("请输入测试图片路径")
+        # 使用多核单线程时使用
+        # if os.name == 'posix':
+        #     init_pipeline_linux(BASE_DIR, FONT_PATH)
+        #     worker_init_fn = None
+        # else:
+        #     worker_init_fn = partial(init_worker, BASE_DIR, FONT_PATH)
+        #max_processes = max(1, (os.cpu_count() or 4) - 1)
+        det_path = os.path.join(BASE_DIR, 'models', 'ogkalucomic-speech-bubble-detector-yolov8m','comic-speech-bubble-detector.pt')
+        print("正在加载模型...")
+        global_pipeline = ComicTranslatorPipeline(
+            det_model_path=det_path,
+            font_path=FONT_PATH,
+            font_size=16,
+            use_gpu=True
+        )
+        # 预热 YOLO 模型
+        # 进行一次空跑
+        dummy_img = np.zeros((640, 640, 3), dtype=np.uint8)
+        # 调用检测器跑一次
+        global_pipeline.detector(dummy_img, verbose=False)
+        max_workers =  int(input("请输入加载图数"))
+        print(f"最大并发数: {max_workers}")
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            print("等待任务...")
+            if input("按任意键继续") == "^*":
+                start1 = time.time()
+            for i in range(1,max_workers+1):
+                the_page = f"page/test_page/test{i}.jpg"
+                TEST_IMAGE = the_page
                 user_input = TEST_IMAGE
-                if user_input.strip().lower() == 'exit':
-                    print("正在等待所有后台进程结束...")
-                    break
-                if not user_input.strip():
-                    continue
                 if not os.path.exists(user_input):
-                    print("文件不存在，请检查路径")
+                    print(f"test{i}.jpg文件不存在，请检查路径")
                     continue
                 # 提交任务
-                base_name = os.path.basename(user_input)
-                output_name = f"translated_{base_name}"
-                executor.submit(run_worker, user_input, output_name)
+                if os.path.exists(user_input):
+                    output_name = f"translated_{os.path.basename(user_input)}"
+                    executor.submit(run_worker_thread,global_pipeline,user_input, output_name)
 
     except Exception as e:
         import traceback

@@ -9,3 +9,4 @@ env/
 .env.local
 nginx/certs/*.key
 nginx/certs/*.pem
+models/manga-ocr-base
