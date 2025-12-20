@@ -1,4 +1,5 @@
 import os
+import math
 import time
 import base64
 import json
@@ -10,6 +11,7 @@ load_dotenv()
 import cv2
 import numpy as np
 import torch
+import torch.nn as nn
 from PIL import Image, ImageDraw, ImageFont
 from openai import OpenAI
 from ultralytics import YOLO
@@ -17,27 +19,122 @@ from manga_ocr import MangaOcr
 from paddleocr import PaddleOCR
 from simple_lama_inpainting import SimpleLama
 from paddle.dataset.movielens import user_info
+from torchvision import models, transforms
+
 #使用多核单线程时使用
 #pipeline = None
 #from functools import partial
+class FontPredictor:
+    def __init__(self, model_path, device='cuda'):
+        self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
+        # 对应训练代码中的 label_map
+        self.class_names = ["radiating", "dialogue", "handwriting","serious"]
 
+        # 重建模型结构 (MobileNetV2 Small)
+        self.model = models.mobilenet_v2(weights=None)
+        # 修改全连接层以匹配 3 个分类
+        in_features = self.model.classifier[1].in_features
+        self.model.classifier[1] = nn.Linear(in_features, 4)
+
+        try:
+            state_dict = torch.load(model_path, map_location=self.device)
+            self.model.load_state_dict(state_dict)
+        except Exception as e:
+            print(f"字体模型加载失败: {e}")
+            import traceback
+            traceback.print_exc()
+
+        self.model.to(self.device).eval()
+
+        # 预处理
+        self.transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
+
+    def predict(self, img_bgr):
+        try:
+            # OpenCV BGR -> PIL RGB
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+            pil_img = Image.fromarray(img_rgb)
+            img_tensor = self.transform(pil_img).unsqueeze(0).to(self.device)
+
+            with torch.no_grad():
+                outputs = self.model(img_tensor)
+                _, preds = torch.max(outputs, 1)
+            return self.class_names[preds.item()]
+        except:
+            return "dialogue"  # 出错默认回退
 # 模块 1: 竖排嵌字器 (Vertical Typesetter)
 class VerticalTypesetter:
-    def __init__(self, font_path, font_size, color=(0, 0, 0)):
-        self.font_path = font_path
+    def __init__(self, font_map, font_size, color=(0, 0, 0)):
+        self.fonts = {}
+        self.font_map = font_map
+        self.font_cache = {}
         self.base_font_size = font_size
         self.color = color
-        
-        # 字体加载容错处理
-        if os.path.exists(font_path):
+
+        # 预加载所有字体
+        # font_map 格式: {'dialogue': 'a.ttf', 'radiating': 'b.ttf', ...}
+        for style, path in font_map.items():
             try:
-                self.font = ImageFont.truetype(font_path, font_size)
-            except Exception as e:
-                print(f"字体文件损坏，回退默认: {e}")
-                self.font = ImageFont.load_default()
-        else:
-            print(f"未找到字体文件: {font_path}，将无法显示中文/日文。请在代码中修改 font_path。")
-            self.font = ImageFont.load_default()
+                self._load_font_to_cache(style, path, font_size)
+                self.fonts[style] = self.font_cache.get((path, font_size))
+            except:
+                print(f"字体加载失败: {path}")
+                self.fonts[style] = ImageFont.load_default()
+
+        # 兼容旧代码引用 self.font 的地方，默认给 dialogue
+        self.default_font = self.fonts.get('dialogue', ImageFont.load_default())
+        # 字体加载容错处理
+        # if os.path.exists(font_path):
+        #     try:
+        #         self.font = ImageFont.truetype(font_path, font_size)
+        #     except Exception as e:
+        #         print(f"字体文件损坏，回退默认: {e}")
+        #         self.font = ImageFont.load_default()
+        # else:
+        #     print(f"未找到字体文件: {font_path}，将无法显示中文/日文。请在代码中修改 font_path。")
+        #     self.font = ImageFont.load_default()
+
+    def _load_font_to_cache(self, style, path, size):
+        key = (path, size)
+        if key not in self.font_cache:
+            try:
+                self.font_cache[key] = ImageFont.truetype(path, size)
+            except:
+                self.font_cache[key] = ImageFont.load_default()
+        return self.font_cache[key]
+
+    def _get_font_object(self, style, size):
+        path = self.font_map.get(style, self.font_map.get('dialogue'))
+        if path:
+            return self._load_font_to_cache(style, path, size)
+        return ImageFont.load_default()
+
+    def _calculate_layout_fast(self, text, font, box_h, line_spacing=4):
+        lines_structure = []  # 只存每行有几个字，不存具体字符串
+        current_line_count = 0
+        current_height = 0
+
+        for char in text:
+            w, h = self._get_char_size(char, font)
+            if current_height + h > box_h:
+                if current_line_count > 0: lines_structure.append(current_line_count)
+                current_line_count = 1
+                current_height = h + line_spacing
+            else:
+                current_line_count += 1
+                current_height += h + line_spacing
+
+        if current_line_count > 0: lines_structure.append(current_line_count)
+        if not lines_structure: return False, 0, [], 0
+
+        sample_w, _ = self._get_char_size("国", font)
+        col_spacing = int(sample_w * 0.2)
+        total_width = len(lines_structure) * sample_w + (len(lines_structure) - 1) * col_spacing
+        return True, total_width, lines_structure, col_spacing
 
     def _is_punctuation_to_rotate(self, char):
         """判断是否需要旋转的标点符号"""
@@ -74,88 +171,179 @@ class VerticalTypesetter:
             lines.append(current_line)
         return lines
 
-    def draw_text(self, image, box, text):
-        """执行竖排绘制"""
-        x1, y1, x2, y2 = map(int, box) # 确保坐标是整数
-        box_width = x2 - x1
-        box_height = y2 - y1
-        
-        # 简单的字号自适应：如果框特别小，稍微缩小字体
-        # 实际生产中可能需要更复杂的二分法查找最佳字号
-        current_font = self.font
-        if box_width < self.base_font_size * 2:
-            try:
-                new_size = max(12, box_width // 2)
-                current_font = ImageFont.truetype(self.font_path, new_size)
-            except:
-                pass
+    def draw_text(self, image, box, text, style='dialogue',mask=None):
+        """执行竖排绘制 (使用绝对居中算法 anchor='mm')"""
+        try:
+            x1, y1, x2, y2 = map(int, box)
 
-        # 1. 文本清洗与分列
-        clean_text = text.replace('\n', '') # 去除OCR带来的换行符
-        columns = self.wrap_text_vertical(clean_text, box_height, current_font)
-        
-        if not columns:
+            scale_ratio = 0.6
+
+            GLOBAL_OFFSET_X = -6  # 正数向右，负数向左
+            GLOBAL_OFFSET_Y = 16  # 正数向下，负数向上
+
+            raw_width = x2 - x1
+            raw_height = y2 - y1
+            box_width = int(raw_width * scale_ratio)
+            box_height = int(raw_height * scale_ratio)
+
+            # 气泡几何中心点
+            center_x = x1 + raw_width // 2
+
+            base_font = self.fonts.get(style, self.fonts.get('dialogue'))
+            current_font = base_font
+
+            # 简单的字号预处理
+            if box_width < self.base_font_size * 2:
+                try:
+                    new_size = max(12, box_width // 2)
+                    font_path = self.font_map.get(style, self.font_map.get('dialogue'))
+                    if font_path:
+                        current_font = ImageFont.truetype(font_path, new_size)
+                except:
+                    pass
+
+            clean_text = text.replace('\n', '')
+            available_area = 0
+            if mask is not None:
+                try:
+                    # 1. 裁剪出当前气泡区域的 mask
+                    crop_box = (x1, y1, x2, y2)
+                    bubble_mask = mask.crop(crop_box)
+                    # 2. 统计非零(白色)像素数量
+                    # 稍微缩小一点范围以模拟 padding (比如只统计 80% 的像素)
+                    import numpy as np
+                    mask_arr = np.array(bubble_mask)
+                    # 统计值 > 0 的像素点个数
+                    pixel_count = np.count_nonzero(mask_arr)
+                    available_area = pixel_count * 0.7
+                except Exception as e:
+                    print(f"Mask 计算失败: {e}")
+                    available_area = 0
+            if available_area == 0:
+                available_area = (box_width * box_height)
+            columns = self.wrap_text_vertical(clean_text, box_height, current_font)
+            if not columns: return image
+            # 智能寻找最佳字号
+            try:
+                import math
+                # 原公式: box_width * box_height
+                estimated_size = int(math.sqrt(available_area / (len(clean_text) + 1) / 1.3))
+
+                # 限制最大字号 (不能超过盒子宽度的 80%)
+                max_allowed_size = min(box_width, box_height)
+                start_size = min(max_allowed_size, max(12, estimated_size + 4))
+            except:
+                start_size = 24
+
+            best_size = 12
+            best_lines_struct = []
+            best_col_spacing = 5
+
+            for size in range(start_size, 11, -2):
+                font = self._get_font_object(style, size)
+                valid, layout_w, lines_struct, col_sp = self._calculate_layout_fast(clean_text, font, box_height)
+
+                if valid and layout_w <= box_width:
+                    best_size = size
+                    best_lines_struct = lines_struct
+                    best_col_spacing = col_sp
+                    current_font = font
+                    break
+
+            if current_font is None:
+                current_font = self._get_font_object(style, 12)
+                _, _, best_lines_struct, best_col_spacing = self._calculate_layout_fast(clean_text, current_font,box_height)
+            # 还原文本列表
+            columns = []
+            char_ptr = 0
+            for count in best_lines_struct:
+                columns.append(clean_text[char_ptr: char_ptr + count])
+                char_ptr += count
+            if not columns:
+                return image
+            draw = ImageDraw.Draw(image)
+
+            # 获取标准字宽 (作为格子的宽度)
+            sample_w, _ = self._get_char_size("国", current_font)
+
+            # 计算整个文本块的总宽度
+            total_text_width = len(columns) * sample_w + (len(columns) - 1) * best_col_spacing
+
+            # B. 计算第一列（最右边那一列）的中心 X 坐标
+            # 逻辑：盒子中心 + (总宽的一半) - (半个字宽)
+            # 这样保证整个文本块是关于 center_x 对称的
+            current_col_center_x = center_x + (total_text_width // 2) - (sample_w // 2)
+
+            for col_text in columns:
+                # 计算该列总高
+                col_height = 0
+                for char in col_text:
+                    _, h = self._get_char_size(char, current_font)
+                    col_height += h
+                col_height += (len(col_text) - 1) * 2  # 行内字间距
+
+                # 计算该列起始 Y (垂直居中)
+                start_y = y1 + (box_height - col_height) // 2
+                current_y = start_y
+
+                for char in col_text:
+                    w, h = self._get_char_size(char, current_font)
+
+                    # === [重点] 计算“字心”坐标 ===
+                    # 目标 X = 当前列的中心线
+                    # 目标 Y = 当前高度 + 半个字高
+                    target_center_x = int(current_col_center_x) + GLOBAL_OFFSET_X
+                    target_center_y = int(current_y + h // 2) + GLOBAL_OFFSET_Y
+
+                    if self._is_punctuation_to_rotate(char):
+                        # 标点旋转处理
+                        temp_size = max(sample_w, h) * 2
+                        txt_img = Image.new('RGBA', (temp_size, temp_size), (255, 255, 255, 0))
+                        d = ImageDraw.Draw(txt_img)
+                        # 在小画布里也是用 mm 居中
+                        d.text((temp_size / 2, temp_size / 2), char, font=current_font, fill=self.color, anchor='mm')
+                        rotated_txt = txt_img.rotate(-90, expand=False, resample=Image.BICUBIC)
+
+                        # 粘贴到绝对中心 (paste 需要左上角坐标，所以减去半径)
+                        paste_x = target_center_x - temp_size // 2
+                        paste_y = target_center_y - temp_size // 2
+                        image.paste(rotated_txt, (paste_x, paste_y), rotated_txt)
+                    else:
+                        # 普通文字：直接使用 anchor='mm' 让 Python 帮你对齐
+                        draw.text(
+                            (target_center_x, target_center_y),
+                            char,
+                            font=current_font,
+                            fill=self.color,
+                            anchor='mm',
+                            stroke_width=1,
+                            stroke_fill='white'  # 和fill颜色一致就是"加粗"，改成 "white" 就是"白边"
+                        )
+
+                    current_y += h + 2  # 移动到下一个字的顶部
+
+                # 移到下一列 (向左移动一个标准字宽 + 间距)
+                current_col_center_x -= (sample_w + best_col_spacing)
+
+            # 调试框 (取消注释可查看排版范围)
+            # draw.rectangle(box, outline="red", width=3)
+            # draw.line([(center_x, y1), (center_x, y2)], fill="blue", width=2)
+
             return image
 
-        # 2. 计算整体布局 (用于水平居中)
-        char_w_sample, _ = self._get_char_size("国", current_font)
-        col_spacing = 5
-        total_text_width = len(columns) * char_w_sample + (len(columns) - 1) * col_spacing
-        
-        # 3. 计算起始 X (居中逻辑)
-        center_x = x1 + box_width // 2
-        # 竖排是从右向左，起始点是最右侧那一列的左边
-        start_x = center_x + total_text_width // 2 - char_w_sample
-        
-        draw = ImageDraw.Draw(image)
-        current_x = start_x
-        
-        # 4. 逐列绘制
-        for col_text in columns:
-            # 计算该列总高 (用于垂直居中)
-            col_height = 0
-            for char in col_text:
-                _, h = self._get_char_size(char, current_font)
-                col_height += h
-            col_height += (len(col_text) - 1) * 2 # 字间距
-            
-            start_y = y1 + (box_height - col_height) // 2
-            current_y = start_y
-            
-            for char in col_text:
-                w, h = self._get_char_size(char, current_font)
-                
-                if self._is_punctuation_to_rotate(char):
-                    # 标点旋转处理
-                    temp_size = max(w, h) * 2
-                    # 使用 RGBA 创建透明画布
-                    txt_img = Image.new('RGBA', (temp_size, temp_size), (255, 255, 255, 0))
-                    d = ImageDraw.Draw(txt_img)
-                    d.text(((temp_size-w)/2, (temp_size-h)/2), char, font=current_font, fill=self.color)
-                    rotated_txt = txt_img.rotate(-90, expand=False, resample=Image.BICUBIC)
-                    
-                    paste_x = int(current_x + (char_w_sample - temp_size) / 2)
-                    paste_y = int(current_y + (h - temp_size) / 2)
-                    
-                    # 使用 alpha_composite 或 paste(mask=) 进行透明混合
-                    image.paste(rotated_txt, (paste_x, paste_y), rotated_txt)
-                else:
-                    # 普通文字
-                    offset_x = (char_w_sample - w) // 2
-                    draw.text((current_x + offset_x, current_y), char, font=current_font, fill=self.color)
-                
-                current_y += h + 2 # 字间距
-            
-            current_x -= (char_w_sample + col_spacing) # 向左移动
-            
-        return image
+        except Exception as e:
+            import traceback
+            print(f"【严重错误】draw_text 崩溃: {e}")
+            traceback.print_exc()
+            return image
 
 # 模块 2: 漫画处理管线 (Comic Pipeline)
 class ComicTranslatorPipeline:
     def __init__(self, 
                  det_model_path,
-                 font_path, #这里必须指定你的字体文件路径
+                 font_map, #这里必须指定你的字体文件路径
                  font_size,
+                 cls_model_path,
                  use_gpu):
         self.device = 'cuda' if torch.cuda.is_available() and use_gpu else 'cpu'
         print("初始化管线")
@@ -182,7 +370,13 @@ class ComicTranslatorPipeline:
         
         # 4. 嵌字器
         print("初始化嵌字器")
-        self.typesetter = VerticalTypesetter(font_path, font_size)
+        self.typesetter = VerticalTypesetter(font_map, font_size)
+        print("成功！")
+
+        # 5. 字体分类器
+        print("初始化字体分类器器")
+        self.font_classifier = FontPredictor(cls_model_path, device=self.device)
+        self.typesetter = VerticalTypesetter(font_map, font_size)
         print("成功！")
 
         # 线程锁
@@ -222,7 +416,6 @@ class ComicTranslatorPipeline:
                 return "".join([line[1][0] for line in result[0]])
         return ""
 
-    #气泡背景判断函数，决定是否调用lama模型进行背景填充
     def is_simple_bubble(self, roi_img):
         #判断是否存在气泡
         if roi_img is None or roi_img.size == 0:
@@ -246,10 +439,12 @@ class ComicTranslatorPipeline:
         h,w = img_cv.shape[:2]
         #记录ai需要修复的区域
         lama_mask = np.zeros((h, w), dtype=np.uint8)
+        # 排版掩膜
+        full_layout_mask = np.zeros((h, w), dtype=np.uint8)
         #用来判断是否存在需要模型的区域
         needs_ai_inpainting = False
         for (x1, y1, x2, y2) in boxes:
-            paddle = 2
+            paddle = 1
             safe_x1 = max(0, x1 - paddle)
             safe_y1 = max(0, y1 - paddle)
             safe_x2 = min(w, x2 + paddle)
@@ -283,12 +478,18 @@ class ComicTranslatorPipeline:
                     continue
                 # 去除微小噪点
                 if area < 5:
-                    continue
+                     continue
                 # 将通过筛选的画到mask上
                 text_mask[labels == i] = 255
+
             #只对筛选后的文字进行膨胀
             kernel = np.ones((2, 2), np.uint8)
             text_mask_dilated = cv2.dilate(text_mask, kernel, iterations=1)
+
+            layout_kernel = np.ones((5, 5), np.uint8)
+            layout_mask_roi = cv2.dilate(text_mask, layout_kernel, iterations=3)
+            full_layout_mask[safe_y1:safe_y2, safe_x1:safe_x2] = layout_mask_roi
+            self.current_mask_image = Image.fromarray(full_layout_mask)
 
             #分流处理
             if self.is_simple_bubble(roi_img):
@@ -310,48 +511,6 @@ class ComicTranslatorPipeline:
             print("无复杂背景，已全部处理")
         return img_pil_final
 
-    # def translate_with_image(self, text,image_path):
-    #     """翻译接口"""
-    #     #改为中转模式
-    #     BASE_URL = "http://43.133.176.18:8000/v1"
-    #     API_KEY = os.getenv("API_KEY")
-    #     if not text.strip(): return ""
-    #     client = OpenAI(
-    #         api_key=API_KEY,
-    #         base_url=BASE_URL
-    #     )
-    #     # 构造Prompt：
-    #     system_prompt = """
-    #     你是一位专业的日漫汉化组翻译，结合文字
-    #     请将用户的日文文本翻译成地流畅的中文。
-    #     要求：
-    #     1. 保持二次元口语风格，不要过度本土化！保持日漫汉化的习惯！不要翻译腔
-    #     2. 如果遇到拟声词，请根据语境意译或保留
-    #     3. 直接输出翻译后的内容，不要加引号，不要带任何解释，不要最后一句末尾的句号
-    #     4. 姓名输出不要为罗马音
-    #     """
-    #
-    #     try:
-    #         with open(image_path, "rb") as image_file:
-    #             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-    #         response = client.chat.completions.create(
-    #             model="gemini-2.5-flash",
-    #             messages=[
-    #                 {"role": "system","content": f"{system_prompt}"},
-    #                 {"role": "user",
-    #                     "content": [
-    #                         {"type": "text", "text": f"原文OCR参考：{text}"},
-    #                         {"type": "image_url","image_url":
-    #                             {"url": f"data:image/jpeg;base64,{base64_image}"}
-    #                          }
-    #                     ]
-    #                 }
-    #             ]
-    #         )
-    #         return response.choices[0].message.content.strip()
-    #     except Exception as a:
-    #         print(f"翻译出错{a}")
-    #     return f"{text}"
     def translate_page_batch(self, ocr_texts, image_path):
         # 0. 边界检查：如果这页没字，直接返回空
         if not ocr_texts: return []
@@ -373,9 +532,10 @@ class ComicTranslatorPipeline:
         1. 必须返回一个纯 JSON 字符串数组，格式如：["翻译1", "翻译2", "翻译3"]
         2. 数组中的元素数量、顺序必须与输入的 OCR 文本列表完全一致。
         3. 如果某行 OCR 是乱码或无需翻译，请在对应位置填入空字符串 "" 或原样保留，不要跳过。
-        4. 保持二次元口语风格，不要翻译腔。
+        4. 保持二次元口语风格，不要翻译腔，但是返回的语句需要符合中文的语序
         5. 不要使用 Markdown 格式（如 ```json），直接返回数组字符串。
         6. 最后一句句尾不要带句号
+        7. 名字不要罗马音，特定名字使用其中文译名
         """
 
         user_prompt = f"请按顺序翻译以下 {len(ocr_texts)} 条日文文本：\n{text_list_str}"
@@ -459,6 +619,7 @@ class ComicTranslatorPipeline:
         for i, box in enumerate(boxes):
             x1, y1, x2, y2 = map(int, box)
             crop_img = img_cv[y1:y2, x1:x2]
+            font_style = self.font_classifier.predict(crop_img)
             # 先用 manga-ocr，如果太短或失败则用 paddle
             raw_text = self.run_ocr(img_cv, box, method='manga-ocr')
             if len(raw_text) < 2:
@@ -478,7 +639,8 @@ class ComicTranslatorPipeline:
             # print(f"   [{i}] 原文: {raw_text} -> 译文: {trans_text}")
             bubble_metadata.append({
                 "box": box,
-                "raw": raw_text
+                "raw": raw_text,
+                "style": font_style
             })
             ocr_text_only.append(raw_text)
 
@@ -495,6 +657,7 @@ class ComicTranslatorPipeline:
             processed_data.append({
                 "box": item['box'],
                 "raw": item['raw'],
+                "style": item['style'],
                 "trans": trans_text
             })
             print(f"   [{i}] 原文: {item['raw']} -> 译文: {trans_text}")
@@ -504,19 +667,39 @@ class ComicTranslatorPipeline:
         final_canvas = self.inpaint_bubbles(input_path, boxes)
 
         # 5. 嵌字 (Typesetting)
-        print("正在进行竖排嵌字...")
         for item in processed_data:
             if item['trans']:
-                # 在干净的画布上绘制
-                final_canvas = self.typesetter.draw_text(
-                    final_canvas, 
-                    item['box'], 
-                    item['trans']
-                )
+                try:
+                    final_canvas = self.typesetter.draw_text(
+                        final_canvas,
+                        item['box'],
+                        item['trans'],
+                        mask=self.current_mask_image
+                    )
 
-        # 6. 保存
+                except Exception as e:
+                    import traceback
+                    print(f"无法执行 draw_text，原因: {e}")
+                    traceback.print_exc()
+
+        # 保存逻辑
+        print("[DEBUG] 正在保存图片...")
         final_canvas.save(output_path)
-        print(f"处理完成！已保存至: {output_path}")
+        print(f"[DEBUG] 处理结束，保存至: {output_path}")
+        # print("正在进行竖排嵌字...")
+        # for item in processed_data:
+        #     if item['trans']:
+        #         # 在干净的画布上绘制
+        #         final_canvas = self.typesetter.draw_text(
+        #             final_canvas,
+        #             item['box'],
+        #             item['trans'],
+        #             mask=self.current_mask_image
+        #         )
+        #
+        # # 6. 保存
+        # final_canvas.save(output_path)
+        # print(f"处理完成！已保存至: {output_path}")
 
 #使用多核单线程时使用
 # def init_worker(base_dir, font_path):
@@ -547,7 +730,13 @@ def run_worker_thread(pipeline_instance, user_input, output_name):
 # 主程序入口
 if __name__ == "__main__":
     # 字体
-    FONT_PATH = "./font_file/font.ttf"
+    FONT_MAP = {
+        "dialogue": "./font_file/CN/SourceHanSerifCN-Regular-1.otf",# 1.  正常对话 (宋体)
+        "radiating": "./font_file/CN/SourceHanSansSC-Heavy-2.otf",  # 0.  喊叫/冲击 (黑体)
+        "handwriting": "./font_file/CN/setofont.ttf",               # 2.  心理/手写 (娃娃体)
+        "serious": "./font_file/CN/SourceHanSansSC-Medium-2.otf"    # 3 . 严肃
+    }
+
     try:
         # 初始化管线
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -559,11 +748,13 @@ if __name__ == "__main__":
         #     worker_init_fn = partial(init_worker, BASE_DIR, FONT_PATH)
         #max_processes = max(1, (os.cpu_count() or 4) - 1)
         det_path = os.path.join(BASE_DIR, 'models', 'ogkalucomic-speech-bubble-detector-yolov8m','comic-speech-bubble-detector.pt')
+        cls_model = os.path.join(BASE_DIR,'models', 'manga-font-mobilnet', 'manga_font_mobilnet.pth')
         print("正在加载模型...")
         global_pipeline = ComicTranslatorPipeline(
             det_model_path=det_path,
-            font_path=FONT_PATH,
+            font_map=FONT_MAP,
             font_size=16,
+            cls_model_path=cls_model,
             use_gpu=True
         )
         # 预热 YOLO 模型
@@ -571,13 +762,13 @@ if __name__ == "__main__":
         dummy_img = np.zeros((640, 640, 3), dtype=np.uint8)
         # 调用检测器跑一次
         global_pipeline.detector(dummy_img, verbose=False)
-        max_workers =  int(input("请输入加载图数"))
+        max_workers =  1 #int(input("请输入加载图数"))
         print(f"最大并发数: {max_workers}")
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             print("等待任务...")
-            if input("按任意键继续") == "^*":
-                start1 = time.time()
-            for i in range(1,max_workers+1):
+            #if input("按任意键继续") == "^*":
+            #    start1 = time.time()
+            for i in [9]: #range(1,max_workers+1):
                 the_page = f"page/test_page/test{i}.jpg"
                 TEST_IMAGE = the_page
                 user_input = TEST_IMAGE
