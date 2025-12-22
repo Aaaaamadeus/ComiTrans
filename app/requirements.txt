@@ -5,10 +5,11 @@ Pillow
 torch
 torchvision
 paddlepaddle
-paddleocr
 ultralytics
-simple-lama-inpainting
 requests
 manga-ocr
 openai
 python-dotenv
+comic-text-detector
+#simple-lama-inpainting
+#paddleocr
