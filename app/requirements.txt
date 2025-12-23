@@ -10,6 +10,6 @@ requests
 manga-ocr
 openai
 python-dotenv
-comic-text-detector
+shapely
 #simple-lama-inpainting
 #paddleocr

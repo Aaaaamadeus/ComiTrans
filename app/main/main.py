@@ -55,10 +55,11 @@ if __name__ == "__main__":
         "dialogue": "../font_file/CN/SourceHanSerifCN-Regular-1.otf",
         "radiating": "../font_file/CN/SourceHanSansSC-Heavy-2.otf",
         "handwriting": "../font_file/CN/setofont.ttf",
-        "serious": "./font_file/CN/SourceHanSansSC-Medium-2.otf"
+        "serious": "../font_file/CN/SourceHanSansSC-Medium-2.otf"
     }
     lama_path = os.path.join(BASE_DIR,'..' ,'models' ,'manga-lama', 'manga-lama.pt')
-    det_path  = os.path.join(BASE_DIR,'..' ,'models' ,'ogkalucomic-speech-bubble-detector-yolov8m','comic-speech-bubble-detector.pt')
+    det_path  = os.path.join(BASE_DIR,'..' ,'models' ,'text_detector','comictextdetector.pt')
+    # det_path  = os.path.join(BASE_DIR,'..' ,'models' ,'ogkalucomic-speech-bubble-detector-yolov8m','comic-speech-bubble-detector.pt')
     cls_model = os.path.join(BASE_DIR,'..' ,'models' ,'manga-font-mobilnet', 'manga_font_mobilnet.pth')
     current_os = platform.system()
     print(f"检测到操作系统: {current_os}")
@@ -68,7 +69,7 @@ if __name__ == "__main__":
     worker_func = None
 
     if current_os == 'Linux':
-        print(">>> 启用 Linux 高效模式 (Fork + CPU)")
+        print(">>> Linux 高效模式 (Fork + CPU)")
         try:
             multiprocessing.set_start_method('fork', force=True)
         except RuntimeError:
