@@ -55,7 +55,7 @@ if __name__ == "__main__":
         "dialogue": "../font_file/CN/SourceHanSerifCN-Regular-1.otf",
         "radiating": "../font_file/CN/SourceHanSansSC-Heavy-2.otf",
         "handwriting": "../font_file/CN/setofont.ttf",
-        "serious": "./font_file/CN/SourceHanSansSC-Medium-2.otf"
+        "serious": "../font_file/CN/SourceHanSansSC-Medium-2.otf"
     }
     lama_path = os.path.join(BASE_DIR,'..' ,'models' ,'manga-lama', 'manga-lama.pt')
     det_path  = os.path.join(BASE_DIR,'..' ,'models' ,'ogkalucomic-speech-bubble-detector-yolov8m','comic-speech-bubble-detector.pt')
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     worker_func = None
 
     if current_os == 'Linux':
-        print(">>> 启用 Linux 高效模式 (Fork + CPU)")
+        print(">>> Linux 高效模式 (Fork + CPU)")
         try:
             multiprocessing.set_start_method('fork', force=True)
         except RuntimeError:
@@ -104,7 +104,7 @@ if __name__ == "__main__":
             if user_cmd.lower() == 'n': break
             print("等待任务...")
             futures = []
-            target_indices = [7]
+            target_indices = [111]
             for i in target_indices:
                 user_input = f"../page/test_page/test{i}.jpg"
 

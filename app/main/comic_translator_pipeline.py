@@ -214,7 +214,7 @@ class ComicTranslatorPipeline:
                 base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
             response = client.chat.completions.create(
-                model="gemini-2.5-flash",
+                model="gemini-3.0-flash",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user",
