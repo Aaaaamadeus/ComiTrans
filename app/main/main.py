@@ -58,7 +58,8 @@ if __name__ == "__main__":
         "serious": "../font_file/CN/SourceHanSansSC-Medium-2.otf"
     }
     lama_path = os.path.join(BASE_DIR,'..' ,'models' ,'manga-lama', 'manga-lama.pt')
-    det_path  = os.path.join(BASE_DIR,'..' ,'models' ,'ogkalucomic-speech-bubble-detector-yolov8m','comic-speech-bubble-detector.pt')
+    det_path  = os.path.join(BASE_DIR,'..' ,'models' ,'text_detector','comictextdetector.pt')
+    # det_path  = os.path.join(BASE_DIR,'..' ,'models' ,'ogkalucomic-speech-bubble-detector-yolov8m','comic-speech-bubble-detector.pt')
     cls_model = os.path.join(BASE_DIR,'..' ,'models' ,'manga-font-mobilnet', 'manga_font_mobilnet.pth')
     current_os = platform.system()
     print(f"检测到操作系统: {current_os}")
@@ -104,7 +105,7 @@ if __name__ == "__main__":
             if user_cmd.lower() == 'n': break
             print("等待任务...")
             futures = []
-            target_indices = [111]
+            target_indices = [7]
             for i in target_indices:
                 user_input = f"../page/test_page/test{i}.jpg"
 

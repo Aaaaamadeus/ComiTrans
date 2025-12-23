@@ -42,10 +42,10 @@ class VerticalTypesetter:
     def _calculate_layout_fast(self, text, font, limit, is_horizontal=False, spacing=None):
         if spacing is None:
             # 动态间距：字号的 25% (最小 2px)
-            spacing = max(2, int(font.size * 0.25))
+            spacing = max(1, int(font.size * 0.1))
 
         lines_struct = []
-        layout_size = 0  # 竖排时指总宽，横排时指总高
+        layout_size = 0
 
         if not is_horizontal:
             lines_struct = self.wrap_text_vertical(text, limit, font)
@@ -166,12 +166,12 @@ class VerticalTypesetter:
     def draw_text(self, image, box, text, style='dialogue', mask=None):
         """执行竖排绘制 (使用绝对居中算法 anchor='mm')"""
         try:
-            x1, y1, x2, y2 = map(int, box)
+            x1, y1, x2, y2 = map(int, box[:4])
 
-            scale_ratio = 0.6
+            scale_ratio = 0.95
 
-            GLOBAL_OFFSET_X = -5  # 正数向右，负数向左
-            GLOBAL_OFFSET_Y = 8   # 正数向下，负数向上
+            GLOBAL_OFFSET_X = 0   # 正数向右，负数向左
+            GLOBAL_OFFSET_Y = 5   # 正数向下，负数向上
 
             raw_width = x2 - x1
             raw_height = y2 - y1
@@ -204,7 +204,8 @@ class VerticalTypesetter:
                     mask_arr = np.array(bubble_mask)
                     # 统计值 > 0 的像素点个数
                     pixel_count = np.count_nonzero(mask_arr)
-                    available_area = pixel_count * 0.7
+                    # available_area = pixel_count * 0.7
+                    available_area = pixel_count * 0.9
                 except Exception as e:
                     print(f"Mask 计算失败: {e}")
                     available_area = 0
@@ -219,9 +220,11 @@ class VerticalTypesetter:
 
             # 智能预估起点
             try:
-                estimated_size = int(math.sqrt(available_area / (len(clean_text) + 1) / 1.3))
-                max_allowed_size = min(box_width, box_height)
-                upper_bound = min(max_allowed_size, max(12, estimated_size + 10))
+                # estimated_size = int(math.sqrt(available_area / (len(clean_text) + 1) / 1.3))
+                # max_allowed_size = min(box_width, box_height)
+                # upper_bound = min(max_allowed_size, max(12, estimated_size + 10))
+                upper_bound = max_allowed_size
+                upper_bound = min(max_allowed_size, max(12, estimated_size * 2))
                 lower_bound = 12
             except:
                 upper_bound = 24
@@ -266,12 +269,6 @@ class VerticalTypesetter:
                 _, _, best_lines_struct, best_col_spacing = self._calculate_layout_fast(
                     clean_text, current_font, constraint_limit, is_horizontal=is_horizontal
                 )
-            # 还原文本列表
-            # columns = []
-            # char_ptr = 0
-            # for count in best_lines_struct:
-            #     columns.append(clean_text[char_ptr: char_ptr + count])
-            #     char_ptr += count
             columns = best_lines_struct
             if not columns:
                 return image
@@ -285,39 +282,29 @@ class VerticalTypesetter:
             # 计算整个文本块的总宽度
             total_text_width = len(columns) * sample_w + (len(columns) - 1) * best_col_spacing
 
-            # B. 计算第一列（最右边那一列）的中心 X 坐标
-            # 逻辑：盒子中心 + (总宽的一半) - (半个字宽)
-            # 这样保证整个文本块是关于 center_x 对称的
             current_col_center_x = center_x + (total_text_width // 2) - (sample_w // 2)
 
             if is_horizontal:
-                # === 新增：横排渲染逻辑 ===
-                # 1. 计算文本块总高度
+
                 total_height = len(columns) * sample_h + (len(columns) - 1) * best_col_spacing
 
-                # 2. 计算第一行的中心 Y 坐标 (垂直居中)
-                # 逻辑：盒子中心Y - 半个总高 + 半个字高
                 center_y = (y1 + y2) // 2  # 或者 box[1] + box[3] // 2
                 current_row_center_y = center_y - (total_height // 2) + (sample_h // 2)
 
                 for row_text in columns:
-                    # 3. 计算当前行的总宽 (用于水平居中)
                     row_width = 0
                     for char in row_text:
                         w, _ = self._get_char_size(char, current_font)
                         row_width += w
 
-                    # 4. 计算当前行的起始 X (水平居中)
                     current_x = center_x - (row_width // 2)
 
                     for char in row_text:
                         w, h = self._get_char_size(char, current_font)
 
-                        # 目标坐标 (anchor='mm')
                         target_center_x = int(current_x + w // 2) + GLOBAL_OFFSET_X
                         target_center_y = int(current_row_center_y) + GLOBAL_OFFSET_Y
 
-                        # 横排直接绘制，无需旋转
                         draw.text(
                             (target_center_x, target_center_y),
                             char,
@@ -329,7 +316,6 @@ class VerticalTypesetter:
                         )
                         current_x += w  # 指针右移
 
-                    # 移到下一行 (下移一个字高 + 间距)
                     current_row_center_y += (sample_h + best_col_spacing)
 
             else:

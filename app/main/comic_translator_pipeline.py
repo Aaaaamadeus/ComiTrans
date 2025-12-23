@@ -1,5 +1,6 @@
 import os
 import base64
+import sys
 import json
 import threading
 import cv2
@@ -7,12 +8,17 @@ import numpy as np
 import torch
 from PIL import Image
 from openai import OpenAI
-from ultralytics import YOLO
+# from ultralytics import YOLO
 from manga_ocr import MangaOcr
 from loguru import logger
 from manga_lama import MangaLama
-from font_predictor import FontPredictor
+# from font_predictor import FontPredictor
 from vertical_typesetter import VerticalTypesetter
+current_dir = os.path.dirname(os.path.abspath(__file__))
+detector_lib_path = os.path.join(current_dir, 'comic_text_detector')
+sys.path.append(detector_lib_path)
+from inference import TextDetector
+
 
 class ComicTranslatorPipeline:
     def __init__(self,
@@ -25,9 +31,11 @@ class ComicTranslatorPipeline:
         self.device = 'cuda' if torch.cuda.is_available() and use_gpu else 'cpu'
         print("初始化管线")
 
-        # 1. 气泡检测
-        print("加载 YOLOv8 检测模型...")
-        self.detector = YOLO(det_model_path)
+        # # 1. 气泡检测
+        # print("加载 YOLOv8 检测模型...")
+        # self.detector = YOLO(det_model_path)
+        print(f"加载 Comic Text Detector...")
+        self.detector = TextDetector(model_path=det_model_path, input_size=1024, device=self.device, act="default")
 
         # 2. OCR 模型
         print("加载 Manga-OCR...")
@@ -42,28 +50,49 @@ class ComicTranslatorPipeline:
         print("初始化嵌字器")
         self.typesetter = VerticalTypesetter(font_map, font_size)
 
-        # 5. 字体分类器
-        print("初始化字体分类器")
-        self.font_classifier = FontPredictor(cls_model_path, device=self.device)
-        self.typesetter = VerticalTypesetter(font_map, font_size)
+        # # 5. 字体分类器
+        # print("初始化字体分类器")
+        # self.font_classifier = FontPredictor(cls_model_path, device=self.device)
+        # self.typesetter = VerticalTypesetter(font_map, font_size)
 
         # 线程锁
         self.lock = threading.Lock()
 
     def detect_bubbles(self, image_path):
-        """YOLOv8 检测"""
         print(f"检测气泡中")
-        results = self.detector(image_path, device=self.device)
+        # results = self.detector(image_path, device=self.device)
+        # bubbles = []
+        # for result in results:
+        #     boxes = result.boxes.xyxy.cpu().numpy()
+        #     for box in boxes:
+        #         bubbles.append(tuple(map(int, box)))  # 转换为整数元组
+        _, _, text_lines = self.detector(image_path)
+
         bubbles = []
-        for result in results:
-            boxes = result.boxes.xyxy.cpu().numpy()
-            for box in boxes:
-                bubbles.append(tuple(map(int, box)))  # 转换为整数元组
+        for line in text_lines:
+            # 1. 坐标提取：直接使用 xyxy
+            # 根据列表，xyxy 已经包含了你需要的 [x1, y1, x2, y2]
+            box = line.xyxy
+
+            # 2. 类型提取：列表中没有 mask_type，我们使用 vertical (横排/竖排)
+            # 如果后续逻辑必须叫 mask_type，我们在这里做一个转换
+            # 通常 0 代表横排，1 代表竖排
+            mask_type = 1 if getattr(line, 'vertical', False) else 0
+
+            # 3. 按照你需要的格式存入 (确保转换为整数防止 OpenCV 报错)
+            bubbles.append((
+                int(box[0]),
+                int(box[1]),
+                int(box[2]),
+                int(box[3]),
+                mask_type
+            ))
+
         return bubbles
 
     def run_ocr(self, img_array, box, method):
         """OCR 识别"""
-        x1, y1, x2, y2 = box
+        x1, y1, x2, y2, *_ = box
         h, w, _ = img_array.shape
         # 边界保护
         x1, y1 = max(0, x1), max(0, y1)
@@ -111,7 +140,8 @@ class ComicTranslatorPipeline:
         full_layout_mask = np.zeros((h, w), dtype=np.uint8)
         # 用来判断是否存在需要模型的区域
         needs_ai_inpainting = False
-        for (x1, y1, x2, y2) in boxes:
+        for data in boxes:
+            x1, y1, x2, y2 = data[:4]
             paddle = 2
             safe_x1 = max(0, x1 - paddle)
             safe_y1 = max(0, y1 - paddle)
@@ -214,7 +244,7 @@ class ComicTranslatorPipeline:
                 base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
             response = client.chat.completions.create(
-                model="gemini-3.0-flash",
+                model="gemini-2.5-flash",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user",
@@ -274,8 +304,10 @@ class ComicTranslatorPipeline:
             raise FileNotFoundError(f"无法读取文件: {input_path}")
 
         # 2.检测
-        boxes = self.detect_bubbles(input_path)
-        print(f"检测到{len(boxes)}个气泡")
+        # boxes = self.detect_bubbles(input_path)
+        # print(f"检测到{len(boxes)}个气泡")
+        bubbles_data = self.detect_bubbles(input_path)
+        print(f"检测到 {len(bubbles_data)} 个气泡")
 
         # 暂存数据
         bubble_metadata = []
@@ -283,10 +315,14 @@ class ComicTranslatorPipeline:
 
         # 3.OCR 与 翻译 (并行处理数据)
         processed_data = []
-        for i, box in enumerate(boxes):
-            x1, y1, x2, y2 = map(int, box)
-            crop_img = img_cv[y1:y2, x1:x2]
-            font_style = self.font_classifier.predict(crop_img)
+        for i, box in enumerate(bubbles_data):
+            x1, y1, x2, y2, mask_type = box
+
+            if mask_type == 2:
+                font_style = "radiating"
+            else:
+                font_style = "dialogue"
+            # font_style = self.font_classifier.predict(crop_img)
             raw_text = self.run_ocr(img_cv, box, method='manga-ocr')
 
             bubble_metadata.append({
@@ -316,7 +352,7 @@ class ComicTranslatorPipeline:
 
         # 4. 图像修补 (获得干净的 PIL 画布)
         # 这一步会去除原有文字，生成适合嵌字的底图
-        final_canvas = self.inpaint_bubbles(input_path, boxes)
+        final_canvas = self.inpaint_bubbles(input_path, bubbles_data)
 
         # 5. 嵌字 (Typesetting)
         for item in processed_data:
