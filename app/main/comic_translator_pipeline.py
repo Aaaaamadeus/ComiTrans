@@ -60,12 +60,6 @@ class ComicTranslatorPipeline:
 
     def detect_bubbles(self, image_path):
         print(f"检测气泡中")
-        # results = self.detector(image_path, device=self.device)
-        # bubbles = []
-        # for result in results:
-        #     boxes = result.boxes.xyxy.cpu().numpy()
-        #     for box in boxes:
-        #         bubbles.append(tuple(map(int, box)))  # 转换为整数元组
         _, _, text_lines = self.detector(image_path)
 
         bubbles = []
@@ -78,6 +72,13 @@ class ComicTranslatorPipeline:
             # 如果后续逻辑必须叫 mask_type，我们在这里做一个转换
             # 通常 0 代表横排，1 代表竖排
             mask_type = 1 if getattr(line, 'vertical', False) else 0
+            class_id = getattr(line, 'label', 0)
+            font_style_map = {
+                0: 'dialogue',
+                1: 'radiating',
+                2: 'handwritting'
+            }
+            font_type = font_style_map.get(class_id, 'dialogue')
 
             # 3. 按照你需要的格式存入 (确保转换为整数防止 OpenCV 报错)
             bubbles.append((
@@ -85,7 +86,8 @@ class ComicTranslatorPipeline:
                 int(box[1]),
                 int(box[2]),
                 int(box[3]),
-                mask_type
+                mask_type,
+                font_type,
             ))
 
         return bubbles
@@ -316,19 +318,14 @@ class ComicTranslatorPipeline:
         # 3.OCR 与 翻译 (并行处理数据)
         processed_data = []
         for i, box in enumerate(bubbles_data):
-            x1, y1, x2, y2, mask_type = box
+            x1, y1, x2, y2, mask_type ,font_type= box
 
-            if mask_type == 2:
-                font_style = "radiating"
-            else:
-                font_style = "dialogue"
-            # font_style = self.font_classifier.predict(crop_img)
             raw_text = self.run_ocr(img_cv, box, method='manga-ocr')
 
             bubble_metadata.append({
                 "box": box,
                 "raw": raw_text,
-                "style": font_style
+                "style": font_type
             })
             ocr_text_only.append(raw_text)
 
@@ -362,6 +359,7 @@ class ComicTranslatorPipeline:
                         final_canvas,
                         item['box'],
                         item['trans'],
+                        item['style'],
                         mask=self.current_mask_image
                     )
 

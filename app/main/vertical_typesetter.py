@@ -163,12 +163,12 @@ class VerticalTypesetter:
             lines.append(current_line)
         return lines
 
-    def draw_text(self, image, box, text, style='dialogue', mask=None):
+    def draw_text(self, image, box, text, style, mask=None):
         """执行竖排绘制 (使用绝对居中算法 anchor='mm')"""
         try:
             x1, y1, x2, y2 = map(int, box[:4])
 
-            scale_ratio = 0.95
+            scale_ratio = 0.8
 
             GLOBAL_OFFSET_X = 0   # 正数向右，负数向左
             GLOBAL_OFFSET_Y = 5   # 正数向下，负数向上
