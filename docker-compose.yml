@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  amadeuscomic-app:
+  comic-translate-web:
     build: ./app
     container_name: amadeuscomic_backend
     volumes:
