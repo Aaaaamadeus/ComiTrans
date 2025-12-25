@@ -8,7 +8,7 @@ from comic_translator_pipeline import ComicTranslatorPipeline
 load_dotenv()
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
-def init_worker(det_path, font_map, font_size, cls_path, lama_path, use_gpu):
+def init_worker(det_path, font_map, font_size, lama_path, use_gpu):
     """每个子进程启动时执行一次，加载独立模型"""
     global worker_pipeline
     print(f"[{multiprocessing.current_process().name}] 正在加载模型...")
@@ -17,7 +17,6 @@ def init_worker(det_path, font_map, font_size, cls_path, lama_path, use_gpu):
             det_model_path=det_path,
             font_map=font_map,
             font_size=font_size,
-            cls_model_path=cls_path,
             lama_path=lama_path,
             use_gpu=use_gpu
         )
@@ -59,8 +58,6 @@ if __name__ == "__main__":
     }
     lama_path = os.path.join(BASE_DIR,'..' ,'models' ,'manga-lama', 'manga-lama.pt')
     det_path  = os.path.join(BASE_DIR,'..' ,'models' ,'text_detector','comictextdetector.pt')
-    # det_path  = os.path.join(BASE_DIR,'..' ,'models' ,'ogkalucomic-speech-bubble-detector-yolov8m','comic-speech-bubble-detector.pt')
-    cls_model = os.path.join(BASE_DIR,'..' ,'models' ,'manga-font-mobilnet', 'manga_font_mobilnet.pth')
     current_os = platform.system()
     print(f"检测到操作系统: {current_os}")
     executor_cls = ProcessPoolExecutor
@@ -79,7 +76,6 @@ if __name__ == "__main__":
             det_model_path=det_path,
             font_map=FONT_MAP,
             font_size=16,
-            cls_model_path=cls_model,
             use_gpu=False,
             lama_path=lama_path
         )
@@ -94,7 +90,7 @@ if __name__ == "__main__":
         global_pipeline = None
 
         init_func = init_worker
-        init_args = (det_path, FONT_MAP, 16, cls_model, lama_path, True)
+        init_args = (det_path, FONT_MAP, 16, lama_path, True)
         worker_func = run_worker_process
         max_workers = 1
     print(f"最大并发数: {max_workers}")

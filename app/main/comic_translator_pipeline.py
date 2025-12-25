@@ -8,11 +8,9 @@ import numpy as np
 import torch
 from PIL import Image
 from openai import OpenAI
-# from ultralytics import YOLO
 from manga_ocr import MangaOcr
 from loguru import logger
 from manga_lama import MangaLama
-# from font_predictor import FontPredictor
 from vertical_typesetter import VerticalTypesetter
 current_dir = os.path.dirname(os.path.abspath(__file__))
 detector_lib_path = os.path.join(current_dir, 'comic_text_detector')
@@ -25,7 +23,6 @@ class ComicTranslatorPipeline:
                  det_model_path,
                  font_map,  # 这里必须指定你的字体文件路径
                  font_size,
-                 cls_model_path,
                  use_gpu,
                  lama_path):
         self.device = 'cuda' if torch.cuda.is_available() and use_gpu else 'cpu'
@@ -49,11 +46,6 @@ class ComicTranslatorPipeline:
         # 4. 嵌字器
         print("初始化嵌字器")
         self.typesetter = VerticalTypesetter(font_map, font_size)
-
-        # # 5. 字体分类器
-        # print("初始化字体分类器")
-        # self.font_classifier = FontPredictor(cls_model_path, device=self.device)
-        # self.typesetter = VerticalTypesetter(font_map, font_size)
 
         # 线程锁
         self.lock = threading.Lock()
