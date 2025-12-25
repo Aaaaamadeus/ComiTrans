@@ -60,7 +60,8 @@ class ComicTranslatorPipeline:
 
     def detect_bubbles(self, image_path):
         print(f"检测气泡中")
-        _, _, text_lines = self.detector(image_path)
+        mask, mask_refined, text_lines = self.detector(image_path)
+        self.last_detector_mask = mask_refined
 
         bubbles = []
         for line in text_lines:
@@ -76,7 +77,8 @@ class ComicTranslatorPipeline:
             font_style_map = {
                 0: 'dialogue',
                 1: 'radiating',
-                2: 'handwritting'
+                2: 'handwriting',
+                3: 'serious'
             }
             font_type = font_style_map.get(class_id, 'dialogue')
 
@@ -349,7 +351,8 @@ class ComicTranslatorPipeline:
 
         # 4. 图像修补 (获得干净的 PIL 画布)
         # 这一步会去除原有文字，生成适合嵌字的底图
-        final_canvas = self.inpaint_bubbles(input_path, bubbles_data)
+        clean_boxes = [b[:4] for b in bubbles_data]
+        final_canvas = self.inpaint_bubbles(input_path, clean_boxes)
 
         # 5. 嵌字 (Typesetting)
         for item in processed_data:

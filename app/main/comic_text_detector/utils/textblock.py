@@ -86,6 +86,8 @@ class TextBlock(object):
         self.accumulate_color = accumulate_color
 
         self.label = int(label)
+        if 'label' in kwargs:
+            self.label = kwargs['label']
         self.lines = [] if lines is None else lines
 
     def adjust_bbox(self, with_bbox=False):
