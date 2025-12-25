@@ -105,7 +105,7 @@ if __name__ == "__main__":
             if user_cmd.lower() == 'n': break
             print("等待任务...")
             futures = []
-            target_indices = [7]
+            target_indices = [9]
             for i in target_indices:
                 user_input = f"../page/test_page/test{i}.jpg"
 

@@ -163,15 +163,15 @@ class VerticalTypesetter:
             lines.append(current_line)
         return lines
 
-    def draw_text(self, image, box, text, style='dialogue', mask=None):
+    def draw_text(self, image, box, text, style, mask=None):
         """执行竖排绘制 (使用绝对居中算法 anchor='mm')"""
         try:
             x1, y1, x2, y2 = map(int, box[:4])
 
-            scale_ratio = 0.95
+            scale_ratio = 0.9
 
-            GLOBAL_OFFSET_X = 0   # 正数向右，负数向左
-            GLOBAL_OFFSET_Y = 5   # 正数向下，负数向上
+            GLOBAL_OFFSET_X = 5   # 正数向右，负数向左
+            GLOBAL_OFFSET_Y = 15   # 正数向下，负数向上
 
             raw_width = x2 - x1
             raw_height = y2 - y1
@@ -370,8 +370,27 @@ class VerticalTypesetter:
                     current_col_center_x -= (sample_w + best_col_spacing)
 
             # 调试框 (取消注释可查看排版范围)
-            # draw.rectangle(box, outline="red", width=3)
-            # draw.line([(center_x, y1), (center_x, y2)], fill="blue", width=2)
+            #         debug_box = box[:4]
+            #
+            #         dbg_outline = "yellow"
+            #         if style == 'radiating':
+            #             dbg_outline = "red"
+            #         elif style != 'dialogue':
+            #             dbg_outline = "cyan"
+            #         draw.rectangle([x1, y1, x2, y2], outline="red", width=2)
+            #
+            #         margin_x = (raw_width - box_width) // 2
+            #         margin_y = (raw_height - box_height) // 2
+            #         draw.rectangle([x1 + margin_x, y1 + margin_y, x2 - margin_x, y2 - margin_y], outline="yellow",width=2)
+            #         draw.line([(center_x, y1), (center_x, y2)], fill="blue", width=1)
+            #         # 诊断代码：画一个覆盖全图的大 X，检查 draw 对象的坐标系是否正常
+            #         w, h = image.size
+            #         draw.line([(0, 0), (w, h)], fill="green", width=5)
+            #         draw.line([(w, 0), (0, h)], fill="green", width=5)
+            #
+            #         # 检查当前 box 是否超出了图片边界
+            #         if x2 > w or y2 > h:
+            #             print(f"检测框坐标 {x2, y2} 超出了图片尺寸 {w, h}！")
 
             return image
 

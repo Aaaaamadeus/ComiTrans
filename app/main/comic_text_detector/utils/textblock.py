@@ -41,6 +41,7 @@ class TextBlock(object):
                        accumulate_color = True,
                        default_stroke_width = 0.2,
                        target_lang: str = "",
+                       label: int = 0,
                        **kwargs) -> None:
         self.xyxy = [int(num) for num in xyxy]                    # boundingbox of textblock
         self.lines = [] if lines is None else lines     # polygons of textlines
@@ -83,6 +84,11 @@ class TextBlock(object):
         self._bounding_rect = _bounding_rect
         self.default_stroke_width = default_stroke_width
         self.accumulate_color = accumulate_color
+
+        self.label = int(label)
+        if 'label' in kwargs:
+            self.label = kwargs['label']
+        self.lines = [] if lines is None else lines
 
     def adjust_bbox(self, with_bbox=False):
         lines = self.lines_array().astype(np.int32)
@@ -423,7 +429,7 @@ def group_output(blks, lines, im_w, im_h, mask=None, sort_blklist=True) -> List[
     scattered_lines = {'ver': [], 'hor': []}
     for bbox, cls, conf in zip(*blks):
         # cls could give wrong result
-        blk_list.append(TextBlock(bbox, language=LANG_LIST[cls]))
+        blk_list.append(TextBlock(bbox, language=LANG_LIST[cls], label=int(cls)))
 
     # step1: filter & assign lines to textblocks
     bbox_score_thresh = 0.4
@@ -445,7 +451,7 @@ def group_output(blks, lines, im_w, im_h, mask=None, sort_blklist=True) -> List[
                 mask_score = mask[by1: by2, bx1: bx2].mean() / 255
                 if mask_score < mask_score_thresh:
                     continue
-            blk = TextBlock([bx1, by1, bx2, by2], [line])
+            blk = TextBlock([bx1, by1, bx2, by2], [line], label=2)
             examine_textblk(blk, im_w, im_h, sort=False)
             if blk.vertical:
                 scattered_lines['ver'].append(blk)
