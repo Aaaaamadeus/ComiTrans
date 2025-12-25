@@ -1,9 +1,6 @@
 #必须锁定<2.0.0
 numpy<2.0.0
 opencv-python-headless
-Pillow
-torch
-torchvision
 paddlepaddle
 ultralytics
 requests
@@ -11,5 +8,11 @@ manga-ocr
 openai
 python-dotenv
 shapely
-#simple-lama-inpainting
-#paddleocr
+onnx>=1.9.0
+onnx-simplifier>=0.3.6
+opencv-python>=4.5.0
+Pillow==9.5
+torch>=1.7.0
+torchvision>=0.8.1
+tqdm>=4.41.0
+wandb

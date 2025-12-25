@@ -23,4 +23,4 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 
 COPY . .
 
-CMD ["python", "main.py"]
+CMD ["python", "main/main.py"]
