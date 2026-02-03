@@ -210,7 +210,7 @@ class ComicTranslatorPipeline:
         if not ocr_texts: return []
 
         # 1. 准备 API
-        BASE_URL = "http://43.133.176.18:8000/v1"
+        BASE_URL = os.getenv("BASE_URL")
         API_KEY = os.getenv("API_KEY")
         client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
@@ -225,9 +225,9 @@ class ComicTranslatorPipeline:
         【严格要求】：
         1. 必须返回一个纯 JSON 字符串数组，格式如：["翻译1", "翻译2", "翻译3"]
         2. 数组中的元素数量、顺序必须与输入的 OCR 文本列表完全一致。
-        3. 如果某行 OCR 是乱码或无需翻译，请在对应位置填入空字符串 "" 或原样保留，不要跳过。
+        3. 如果某行 OCR 是乱码或无需翻译，请在对应位置填入空字符串 "" 或原样保留，不要跳过
         4. 保持二次元口语风格，不要翻译腔，但是返回的语句需要符合中文的语序
-        5. 不要使用 Markdown 格式（如 ```json），直接返回数组字符串。
+        5. 不要使用 Markdown 格式（如 ```json），直接返回数组字符串
         6. 最后一句句尾不要带句号
         7. 名字不要罗马音，特定名字使用其中文译名
         """
@@ -240,7 +240,7 @@ class ComicTranslatorPipeline:
                 base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
             response = client.chat.completions.create(
-                model="gemini-2.5-flash",
+                model="qwen3-vl-plus",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user",

@@ -170,8 +170,8 @@ class VerticalTypesetter:
 
             scale_ratio = 0.9
 
-            GLOBAL_OFFSET_X = 5   # 正数向右，负数向左
-            GLOBAL_OFFSET_Y = 15   # 正数向下，负数向上
+            GLOBAL_OFFSET_X = 0   # 正数向右，负数向左
+            GLOBAL_OFFSET_Y = 5   # 正数向下，负数向上
 
             raw_width = x2 - x1
             raw_height = y2 - y1
@@ -369,7 +369,7 @@ class VerticalTypesetter:
                     # 移到下一列 (向左移动一个标准字宽 + 间距)
                     current_col_center_x -= (sample_w + best_col_spacing)
 
-            # 调试框 (取消注释可查看排版范围)
+            # #调试框 (取消注释可查看排版范围)
             #         debug_box = box[:4]
             #
             #         dbg_outline = "yellow"
