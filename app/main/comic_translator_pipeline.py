@@ -28,19 +28,16 @@ class ComicTranslatorPipeline:
         self.device = 'cuda' if torch.cuda.is_available() and use_gpu else 'cpu'
         print("初始化管线")
 
-        # # 1. 气泡检测
-        # print("加载 YOLOv8 检测模型...")
-        # self.detector = YOLO(det_model_path)
-        print(f"加载 Comic Text Detector...")
+        print("[INFO] 加载 Comic Text Detector...")
         self.detector = TextDetector(model_path=det_model_path, input_size=1024, device=self.device, act="default")
 
         # 2. OCR 模型
-        print("加载 Manga-OCR...")
+        print("[INFO] 加载 Manga-OCR...")
         logger.disable("manga_ocr")
         self.manga_ocr = MangaOcr()
 
         # 3. 图像修补
-        print("加载 Manga-lama...")
+        print("[INFO] 加载 Manga-lama...")
         self.inpainter = MangaLama(lama_path, device=self.device)
 
         # 4. 嵌字器
@@ -50,9 +47,9 @@ class ComicTranslatorPipeline:
         # 线程锁
         self.lock = threading.Lock()
 
-    def detect_bubbles(self, image_path):
-        print(f"检测气泡中")
-        mask, mask_refined, text_lines = self.detector(image_path)
+    def detect_bubbles(self, img_cv):
+        print("[INFO] 检测气泡中...")
+        mask, mask_refined, text_lines = self.detector(img_cv)
         self.last_detector_mask = mask_refined
 
         bubbles = []
@@ -124,11 +121,10 @@ class ComicTranslatorPipeline:
         print(f"亮度:{mean_val:.2f},标准差:{std_val:.2f}->{'白气泡' if white else '复杂背景'}")
         return white
 
-    def inpaint_bubbles(self, img_path, boxes):
+    def inpaint_bubbles(self, img_cv, boxes):
         """LaMa 去除气泡文字 (生成底图)"""
-        print(f"正在执行图像修补...")
-        # opencv格式
-        img_cv = cv2.imread(img_path)
+        print("[INFO] 正在执行图像修补...")
+        # 移除了重复的 cv2.imread(img_path)
         h, w = img_cv.shape[:2]
         # 记录ai需要修复的区域
         lama_mask = np.zeros((h, w), dtype=np.uint8)
@@ -183,7 +179,6 @@ class ComicTranslatorPipeline:
             layout_kernel = np.ones((5, 5), np.uint8)
             layout_mask_roi = cv2.dilate(text_mask, layout_kernel, iterations=3)
             full_layout_mask[safe_y1:safe_y2, safe_x1:safe_x2] = layout_mask_roi
-            self.current_mask_image = Image.fromarray(full_layout_mask)
 
             # 分流处理
             if self.is_simple_bubble(roi_img):
@@ -193,6 +188,10 @@ class ComicTranslatorPipeline:
                 # 调用模型处理
                 needs_ai_inpainting = True
                 lama_mask[safe_y1:safe_y2, safe_x1:safe_x2] = text_mask_dilated
+        
+        # 循环结束后统一生成掩膜图像，避免重复转换
+        self.current_mask_image = Image.fromarray(full_layout_mask)
+        
         # 将opencv格式转为PIL格式
         img_cv_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
         img_pil_final = Image.fromarray(img_cv_rgb)
@@ -205,42 +204,51 @@ class ComicTranslatorPipeline:
             print("无复杂背景，已全部处理")
         return img_pil_final
 
-    def translate_page_batch(self, ocr_texts, image_path):
-        # 0. 边界检查：如果这页没字，直接返回空
+    def translate_page_batch(self, ocr_texts, image_input):
         if not ocr_texts: return []
 
-        # 1. 准备 API
-        BASE_URL = os.getenv("BASE_URL")
-        API_KEY = os.getenv("API_KEY")
-        client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+        API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY") or ""
+        API_BASE_URL = os.getenv("GEMINI_BASE_URL") or os.getenv("OPENAI_BASE_URL") or os.getenv("BASE_URL") or ""
+        
+        if not API_KEY or not API_BASE_URL:
+            print("[ERROR] 翻译 API 未配置，请检查 .env 文件")
+            return ocr_texts
+        
+        safe_key = f"{API_KEY[:4]}...{API_KEY[-4:]}" if len(API_KEY) > 8 else "***"
+        print(f"[INFO] 使用翻译 API: {API_BASE_URL.split('?')[0]}")
+        print(f"[INFO] API Key: {safe_key}")
+        
+        client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
 
         # 2. 构造带序号的文本清单，方便 AI 对照
         text_list_str = "\n".join([f"[{i}] {text}" for i, text in enumerate(ocr_texts)])
 
-        # 3. 构造 Prompt：强制要求返回纯 JSON 数组
-        system_prompt = """
-        你是一位专业的日漫汉化组翻译。
-        请结合提供的【整页漫画图片】作为视觉上下文，将给出的【OCR日文列表】翻译成流畅的中文。
+        # 3. 构造 Prompt
+        system_prompt = """你是一位专业的日漫汉化组翻译。请结合提供的【整页漫画图片】作为视觉上下文，将给出的【OCR日文列表】翻译成流畅的中文。
 
-        【严格要求】：
-        1. 必须返回一个纯 JSON 字符串数组，格式如：["翻译1", "翻译2", "翻译3"]
-        2. 数组中的元素数量、顺序必须与输入的 OCR 文本列表完全一致。
-        3. 如果某行 OCR 是乱码或无需翻译，请在对应位置填入空字符串 "" 或原样保留，不要跳过
-        4. 保持二次元口语风格，不要翻译腔，但是返回的语句需要符合中文的语序
-        5. 不要使用 Markdown 格式（如 ```json），直接返回数组字符串
-        6. 最后一句句尾不要带句号
-        7. 名字不要罗马音，特定名字使用其中文译名
-        """
+【严格要求】：
+1. 必须返回一个纯 JSON 字符串数组，格式如：["翻译1", "翻译2", "翻译3"]
+2. 数组中的元素数量、顺序必须与输入的 OCR 文本列表完全一致。
+3. 如果某行 OCR 是乱码或无需翻译，请在对应位置填入空字符串 "" 或原样保留，不要跳过
+4. 保持二次元口语风格，不要翻译腔，但是返回的语句需要符合中文的语序
+5. 不要使用 Markdown 格式，直接返回数组字符串
+6. 最后一句句尾不要带句号
+7. 名字不要罗马音，特定名字使用其中文译名"""
 
         user_prompt = f"请按顺序翻译以下 {len(ocr_texts)} 条日文文本：\n{text_list_str}"
 
         try:
             # 读取整页图片
-            with open(image_path, "rb") as image_file:
-                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            if isinstance(image_input, str):
+                with open(image_input, "rb") as image_file:
+                    base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            else:
+                # 假设是 numpy 数组 (OpenCV 图像)
+                _, buffer = cv2.imencode('.jpg', image_input)
+                base64_image = base64.b64encode(buffer).decode('utf-8')
 
             response = client.chat.completions.create(
-                model="qwen3-vl-plus",
+                model="gemini-2.5-flash",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user",
@@ -250,7 +258,6 @@ class ComicTranslatorPipeline:
                      ]
                      }
                 ],
-                # 如果模型支持 json_object 模式最好开启，不支持也没关系，prompt 已经约束了
                 response_format={"type": "json_object"}
             )
 
@@ -293,7 +300,7 @@ class ComicTranslatorPipeline:
             return ocr_texts
 
     def process_comic_page(self, input_path, output_path):
-        print(f"开始")
+        print("[INFO] 开始处理漫画页面")
         # 1.读取原始图像 (OpenCV 格式用于裁剪 OCR)
         img_cv = cv2.imread(input_path)
         if img_cv is None:
@@ -302,8 +309,8 @@ class ComicTranslatorPipeline:
         # 2.检测
         # boxes = self.detect_bubbles(input_path)
         # print(f"检测到{len(boxes)}个气泡")
-        bubbles_data = self.detect_bubbles(input_path)
-        print(f"检测到 {len(bubbles_data)} 个气泡")
+        bubbles_data = self.detect_bubbles(img_cv)
+        print(f"[INFO] 检测到 {len(bubbles_data)} 个气泡")
 
         # 暂存数据
         bubble_metadata = []
@@ -324,14 +331,16 @@ class ComicTranslatorPipeline:
             ocr_text_only.append(raw_text)
 
         # 批处理阶段
-        print(f"正在批量翻译 {len(ocr_text_only)} 条文本...")
-        # 调用新写的批量函数，传入整页路径 input_path
-        translated_list = self.translate_page_batch(ocr_text_only, input_path)
-        # 重组数据
+        print(f"[INFO] 正在翻译 {len(ocr_text_only)} 条文本...")
+        
+        translated_list = self.translate_page_batch(ocr_text_only, img_cv)
+        
+        if translated_list:
+            print(f"[INFO] 翻译完成，获取 {len(translated_list)} 条结果")
+        
         processed_data = []
         for i, item in enumerate(bubble_metadata):
-            # 从翻译结果列表中取值
-            trans_text = translated_list[i]
+            trans_text = translated_list[i] if i < len(translated_list) else ""
 
             processed_data.append({
                 "box": item['box'],
@@ -339,12 +348,15 @@ class ComicTranslatorPipeline:
                 "style": item['style'],
                 "trans": trans_text
             })
-            print(f"   [{i}] 原文: {item['raw']} -> 译文: {trans_text}")
+            
+            raw_short = item['raw'][:15] + "..." if len(item['raw']) > 15 else item['raw']
+            trans_short = trans_text[:15] + "..." if trans_text and len(trans_text) > 15 else (trans_text or "(无)")
+            print(f"   [{i+1}/{len(bubble_metadata)}] {raw_short} -> {trans_short}")
 
         # 4. 图像修补 (获得干净的 PIL 画布)
         # 这一步会去除原有文字，生成适合嵌字的底图
         clean_boxes = [b[:4] for b in bubbles_data]
-        final_canvas = self.inpaint_bubbles(input_path, clean_boxes)
+        final_canvas = self.inpaint_bubbles(img_cv, clean_boxes)
 
         # 5. 嵌字 (Typesetting)
         for item in processed_data:

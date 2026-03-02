@@ -1,0 +1,3 @@
+diff --git a/.gitattributes b/app/models/.gitattributes
+rename from .gitattributes
+rename to app/models/.gitattributes
