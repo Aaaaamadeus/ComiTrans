@@ -10,3 +10,7 @@ env/
 nginx/certs/*.key
 nginx/certs/*.pem
 models/manga-ocr-base
+.idea/
+.vscode/
+.DS_Store
+logs/
