@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  comic-translate:
+    image: your-image-name:latest
+    # build: .  # 如果需要本地构建，请取消注释
+    container_name: comic-translate
+    volumes:
+      - ./app/page:/app/page
+      - ./app/models:/app/models
+      - ./app/main/config.yaml:/app/main/config.yaml
+    # 如果需要 GPU 支持，请取消注释以下内容 (需安装 NVIDIA Container Toolkit)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    command: ["python", "main/main.py"]
+    restart: unless-stopped
