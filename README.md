@@ -1,6 +1,6 @@
 # Comic Translate Web
 
-漫画翻译 Web 工具，支持自动检测气泡、OCR 识别、翻译和嵌字。旨在为汉化组和个人用户提供高效的漫画汉化解决方案。
+漫画翻译工具，支持自动检测气泡、OCR 识别、翻译和嵌字。旨在为个人用户提供轻量化的漫画汉化解决方案。
 
 ## 🚀 快速开始
 
@@ -23,12 +23,12 @@ pip install -r requirements.txt
 
 ### 3. 配置 API
 
-在 `app` 目录下创建 `.env` 文件：
+修改 `app/main/config.yaml` 文件：
 
-```env
+```yaml
 # 翻译 API (支持 OpenAI 兼容接口)
-GEMINI_API_KEY=your_api_key
-GEMINI_BASE_URL=your_api_base_url
+api_key: your_api_key
+api_base_url: your_api_base_url
 ```
 
 ### 4. 运行程序
@@ -42,31 +42,18 @@ python main.py
 
 ### 🐳 Docker 部署 (推荐)
 
-如果您熟悉 Docker，可以直接使用 Docker 快速部署。
+运行前请确保已下载模型文件并配置好 `config.yaml`。
 
-#### 1. 构建镜像
-
-```bash
-docker build -t comic-translate-web .
-```
-
-#### 2. 运行容器
-
-运行前请确保已下载模型文件并配置好 `.env` 文件。
+由于 `docker-compose.yml` 已配置好所有挂载，直接启动即可：
 
 ```bash
-docker run -d \
-  --name comic-translate \
-  -v $(pwd)/app/models:/app/app/models \
-  -v $(pwd)/app/page:/app/app/page \
-  -v $(pwd)/app/.env:/app/app/.env \
-  comic-translate-web \
-  python app/main/main.py
+docker-compose up -d
 ```
 
-- `-v .../models`: 挂载模型目录，避免重复下载。
-- `-v .../page`: 挂载输入输出目录，方便传入图片和获取结果。
-- `-v .../.env`: 挂载 API 配置文件。
+这将自动：
+- 拉取最新镜像
+- 挂载 `models`、`page` 目录和 `config.yaml` 配置文件
+- 启动服务
 
 ## ✨ 功能特性
 
