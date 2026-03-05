@@ -170,16 +170,33 @@ class VerticalTypesetter:
 
             scale_ratio = 0.9
 
-            GLOBAL_OFFSET_X = 0   # 正数向右，负数向左
-            GLOBAL_OFFSET_Y = 5   # 正数向下，负数向上
+            GLOBAL_OFFSET_X = 0
+            GLOBAL_OFFSET_Y = 0   # 移除之前的 +5 硬补偿，因为接下来使用绝对几何中心
 
             raw_width = x2 - x1
             raw_height = y2 - y1
+
+            # 气泡物理几何中心（始终基于最原始的框保持不动）
+            center_x = x1 + raw_width // 2
+            center_y = y1 + raw_height // 2
+
+            # --- 智能气泡外扩算法 ---
+            # 解决日语瘦长包围盒限制中文排版空间的问题
+            if raw_height > raw_width * 1.5:
+                # 瘦长型气泡：推测存在横白边，放宽宽度
+                expanded_width = int(raw_height * 0.8)
+                raw_width = max(raw_width, expanded_width)
+            elif raw_width > raw_height * 1.5:
+                # 宽扁型气泡：放宽高度
+                expanded_height = int(raw_width * 0.8)
+                raw_height = max(raw_height, expanded_height)
+            else:
+                # 近方形气泡：各个方向按比例扩展以吃满白区
+                raw_width = int(raw_width * 1.2)
+                raw_height = int(raw_height * 1.2)
+
             box_width = int(raw_width * scale_ratio)
             box_height = int(raw_height * scale_ratio)
-
-            # 气泡几何中心点
-            center_x = x1 + raw_width // 2
 
             base_font = self.fonts.get(style, self.fonts.get('dialogue'))
             current_font = base_font
@@ -196,8 +213,13 @@ class VerticalTypesetter:
             available_area = 0
             if mask is not None:
                 try:
-                    # 1. 裁剪出当前气泡区域的 mask
-                    crop_box = (x1, y1, x2, y2)
+                    # 1. 裁剪出当前扩充后气泡区域的 mask (保证能够抓取到真实泡泡的边缘)
+                    expanded_x1 = max(0, center_x - raw_width // 2)
+                    expanded_y1 = max(0, center_y - raw_height // 2)
+                    expanded_x2 = center_x + raw_width // 2
+                    expanded_y2 = center_y + raw_height // 2
+                    
+                    crop_box = (expanded_x1, expanded_y1, expanded_x2, expanded_y2)
                     bubble_mask = mask.crop(crop_box)
                     # 2. 统计非零(白色)像素数量
                     # 稍微缩小一点范围以模拟 padding (比如只统计 80% 的像素)
@@ -220,11 +242,12 @@ class VerticalTypesetter:
 
             # 智能预估起点
             try:
-                # estimated_size = int(math.sqrt(available_area / (len(clean_text) + 1) / 1.3))
-                # max_allowed_size = min(box_width, box_height)
-                # upper_bound = min(max_allowed_size, max(12, estimated_size + 10))
-                upper_bound = max_allowed_size
-                upper_bound = min(max_allowed_size, max(12, estimated_size * 2))
+                # 恢复至初版的保守字号预估，提供充沛的留白
+                estimated_size = int(math.sqrt(available_area / (len(clean_text) + 1) / 1.5))
+                max_allowed_size = min(box_width, box_height)
+                
+                # 恢复至初版极其严格的极限值封锁（基础值的 1.5 倍）
+                upper_bound = min(max_allowed_size, max(12, int(estimated_size * 1.5)))
                 lower_bound = 12
             except:
                 upper_bound = 24
@@ -288,7 +311,6 @@ class VerticalTypesetter:
 
                 total_height = len(columns) * sample_h + (len(columns) - 1) * best_col_spacing
 
-                center_y = (y1 + y2) // 2  # 或者 box[1] + box[3] // 2
                 current_row_center_y = center_y - (total_height // 2) + (sample_h // 2)
 
                 for row_text in columns:
@@ -327,8 +349,8 @@ class VerticalTypesetter:
                         col_height += h
                     col_height += (len(col_text) - 1) * 2  # 行内字间距
 
-                    # 计算该列起始 Y (垂直居中)
-                    start_y = y1 + (box_height - col_height) // 2
+                    # 新算法：绝对几何中心对齐 (从物理中心往上推算起点，防下坠防偏移)
+                    start_y = center_y - (col_height // 2)
                     current_y = start_y
 
                     for char in col_text:
@@ -344,8 +366,8 @@ class VerticalTypesetter:
                             temp_size = max(sample_w, h) * 2
                             txt_img = Image.new('RGBA', (temp_size, temp_size), (255, 255, 255, 0))
                             d = ImageDraw.Draw(txt_img)
-                            # 在小画布里也是用 mm 居中
-                            d.text((temp_size / 2, temp_size / 2), char, font=current_font, fill=self.color, anchor='mm')
+                            # 在小画布里也是用 mm 居中，并加上与正常文字一样的白边描边
+                            d.text((temp_size / 2, temp_size / 2), char, font=current_font, fill=self.color, anchor='mm', stroke_width=1, stroke_fill='white')
                             rotated_txt = txt_img.rotate(-90, expand=False, resample=Image.BICUBIC)
 
                             # 粘贴到绝对中心 (paste 需要左上角坐标，所以减去半径)

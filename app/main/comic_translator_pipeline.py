@@ -24,8 +24,16 @@ class ComicTranslatorPipeline:
                  font_map,  # 这里必须指定你的字体文件路径
                  font_size,
                  use_gpu,
-                 lama_path):
+                 lama_path,
+                 translation_model=None,
+                 api_key=None,
+                 api_base_url=None):
         self.device = 'cuda' if torch.cuda.is_available() and use_gpu else 'cpu'
+        self.translation_model = translation_model
+        self.api_key = api_key
+        self.api_base_url = api_base_url
+        if not self.translation_model:
+             print("[WARNING] Pipeline 初始化时未指定翻译模型")
         print("初始化管线")
 
         print("[INFO] 加载 Comic Text Detector...")
@@ -116,8 +124,8 @@ class ComicTranslatorPipeline:
         mean, std = cv2.meanStdDev(gray)
         mean_val = mean[0][0]
         std_val = std[0][0]
-        # 阈值参数设置
-        white = mean_val > 160 and std_val < 90
+        # 阈值参数设置（收紧：仅处理真正的纯白气泡，防止将网点纸直接涂白）
+        white = mean_val > 230 and std_val < 20
         print(f"亮度:{mean_val:.2f},标准差:{std_val:.2f}->{'白气泡' if white else '复杂背景'}")
         return white
 
@@ -134,7 +142,7 @@ class ComicTranslatorPipeline:
         needs_ai_inpainting = False
         for data in boxes:
             x1, y1, x2, y2 = data[:4]
-            paddle = 2
+            paddle = 15  # 扩大上下文参考边缘，供 LaMa 获取足够纹理
             safe_x1 = max(0, x1 - paddle)
             safe_y1 = max(0, y1 - paddle)
             safe_x2 = min(w, x2 + paddle)
@@ -172,9 +180,9 @@ class ComicTranslatorPipeline:
                 # 将通过筛选的画到mask上
                 text_mask[labels == i] = 255
 
-            # 只对筛选后的文字进行膨胀
-            kernel = np.ones((2, 2), np.uint8)
-            text_mask_dilated = cv2.dilate(text_mask, kernel, iterations=1)
+            # 只对筛选后的文字进行膨胀，增强边缘包围，防止遗留抗锯齿的灰色鬼影
+            kernel = np.ones((3, 3), np.uint8)
+            text_mask_dilated = cv2.dilate(text_mask, kernel, iterations=2)
 
             layout_kernel = np.ones((5, 5), np.uint8)
             layout_mask_roi = cv2.dilate(text_mask, layout_kernel, iterations=3)
@@ -207,18 +215,26 @@ class ComicTranslatorPipeline:
     def translate_page_batch(self, ocr_texts, image_input):
         if not ocr_texts: return []
 
-        API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY") or ""
-        API_BASE_URL = os.getenv("GEMINI_BASE_URL") or os.getenv("OPENAI_BASE_URL") or os.getenv("BASE_URL") or ""
+        # 使用初始化时传入的配置（来自 config.yaml）
+        API_KEY = self.api_key or ""
+        API_BASE_URL = self.api_base_url or ""
         
         if not API_KEY or not API_BASE_URL:
-            print("[ERROR] 翻译 API 未配置，请检查 .env 文件")
+            print("[ERROR] 翻译 API 未正确配置。请在 config.yaml 中填写 api_key 和 api_base_url。")
             return ocr_texts
         
         safe_key = f"{API_KEY[:4]}...{API_KEY[-4:]}" if len(API_KEY) > 8 else "***"
         print(f"[INFO] 使用翻译 API: {API_BASE_URL.split('?')[0]}")
         print(f"[INFO] API Key: {safe_key}")
         
-        client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
+        import urllib.request
+        import httpx
+        
+        proxies = urllib.request.getproxies()
+        proxy_url = proxies.get('http') or proxies.get('https')
+        http_client = httpx.Client(proxy=proxy_url, timeout=20.0) if proxy_url else httpx.Client(timeout=20.0)
+
+        client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL, http_client=http_client)
 
         # 2. 构造带序号的文本清单，方便 AI 对照
         text_list_str = "\n".join([f"[{i}] {text}" for i, text in enumerate(ocr_texts)])
@@ -248,7 +264,7 @@ class ComicTranslatorPipeline:
                 base64_image = base64.b64encode(buffer).decode('utf-8')
 
             response = client.chat.completions.create(
-                model="gemini-2.5-flash",
+                model=self.translation_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user",
@@ -367,7 +383,7 @@ class ComicTranslatorPipeline:
                         item['box'],
                         item['trans'],
                         item['style'],
-                        mask=self.current_mask_image
+                        mask=Image.fromarray(self.last_detector_mask) if hasattr(self, 'last_detector_mask') else None
                     )
 
                 except Exception as e:

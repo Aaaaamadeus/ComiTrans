@@ -4,53 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c12d485f-458f-42ea-a408-bd61712d5b45" name="更改" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/comic-translate-web.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/comic-translate-web.iml" afterDir="false" />
+    <list default="true" id="c12d485f-458f-42ea-a408-bd61712d5b45" name="更改" comment="1">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/main/comic_translator_pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/main/comic_translator_pipeline.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/main/config.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/app/main/config.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/main/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/main/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/page/test_page/test.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/pom.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/ComicTranslateApplication.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/config/WebConfig.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/controller/UserController.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/exception/GlobalExceptionHandler.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/interceptors/LoginInterceptor.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/mapper/UserMapper.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/pojo/dto/Result.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/pojo/dto/UserLoginDTO.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/pojo/dto/UserRegisteDTO.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/pojo/entity/User.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/pojo/vo/UserVO.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/service/UserService.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/service/impl/UserServiceImpl.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/utils/JwtUtil.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/utils/Md5Util.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/java/com/yychainsaw/utils/ThreadLocalUtil.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/main/resources/application.yml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/src/test/java/com/yychainsaw/ComicTranslateApplicationTest.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/application.yml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/ComicTranslateApplication.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/config/WebConfig.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/controller/UserController.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/exception/GlobalExceptionHandler.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/interceptors/LoginInterceptor.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/mapper/UserMapper.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/pojo/dto/Result.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/pojo/dto/UserLoginDTO.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/pojo/dto/UserRegisteDTO.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/pojo/entity/User.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/pojo/vo/UserVO.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/service/UserService.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/service/impl/UserServiceImpl.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/utils/JwtUtil.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/utils/Md5Util.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/classes/com/yychainsaw/utils/ThreadLocalUtil.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/comic-tanslate-common/target/test-classes/com/yychainsaw/ComicTranslateApplicationTest.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/index.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/indexold.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/app/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -119,6 +79,7 @@
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHELLCHECK.PATH&quot;: &quot;C:\\Users\\MR\\AppData\\Roaming\\JetBrains\\PyCharm2025.2\\plugins\\Shell Script\\shellcheck.exe&quot;,
     &quot;git-widget-placeholder&quot;: &quot;amadeus&quot;,
     &quot;last_opened_file_path&quot;: &quot;D:/comic-translate-web/app/page/test_page&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
@@ -409,7 +370,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772463311921</updated>
     </task>
-    <option name="localTasksCounter" value="31" />
+    <task id="LOCAL-00031" summary="1">
+      <option name="closed" value="true" />
+      <created>1772518159303</created>
+      <option name="number" value="00031" />
+      <option name="presentableId" value="LOCAL-00031" />
+      <option name="project" value="LOCAL" />
+      <updated>1772518159303</updated>
+    </task>
+    <option name="localTasksCounter" value="32" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
