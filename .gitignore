@@ -1,12 +1,76 @@
 
+# ===== IDE / Editor =====
+.idea/
+.vscode/
+*.iml
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===== Logs =====
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ===== Environment / Secrets =====
+.env
+.env.*
+!.env.example
+nginx/certs/*.key
+nginx/certs/*.pem
+nginx/certs/*.crt
+
+# ===== Python (comic-translate-ai) =====
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
 venv/
 .venv/
 env/
-.env
-.env.local
-nginx/certs/*.key
-nginx/certs/*.pem
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Python AI 模型文件（体积大，不上传）
+comic-translate-ai/models/**/*.pt
+comic-translate-ai/models/**/*.pth
+comic-translate-ai/models/**/*.onnx
+comic-translate-ai/models/**/*.bin
 models/manga-ocr-base
+
+# Python 测试页面输出
+comic-translate-ai/page/test_page_output/
+
+# ===== Node.js / Vue 前端 (comic-tanslate-ui) =====
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.local
+*.tsbuildinfo
+.eslintcache
+package-lock.json
+
+# ===== Java / Maven 后端 (comic-tanslate-web) =====
+comic-tanslate-web/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# ===== Docker =====
+docker-compose.override.yml
