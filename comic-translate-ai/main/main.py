@@ -4,8 +4,7 @@ import multiprocessing
 import platform
 import numpy as np
 import signal
-from dotenv import load_dotenv
-load_dotenv()
+
 
 from concurrent.futures import ProcessPoolExecutor
 import sys
@@ -64,6 +63,14 @@ FONT_MAP = {
 LAMA_PATH = get_path('lama_model', 'models/manga-lama/manga-lama.pt')
 DET_PATH = get_path('detector_model', 'models/text_detector/comictextdetector.pt')
 
+# API 配置（仅从 config.yaml 读取）
+API_KEY = CONFIG.get('api_key', '')
+API_BASE_URL = CONFIG.get('api_base_url', '')
+TRANSLATION_MODEL = CONFIG.get('translation_model', 'gemini-2.5-flash')
+
+if not API_KEY or not API_BASE_URL:
+    print("[WARNING] 未检测到有效的 API 配置，请在 config.yaml 中填写 api_key 和 api_base_url")
+
 USE_GPU = bool(CONFIG.get('use_gpu', False))
 
 MAX_WORKERS = CONFIG.get('max_workers')
@@ -74,12 +81,9 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 def get_test_indices(count):
     return tuple(range(1, count + 1))
 
-def init_worker(det_path, font_map, font_size, lama_path, use_gpu, output_dir):
+def init_worker(det_path, font_map, font_size, lama_path, use_gpu, output_dir, trans_model, api_key, api_base_url):
     global worker_pipeline, worker_output_dir
     worker_output_dir = output_dir
-    
-    from dotenv import load_dotenv
-    load_dotenv()
     
     print(f"[WORKER {multiprocessing.current_process().name}] 加载模型...")
     try:
@@ -88,10 +92,16 @@ def init_worker(det_path, font_map, font_size, lama_path, use_gpu, output_dir):
             font_map=font_map,
             font_size=font_size,
             lama_path=lama_path,
-            use_gpu=use_gpu
+            use_gpu=use_gpu,
+            translation_model=trans_model,
+            api_key=api_key,
+            api_base_url=api_base_url
         )
     except Exception as e:
         print(f"[ERROR] 模型加载失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise  # 让异常传播到主进程，避免静默失败
 
 def run_worker_process(user_input, output_name):
     if worker_pipeline is None:
@@ -157,7 +167,10 @@ if __name__ == "__main__":
             font_map=FONT_MAP,
             font_size=FONT_SIZE,
             use_gpu=USE_GPU,
-            lama_path=LAMA_PATH
+            lama_path=LAMA_PATH,
+            translation_model=TRANSLATION_MODEL,
+            api_key=API_KEY,
+            api_base_url=API_BASE_URL
         )
 
         print("[INFO] 预热检测模型...")
@@ -171,7 +184,7 @@ if __name__ == "__main__":
         global_pipeline = None
 
         init_func = init_worker
-        init_args = (DET_PATH, FONT_MAP, FONT_SIZE, LAMA_PATH, USE_GPU, PAGE_OUTPUT_DIR)
+        init_args = (DET_PATH, FONT_MAP, FONT_SIZE, LAMA_PATH, USE_GPU, PAGE_OUTPUT_DIR, TRANSLATION_MODEL, API_KEY, API_BASE_URL)
         worker_func = run_worker_process
 
     print(f"[INFO] 最大并发数: {max_workers}")
@@ -180,10 +193,13 @@ if __name__ == "__main__":
     print("等待新图片...")
     
     processed_count = 0
+    failed_images = set()  # 记录处理失败的图片，避免反复重试
     
     with executor_cls(max_workers=max_workers, initializer=init_func, initargs=init_args) as executor:
         while is_running:
             pending = get_pending_images(PAGE_INPUT_DIR, PAGE_OUTPUT_DIR)
+            # 过滤掉已知失败的图片
+            pending = [(p, n) for p, n in pending if p not in failed_images]
             
             if pending:
                 print(f"\n[INFO] 发现 {len(pending)} 张待处理图片")
@@ -193,17 +209,24 @@ if __name__ == "__main__":
                     if not is_running: break
                     print(f"[TASK] 处理: {os.path.basename(input_path)}")
                     future = executor.submit(worker_func, input_path, output_name)
-                    futures.append(future)
+                    futures.append((future, input_path))
 
-                for f in futures:
+                for f, input_path in futures:
                     try:
                         result = f.result()
-                        print(f"[DONE] {result}")
-                        processed_count += 1
+                        if result.startswith("错误") or result.startswith("失败"):
+                            print(f"[FAIL] {result}")
+                            failed_images.add(input_path)
+                        else:
+                            print(f"[DONE] {result}")
+                            processed_count += 1
                     except Exception as e:
                         print(f"[ERROR] 任务执行异常: {e}")
+                        failed_images.add(input_path)
                 
-                print(f"[INFO] 本轮完成，累计处理 {processed_count} 张")
+                if failed_images:
+                    print(f"[INFO] 累计 {len(failed_images)} 张图片处理失败，已跳过")
+                print(f"[INFO] 本轮完成，累计成功处理 {processed_count} 张")
                 print("等待新图片...")
             else:
                 for _ in range(20): # sleep 2s in 0.1s intervals to respond to signal faster

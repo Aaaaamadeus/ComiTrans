@@ -22,6 +22,7 @@ detector_model: models/text_detector/comictextdetector.pt
 use_gpu: false
 max_workers: null
 
-# 翻译 API（从环境变量读取，也可在此处配置）
+# 翻译 API（唯一配置来源，请在此处填写）
 api_key: your_api_key
 api_base_url: your_api_base_url
+translation_model: your_translate_model
