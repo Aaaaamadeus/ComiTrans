@@ -1,21 +1,80 @@
 version: '3.8'
 
 services:
-  comic-translate:
-    image: your-image-name:latest
-    # build: .  # 如果需要本地构建，请取消注释
-    container_name: comic-translate
+  # 1. 数据库
+  db:
+    image: postgres:15-alpine
+    container_name: comic-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "1234"
+      POSTGRES_DB: comic
     volumes:
-      - ./app/page:/app/page
-      - ./app/models:/app/models
-      - ./app/main/config.yaml:/app/main/config.yaml
-    # 如果需要 GPU 支持，请取消注释以下内容 (需安装 NVIDIA Container Toolkit)
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
-    command: ["python", "main/main.py"]
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     restart: unless-stopped
+
+  # 2. 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: comic-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # 3. AI 核心引擎 (FastAPI)
+  ai-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: comic-translate-ai:latest
+    container_name: comic-ai-worker
+    volumes:
+      - ./comic-translate-ai/models:/app/models
+      - ./comic-translate-ai/main/config.yaml:/app/main/config.yaml
+      - ./comic-translate-ai/page:/app/page
+      - ./Log:/app/logs
+    working_dir: /app/main
+    command: sh -c "uvicorn app:app --host 0.0.0.0 --port 8000 2>&1 | tee /app/logs/ai-worker.log"
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  # 4. Java 后端 API (Spring Boot)
+  web-api:
+    build:
+      context: ./comic-tanslate-web
+      dockerfile: Dockerfile
+    container_name: comic-web-api
+    depends_on:
+      - db
+      - redis
+    expose:
+      - "8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/comic
+      - SPRING_DATA_REDIS_HOST=redis
+      - LOGGING_FILE_NAME=/app/logs/web-api.log
+    volumes:
+      - ./Log:/app/logs
+    restart: unless-stopped
+
+  # 5. Nginx 前端与网关代理
+  nginx-ui:
+    build:
+      context: ./comic-tanslate-ui
+      dockerfile: Dockerfile
+    container_name: comic-nginx-ui
+    ports:
+      - "80:80" # 本地或局域网可以直接通过 IP:80 访问
+    volumes:
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf
+      - ./Log:/var/log/nginx
+    depends_on:
+      - web-api
+      - ai-worker
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
