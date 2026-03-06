@@ -123,9 +123,9 @@ const uploadAndProcess = async () => {
     formData.append("file", file.value)
 
     try {
-        const response = await axios.post('/api/comic/translateImage', formData, {
+        const response = await axios.post('/process-image', formData, {
             responseType: 'blob',
-            timeout: 120000
+            timeout: 300000
         })
 
     const blob = response.data
