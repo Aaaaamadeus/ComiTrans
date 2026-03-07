@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>Comic Translate Web 💬🎨</h1>
+  <h1>ComiTrans - 漫译💬🎨</h1>
   <p>一个轻量、高效的自动化漫画汉化/翻译管线。集成了气泡检测、OCR 识别、大模型翻译、智能图像修补以及动态自适应嵌字排版技术。</p>
 </div>
 
