@@ -52,34 +52,25 @@ cd comic-translate-web
 pip install -r comic-translate-ai/requirements.txt
 ```
 
-### 2. 模型下载
+### 2. 在线 API 配置
 
-目前系统依赖两个核心模型，请下载后放置在指定的路径下：
+项目由 `comic-translate-ai/main/config.yaml` 统一驱动底层逻辑，但**无需手动编辑**此文件。
 
-- **文字与气泡检测模型**: `comic-translate-ai/models/text_detector/comictextdetector.pt`
-- **去字修补模型 (LaMa)**: `comic-translate-ai/models/manga-lama/manga-lama.pt`
+当你启动并访问 Web UI 后，直接点击右上角的“设置”按钮，在弹出的“翻译 API 设置”对话框中：
+- 输入你的 **API Key**
+- 输入你的 **API Base URL**（如 `https://api.openai.com/v1`）
+- 填入你使用的**翻译模型**（如 `gpt-4o`, `gemini-2.5-flash`）
 
-### 3. 配置核心依赖 (`config.yaml`)
+所有设置点击“保存”后即时生效，无需重启任何服务。
 
-项目由 `comic-translate-ai/main/config.yaml` 统一驱动，拒绝混乱的环境变量。你需要在这里填入你的大模型 API 密钥。
+### 3. 网页端使用
 
-```yaml
-# 填入你自己的中转/官方 API Key
-api_key: "sk-xxxxxx"
-api_base_url: "https://api.openai.com/v1"
-translation_model: "gpt-4o"
-```
+服务相关容器/程序启动后，直接在浏览器中访问 Web 页面（本地部署默认为 `http://localhost` 或相应的 Nginx 地址）。
 
-### 4. 投入运行
-
-直接将需要测试翻译的漫画图片放入 `comic-translate-ai/page/test_page` 目录下。随后在终端启动服务：
-
-```bash
-cd comic-translate-ai/main
-python main.py
-```
-
-终端将显示监视日志。当处理完毕后，你可以在 `comic-translate-ai/page/test_page_output` 目录找到具有精美排版和干净背景的汉化图片。脚本会自动长期驻留并监听新放入的图频，**无需反复重新启动**以避免重新加载模型。
+在网页主工作区中：
+1. **上传图片**：直接拖拽或选择需要汉化的原始漫画图片。
+2. **自动处理**：系统将在后台自动进行气泡检测、OCR 识别、AI 翻译、底层修补去字以及最终的自动中文嵌字排版。
+3. **获取结果**：处理完成后，一张兼具精美排版与无损背景的汉化成品图将直接呈现在网页端供您预览下载。整个流程全自动联动，无需繁琐的人工干预。
 
 ---
 
@@ -87,7 +78,7 @@ python main.py
 
 如果你不想在本地折腾 Python 环境、依赖版本和 CUDA，使用 Docker 可以一键获取完全隔离的运行容器。
 
-（请务必在运行前确保已在宿主机下载了模型文件并填好了 `config.yaml`）
+（在线 API 密钥等配置待容器成功启动后，直接进入浏览器 Web 端的“设置”弹窗中操作即可）
 
 ```bash
 cd comic-translate-web

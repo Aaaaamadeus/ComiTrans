@@ -1,6 +1,6 @@
 <template>
   <div class="comic-translator">
-    <h1>Amadeus 漫画汉化助手</h1>
+    <h1>ComiTrans 漫画汉化助手</h1>
 
     <!-- 移除了 :class="{ 'wide-container': ... }"，现在样式由 CSS 媒体查询全权控制 -->
     <div class="container" v-loading="loading" element-loading-text="正在识别并翻译中...可能需要 10-30 秒">
