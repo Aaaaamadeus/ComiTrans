@@ -9,7 +9,7 @@
     </parent>
 
     <groupId>com.yychainsaw</groupId>
-    <artifactId>comic-tanslate-web</artifactId>
+    <artifactId>comic-translate-web</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 

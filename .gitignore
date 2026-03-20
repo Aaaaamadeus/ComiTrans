@@ -75,3 +75,6 @@ comic-tanslate-web/target/
 
 # ===== Docker =====
 docker-compose.override.yml
+
+
+.jpg
