@@ -1,28 +1,14 @@
-# 漫画翻译工具配置文件
-# 修改后保存即可生效，无需重启程序
-
-# 目录路径
+api_base_url: https://api.n1n.ai/v1
+api_key: sk-x8yZZ1BAI0NH6g7ofYdyTVSWWGZoG0LgFgz7PP2aY04FTCAv
+detector_model: models/text_detector/comictextdetector.pt
+font_dialogue: font_file/CN/SourceHanSerifCN-Regular-1.otf
+font_handwriting: font_file/CN/setofont.ttf
+font_radiating: font_file/CN/SourceHanSansSC-Heavy-2.otf
+font_serious: font_file/CN/SourceHanSansSC-Medium-2.otf
+font_size: 16
+lama_model: models/manga-lama/manga-lama.pt
+max_workers: null
 page_input_dir: page/test_page
 page_output_dir: page/test_page_output
-
-# 字体配置
-font_size: 16
-
-# 字体文件路径（根据需要修改）
-font_dialogue: font_file/CN/SourceHanSerifCN-Regular-1.otf
-font_radiating: font_file/CN/SourceHanSansSC-Heavy-2.otf
-font_handwriting: font_file/CN/setofont.ttf
-font_serious: font_file/CN/SourceHanSansSC-Medium-2.otf
-
-# 模型路径
-lama_model: models/manga-lama/manga-lama.pt
-detector_model: models/text_detector/comictextdetector.pt
-
-# 运行选项
+translation_model: gemini-2.5-flash
 use_gpu: false
-max_workers: null
-
-# 翻译 API（唯一配置来源，请在此处填写）
-api_key: your_api_key
-api_base_url: your_api_base_url
-translation_model: your_translate_model

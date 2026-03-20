@@ -7,7 +7,7 @@
           <div class="logo-icon">
             <el-icon :size="48"><Picture /></el-icon>
           </div>
-          <h1>Amadeus</h1>
+          <h1>ComiTrans</h1>
           <p>智能漫画翻译平台</p>
           <div class="features">
             <div class="feature-item">

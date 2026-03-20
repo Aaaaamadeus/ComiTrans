@@ -5,7 +5,7 @@
       <div class="header-left">
         <router-link to="/" class="logo">
           <el-icon :size="24"><Picture /></el-icon>
-          <span class="logo-text">Amadeus</span>
+          <span class="logo-text">ComiTrans</span>
         </router-link>
       </div>
 
@@ -159,4 +159,5 @@ const handleCommand = (command) => {
   gap: 8px;
   align-items: center;
 }
+
 </style>

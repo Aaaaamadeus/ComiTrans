@@ -3,7 +3,7 @@ import io
 import threading
 import uuid
 import yaml
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 import uuid
 
@@ -117,6 +117,67 @@ async def process_image(file: UploadFile = File(...)):
         import traceback
         print(f"[API ERROR] {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---- 配置管理 ----
+
+def mask_key(key: str) -> str:
+    """对 API Key 进行脱敏处理"""
+    if not key or len(key) <= 8:
+        return "***"
+    return f"{key[:4]}{'*' * (len(key) - 8)}{key[-4:]}"
+
+@app.get("/config")
+def get_config():
+    """获取当前翻译 API 配置（API Key 脱敏显示）"""
+    current = load_config()
+    return JSONResponse(content={
+        "api_key": mask_key(current.get("api_key", "")),
+        "api_base_url": current.get("api_base_url", ""),
+        "translation_model": current.get("translation_model", ""),
+        "raw_api_key_length": len(current.get("api_key", ""))
+    })
+
+@app.post("/config")
+async def update_config(request: Request):
+    """更新翻译 API 配置，写入 config.yaml 并热更新 pipeline"""
+    global pipeline_instance
+    try:
+        body = await request.json()
+        print(f"[API] 收到配置更新请求: {list(body.keys())}")
+    except Exception as e:
+        print(f"[API ERROR] 解析请求体失败: {e}")
+        raise HTTPException(status_code=400, detail=f"请求体解析失败: {e}")
+
+    current = load_config()
+
+    # 只更新用户提交的字段
+    if body.get("api_key") is not None:
+        current["api_key"] = body["api_key"]
+    if body.get("api_base_url") is not None:
+        current["api_base_url"] = body["api_base_url"]
+    if body.get("translation_model") is not None:
+        current["translation_model"] = body["translation_model"]
+
+    # 写入 config.yaml
+    try:
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            yaml.dump(current, f, allow_unicode=True, default_flow_style=False)
+        print(f"[API] 配置已写入: {CONFIG_PATH}")
+    except Exception as e:
+        import traceback
+        print(f"[API ERROR] 写入配置文件失败: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"写入配置文件失败: {e}")
+
+    # 热更新 pipeline 实例的翻译配置
+    if pipeline_instance:
+        with pipeline_lock:
+            pipeline_instance.api_key = current.get("api_key", "")
+            pipeline_instance.api_base_url = current.get("api_base_url", "")
+            pipeline_instance.translation_model = current.get("translation_model", "")
+        print(f"[API] 配置已热更新: model={current.get('translation_model')}, url={current.get('api_base_url')}")
+
+    return JSONResponse(content={"message": "配置更新成功"})
 
 if __name__ == "__main__":
     import uvicorn
