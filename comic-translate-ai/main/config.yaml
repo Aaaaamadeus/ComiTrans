@@ -1,5 +1,5 @@
-api_base_url: https://api.n1n.ai/v1
-api_key: sk-x8yZZ1BAI0NH6g7ofYdyTVSWWGZoG0LgFgz7PP2aY04FTCAv
+api_base_url: none
+api_key: none
 detector_model: models/text_detector/comictextdetector.pt
 font_dialogue: font_file/CN/SourceHanSerifCN-Regular-1.otf
 font_handwriting: font_file/CN/setofont.ttf
