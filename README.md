@@ -1,6 +1,6 @@
 <div align="center">
-  <h1>ComiTrans - 漫译💬🎨</h1>
-  <p>一个轻量、高效的自动化漫画汉化/翻译管线。集成了气泡检测、OCR 识别、大模型翻译、智能图像修补以及动态自适应嵌字排版技术。</p>
+  <h1>Comic Translate Web 💬🎨</h1>
+  <p>一个基于 Docker 微服务架构的端到端 AI 漫画自动翻译平台。<br/>集成气泡检测、OCR 识别、大模型翻译、智能图像修补及动态排版引擎，通过 Nginx 网关统一对外提供服务。</p>
 </div>
 
 ---
@@ -74,18 +74,83 @@ pip install -r comic-translate-ai/requirements.txt
 
 ---
 
-## 🐳 Docker 部署 (推荐)
+## 🐳 系统架构与 Docker 部署
 
-如果你不想在本地折腾 Python 环境、依赖版本和 CUDA，使用 Docker 可以一键获取完全隔离的运行容器。
+### 整体架构
 
-（在线 API 密钥等配置待容器成功启动后，直接进入浏览器 Web 端的“设置”弹窗中操作即可）
+项目采用 **Docker Compose 多服务微架构**，由 5 个容器协同运行：
+
+```text
+                        +---------------------------------------------+
+                        |              Docker Compose                 |
+  Browser --> :80 -->   |  +---------------------------+              |
+                        |  |   Nginx (nginx-ui)        |              |
+                        |  |   - /      -> Vue SPA     |              |
+                        |  |   - /api/  -> Spring Boot |              |
+                        |  |   - /process-image -> AI  |              |
+                        |  |   - /config -> AI config  |              |
+                        |  +------+----------+---------+              |
+                        |         |          |                        |
+                        |    +----v---+ +----v--------+               |
+                        |    |web-api | |  ai-worker  |               |
+                        |    | :8080  | |    :8000    |               |
+                        |    |Spring  | |  FastAPI +  |               |
+                        |    | Boot   | | AI Pipeline |               |
+                        |    +---+--+-+ +-------------+               |
+                        |        |  |                                 |
+                        |   +----v--v--+  +---------+                 |
+                        |   |   db     |  |  redis  |                 |
+                        |   | PG 15   |  |  7      |                 |
+                        |   +----------+  +---------+                 |
+                        +---------------------------------------------+
+```
+
+| 服务 | 容器名 | 说明 |
+|------|--------|------|
+| **Nginx** | `comic-nginx-ui` | 统一入口网关，分发前端静态资源 + 反向代理后端 API 和 AI 服务 |
+| **Spring Boot** | `comic-web-api` | Java 后端 API，对接 PostgreSQL / Redis |
+| **FastAPI AI Worker** | `comic-ai-worker` | Python AI 推理引擎，承载完整翻译管线 |
+| **PostgreSQL 15** | `comic-db` | 业务数据持久化存储（命名卷 `postgres-data`） |
+| **Redis 7** | `comic-redis` | 高速缓存服务 |
+
+### 快速启动
 
 ```bash
 cd comic-translate-web
 docker-compose up -d
 ```
 
-服务将自动挂载你的 `models`、`page` 目录以及 `config.yaml` 配置文件进入容器并开始轮询任务。
+在线 API 密钥等配置，待容器启动后直接进入 Web 端的“设置”弹窗即可操作，**无需重启容器即时生效**。
+
+### Nginx 网关路由
+
+Nginx 作为唯一对外暴露端口（`:80` / `:443`），实现以下路由策略：
+
+| 路径 | 目标 | 特殊配置 |
+|------|------|----------|
+| `/` | Vue SPA 静态资源 | `try_files` 支持前端路由回退 |
+| `/api/` | Spring Boot `:8080` | 透传 `X-Real-IP`、`X-Forwarded-For`；配置 CORS 跨域头 |
+| `/process-image` | AI Worker `:8000` | 关闭 `proxy_buffering`；`read_timeout 300s`；`body_size 50M` |
+| `/config` | AI Worker `:8000` | 配置管理（读取脱敏 / 写入热更新） |
+
+生产环境已部署 SSL 证书，启用 HTTPS 并强制 TLSv1.2 / TLSv1.3。
+
+### 镜像构建优化
+
+AI Worker 镜像基于 `python:3.10-slim`，采用以下策略控制体积与加速构建：
+- 分层构建顺序优化，最大化 Docker 层缓存命中率
+- 阿里云 APT 镜像源加速系统依赖安装
+- `--no-cache-dir` + APT 缓存清理减少冗余层
+- 模型文件、配置、日志通过 **Volume 热挂载**至宿主机，迭代无需重建镜像
+
+### 日志归集
+
+各服务日志通过 Docker Volume 统一挂载至宿主机 `./Log` 目录：
+- **AI Worker**：`tee` 双写，标准输出 + 文件同步记录
+- **Spring Boot**：`logging.file.name` 配置输出
+- **Nginx**：access / error log 分离
+
+便于运维排查，也为后续接入 ELK / Loki 等日志分析平台预留了接口。
 
 ---
 
@@ -93,16 +158,29 @@ docker-compose up -d
 
 ```text
 comic-translate-web/
-├── comic-translate-ai/
+├── docker-compose.yml                     # 多服务编排定义
+├── Dockerfile                             # AI Worker 镜像构建
+├── init.sql                               # PostgreSQL 初始化脚本
+│
+├── nginx/
+│   ├── conf.d/
+│   │   └── default.conf                   # Nginx 路由与反向代理配置
+│   └── certs/                             # SSL 证书目录
+│
+├── comic-translate-ai/                    # AI 推理引擎 (FastAPI)
 │   ├── main/
-│   │   ├── main.py                       # 异步多进程任务监听入口
-│   │   ├── config.yaml                   # 唯一事实配置表
-│   │   ├── comic_translator_pipeline.py  # OCR / 翻译 / 修补核心调度逻辑
-│   │   └── vertical_typesetter.py        # 核心：动态自适应中文排版引擎
-│   ├── models/                           # 需预先放入模型的目录
-│   ├── font_file/                        # 自定义预置字体配置
-│   └── page/                             # 输入/输出图床目录
-└── docker-compose.yml
+│   │   ├── app.py                         # FastAPI 应用入口 & 配置热更新
+│   │   ├── config.yaml                    # 唯一事实配置表
+│   │   ├── comic_translator_pipeline.py   # OCR / 翻译 / 修补核心调度
+│   │   ├── vertical_typesetter.py         # 动态自适应中文排版引擎
+│   │   └── manga_lama.py                  # LaMa 图像修补封装
+│   ├── models/                            # AI 模型文件 (Volume 挂载)
+│   ├── font_file/                         # 自定义预置字体
+│   └── page/                              # 输入/输出图床目录
+│
+├── comic-translate-web/                   # Spring Boot 后端 API
+├── comic-translate-ui/                    # Vue 前端 (构建后由 Nginx 分发)
+└── Log/                                   # 统一日志归集目录 (Volume 挂载)
 ```
 
 ---
@@ -112,9 +190,16 @@ comic-translate-web/
 - [x] 基于纯配置文件的隔离机制
 - [x] 背景修补光晕与鬼影消除
 - [x] 基于真实掩膜 (Mask) 面积的动态排版引擎重构
+- [x] Docker Compose 多服务容器化编排
+- [x] Nginx 反向代理网关 + SSL/HTTPS
+- [x] FastAPI 封装 AI Pipeline 为 RESTful API
+- [x] 运行时配置热更新（无需重启容器）
+- [x] 多容器日志统一归集
 - [ ] 针对剧情上下文的记忆跨图连续翻译
 - [ ] 基于 UI 前端的交互式修正面版
 - [ ] 根据翻译出的情感内容（愤怒、窃语等）调用多重表现渲染效果字
+- [ ] 接入 CI/CD 自动构建与镜像推送
+- [ ] Prometheus + Grafana 服务监控
 
 ---
 
