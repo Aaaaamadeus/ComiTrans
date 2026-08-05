@@ -2,6 +2,14 @@
 
 ComiTrans v2.0.0 是本地漫画自动汉化桌面客户端，从原来的 Web 架构重构为纯本地 PySide6 应用。AI 检测、OCR、翻译、背景修复和中文排版全部在当前机器上直接执行，不再依赖浏览器、Spring Boot、FastAPI、PostgreSQL、Redis 或 Nginx。
 
+## 即下即用（推荐）
+
+1. 从 GitHub Releases 下载最新 v2.0.0 压缩包。
+2. 解压后双击 `ComiTrans.exe`。
+3. 在“API 配置”页填写你的翻译 API Key 和模型。
+
+Release 用户不需要安装 Python、PyTorch、pip 或 CUDA Toolkit。模型、字体和 AI 依赖都已打进程序。GPU 加速只需本机已有 NVIDIA 驱动。
+
 ## v2.0.0 重点改动
 
 - **纯本地桌面客户端**：抛弃 Web 页面，改为 PySide6 桌面应用，启动后即可使用。
@@ -29,7 +37,9 @@ ComiTrans v2.0.0 是本地漫画自动汉化桌面客户端，从原来的 Web �
 5. 动态中文排版并导出图片
 6. 保存清理底图与布局 JSON，供人工编辑
 
-## 环境准备
+## 源码运行（开发者）
+
+以下步骤仅适合开发者或需要从源码运行的用户，Release 用户请直接使用上面的即下即用方式。
 
 推荐 Python 3.10+，支持 CUDA 的 NVIDIA GPU 可选。
 
