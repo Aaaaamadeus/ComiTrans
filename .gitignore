@@ -26,9 +26,11 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
-nginx/certs/*.key
-nginx/certs/*.pem
-nginx/certs/*.crt
+.pip-cache/
+comic-translate-ai/main/config.yaml
+legacy/web/nginx/certs/*.key
+legacy/web/nginx/certs/*.pem
+legacy/web/nginx/certs/*.crt
 
 # ===== Python (comic-translate-ai) =====
 __pycache__/
@@ -51,10 +53,14 @@ comic-translate-ai/models/**/*.pt
 comic-translate-ai/models/**/*.pth
 comic-translate-ai/models/**/*.onnx
 comic-translate-ai/models/**/*.bin
+comic-translate-ai/models/
 models/manga-ocr-base
 
 # Python 测试页面输出
 comic-translate-ai/page/test_page_output/
+comic-translate-ai/page/*_layout/
+comic-translate-ai/page/temp_api/
+app/
 
 # ===== Node.js / Vue 前端 (comic-tanslate-ui) =====
 node_modules/
@@ -76,5 +82,19 @@ comic-tanslate-web/target/
 # ===== Docker =====
 docker-compose.override.yml
 
+# ===== Legacy web (archived, no longer the active architecture) =====
+legacy/web/**/node_modules/
+legacy/web/**/dist/
+legacy/web/**/dist-ssr/
+legacy/web/**/coverage/
+legacy/web/**/package-lock.json
+legacy/web/**/target/
+legacy/web/**/*.class
+legacy/web/**/*.jar
+legacy/web/**/*.war
+legacy/web/**/*.ear
+legacy/web/docker-compose.override.yml
 
-.jpg
+
+*.jpg
+*.png

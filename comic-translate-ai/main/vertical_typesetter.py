@@ -3,6 +3,10 @@ import traceback
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+
+UPRIGHT_VERTICAL_PUNCTUATION = set("，。！？；：、")
+
+
 class VerticalTypesetter:
     def __init__(self, font_map, font_size, color=(0, 0, 0)):
         self.fonts = {}
@@ -163,7 +167,17 @@ class VerticalTypesetter:
             lines.append(current_line)
         return lines
 
-    def draw_text(self, image, box, text, style, mask=None):
+    def draw_text(
+        self,
+        image,
+        box,
+        text,
+        style,
+        mask=None,
+        direction=0,
+        target_font_size=None,
+        non_bubble=False,
+    ):
         """执行竖排绘制 (使用绝对居中算法 anchor='mm')"""
         try:
             x1, y1, x2, y2 = map(int, box[:4])
@@ -198,6 +212,12 @@ class VerticalTypesetter:
             box_width = int(raw_width * scale_ratio)
             box_height = int(raw_height * scale_ratio)
 
+            if non_bubble:
+                raw_width = x2 - x1
+                raw_height = y2 - y1
+                box_width = int(raw_width * scale_ratio)
+                box_height = int(raw_height * scale_ratio)
+
             base_font = self.fonts.get(style, self.fonts.get('dialogue'))
             current_font = base_font
 
@@ -210,6 +230,9 @@ class VerticalTypesetter:
                     pass
 
             clean_text = text.replace('\n', '')
+            preferred_size = None
+            if target_font_size and target_font_size > 0:
+                preferred_size = max(10, int(target_font_size * 0.85))
             available_area = 0
             if mask is not None:
                 try:
@@ -233,24 +256,50 @@ class VerticalTypesetter:
                     available_area = 0
             if available_area == 0:
                 available_area = (box_width * box_height)
+            # 用原始气泡框面积估算可排版区域，避免文本 mask 导致字号过小。
+            available_area = max(1, raw_width * raw_height)
             columns = self.wrap_text_vertical(clean_text, box_height, current_font)
             if not columns: return image
             # 智能寻找最佳字号
             # 自动判断排版方向
             # 宽高比 > 1.5 则横排，否则竖排
-            is_horizontal = (box_width / box_height) > 1.1
+            if direction == 1:
+                is_horizontal = False
+            elif direction == 0:
+                is_horizontal = box_width > box_height * 1.5
+            else:
+                is_horizontal = box_width > box_height * 1.5
 
             # 智能预估起点
             try:
                 # 恢复至初版的保守字号预估，提供充沛的留白
-                estimated_size = int(math.sqrt(available_area / (len(clean_text) + 1) / 1.5))
+                estimated_size = int(math.sqrt(available_area / (len(clean_text) + 1) / 2.2))
                 max_allowed_size = min(box_width, box_height)
                 
                 # 恢复至初版极其严格的极限值封锁（基础值的 1.5 倍）
-                upper_bound = min(max_allowed_size, max(12, int(estimated_size * 1.5)))
-                lower_bound = 12
+                if style in ("radiating", "handwriting"):
+                    size_cap = int(min(box_width, box_height) * 0.85)
+                    estimate_multiplier = 1.5
+                    lower_bound = 16
+                else:
+                    size_cap = int(min(box_width, box_height) * 0.45)
+                    estimate_multiplier = 1.2
+                    lower_bound = 12
+                if non_bubble:
+                    size_cap = min(size_cap, int(min(box_width, box_height) * 0.35))
+                pref_cap = None
+                if preferred_size:
+                    lower_bound = min(lower_bound, max(10, preferred_size))
+                    pref_cap = int(preferred_size * 0.9) if non_bubble else preferred_size
+                    size_cap = min(size_cap, pref_cap)
+                upper_bound = min(
+                    max_allowed_size,
+                    max(lower_bound, size_cap, int(estimated_size * estimate_multiplier)),
+                )
+                if pref_cap:
+                    upper_bound = min(upper_bound, pref_cap)
             except:
-                upper_bound = 24
+                upper_bound = min(24, preferred_size) if preferred_size else 24
                 lower_bound = 12
 
             # 二分查找最佳字号
@@ -268,7 +317,7 @@ class VerticalTypesetter:
             while low <= high:
                 mid = (low + high) // 2
                 if mid % 2 != 0: mid -= 1
-                if mid < 12: mid = 12
+                if mid < lower_bound: mid = lower_bound
 
                 font = self._get_font_object(style, mid)
 
@@ -375,9 +424,13 @@ class VerticalTypesetter:
                             paste_y = target_center_y - temp_size // 2
                             image.paste(rotated_txt, (paste_x, paste_y), rotated_txt)
                         else:
-                            # 普通文字：直接使用 anchor='mm' 让 Python 帮你对齐
+                            punct_offset = (
+                                int(sample_w * 0.25)
+                                if char in UPRIGHT_VERTICAL_PUNCTUATION
+                                else 0
+                            )
                             draw.text(
-                                (target_center_x, target_center_y),
+                                (target_center_x + punct_offset, target_center_y),
                                 char,
                                 font=current_font,
                                 fill=self.color,
