@@ -126,7 +126,7 @@ Except for next-episode previews, all text defaults to `radiating`. Ultra-wide h
 ## Translation Pipeline
 
 1. **Bubble & text detection**: an ONNX detector outputs bubbles, text masks, and text lines.
-2. **Japanese OCR**: ONNX Manga-OCR recognizes Japanese text. English blocks are preserved and skipped (not erased or translated).
+2. **Japanese OCR**: ONNX Manga-OCR recognizes Japanese text. Blocks detected as English, or whose OCR output looks like garbled Latin, are kept whole: no OCR, no erasing, and no typesetting.
 3. **LLM translation**: pure-text mode translates OCR results; multimodal mode sends the page image and asks the AI to configure font, size, and direction.
 4. **Background inpainting**: erases only the detector text mask; simple white bubbles are filled directly, complex backgrounds use LaMa ONNX.
 5. **Chinese typesetting**: font size is estimated from the mask area, text is centered on the mask centroid, orientation adapts automatically, and long text gets tighter sizing.
@@ -215,7 +215,7 @@ ComiTrans
 - Balanced orientation thresholds to reduce horizontal/vertical misclassification.
 - Balanced font sizes: larger for vertical text, tighter for horizontal and long text; mask-area sizing and mask-centroid layout.
 - Erasing now uses the detector text mask only, not the whole bubble.
-- English text blocks are preserved and skipped by OCR/inpaint.
+- English text blocks are fully skipped: no OCR, no erasing, no typesetting; high Latin/full-width Latin ratio in OCR output is auto-detected and the original text is kept.
 - Cleaned canvases moved to `<output_dir>_cleaned/`.
 - Removed training/visualization dependencies (matplotlib, wandb, pandas, torchsummary).
 
@@ -237,7 +237,7 @@ Beside the exe at `comic-translate-ai/models/`. Release users must extract `Comi
 
 **Why is English text not translated?**
 
-The current OCR model is Japanese-only and garbles English. English blocks are preserved and skipped. Enable multimodal translation to translate English, or wait for a future English OCR.
+The current OCR model is Japanese-only and garbles English. English is detected in two layers: detector labels marked as English, and OCR output where Latin/full-width Latin characters account for at least 40%. Matched blocks skip OCR, erasing, and typesetting so the original English stays on the page. To translate English, enable multimodal translation or wait for a future English OCR.
 
 **Why is the app archive so small?**
 
