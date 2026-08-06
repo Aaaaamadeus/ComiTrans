@@ -604,7 +604,10 @@ class ComicTranslatorPipeline:
         
         processed_data = []
         for i, item in enumerate(bubble_metadata):
-            trans_text = translated_list[i] if i < len(translated_list) else ""
+            if len(bubbles_data[i]) > 8 and bubbles_data[i][8] == 'eng':
+                trans_text = ""
+            else:
+                trans_text = translated_list[i] if i < len(translated_list) else ""
             font_cfg = font_config.get(i, {})
 
             processed_data.append({
