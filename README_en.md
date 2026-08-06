@@ -21,11 +21,13 @@ Since v2.1.0, detection, OCR, and inpainting are powered entirely by **ONNX Runt
 ## Before / After
 
 > [!NOTE]
-> Put comparison images into `docs/images/`: `before.jpg` (original page) and `after.jpg` (translated page). They will show up here once added to the repository.
+> If you need other language, open an issue and i will add it.
+> and maybe support add new language by yourself in a future update.
 
 | Before | After |
 | --- | --- |
-| ![Before](docs/images/before.jpg) | ![After](docs/images/after.jpg) |
+| ![Before](docs/images/before1.jpg) | ![After](docs/images/after1.jpg) |
+| ![Before](docs/images/before2.jpg) | ![After](docs/images/after2.jpg) |
 
 ## Table of Contents
 
