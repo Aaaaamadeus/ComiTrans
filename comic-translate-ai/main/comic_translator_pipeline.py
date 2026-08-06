@@ -122,6 +122,7 @@ class ComicTranslatorPipeline:
                 font_type,
                 detected_font_size,
                 detected_label,
+                getattr(line, 'language', 'unknown'),
             ))
 
         return bubbles
@@ -136,6 +137,8 @@ class ComicTranslatorPipeline:
 
         crop_img = img_array[y1:y2, x1:x2]
         if crop_img.size == 0: return ""
+        if len(box) > 8 and box[8] == 'eng':
+            return ""
 
         if method == 'manga-ocr':
             # 必须转为 RGB PIL
@@ -191,6 +194,8 @@ class ComicTranslatorPipeline:
         needs_ai_inpainting = False
         for data in boxes:
             x1, y1, x2, y2 = data[:4]
+            if len(data) > 8 and data[8] == 'eng':
+                continue
             paddle = 15  # 扩大上下文参考边缘，供 LaMa 获取足够纹理
             safe_x1 = max(0, x1 - paddle)
             safe_y1 = max(0, y1 - paddle)
@@ -543,7 +548,7 @@ class ComicTranslatorPipeline:
         # 3.OCR 与 翻译 (并行处理数据)
         processed_data = []
         for i, box in enumerate(bubbles_data):
-            x1, y1, x2, y2, mask_type, font_type, target_font_size, detected_label = box
+            x1, y1, x2, y2, mask_type, font_type, target_font_size, detected_label, language = box
 
             raw_text = self.run_ocr(img_cv, box, method='manga-ocr')
             self._check_cancelled()
