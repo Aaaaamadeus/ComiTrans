@@ -18,6 +18,15 @@ ComiTrans 是一款纯本地运行的漫画自动汉化桌面客户端。它把�
 
 从 v2.1.0 开始，检测、OCR、修复全部切换为 **ONNX Runtime 推理**，彻底移除 PyTorch / torchvision / transformers 依赖；主程序和模型拆分发布，程序压缩包约 0.4GB，更新程序时不再需要重新下载模型。
 
+## 翻译前后对比
+
+> [!NOTE]
+> 对比图放在 `docs/images/` 目录：`before.jpg`（原文页）和 `after.jpg`（汉化页），放入仓库后会自动显示在这里。
+
+| 翻译前 | 翻译后 |
+| --- | --- |
+| ![翻译前](docs/images/before.jpg) | ![翻译后](docs/images/after.jpg) |
+
 ## 目录
 
 1. [核心特性](#核心特性)
