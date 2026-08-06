@@ -102,8 +102,11 @@ class ComicTranslatorPipeline:
             detected_label = int(getattr(line, 'label', 0))
             box_width = max(1, int(box[2] - box[0]))
             box_height = max(1, int(box[3] - box[1]))
-            # ?????? radiating????????? OCR ???? next_preview
-            font_type = 'radiating'
+            # ???????????????????? radiating
+            if mask_type == 0 and box_width > box_height * 2.5:
+                font_type = 'narration'
+            else:
+                font_type = 'radiating'
             # ?????????????????????????
             if detected_font_size > 0:
                 size_limit = int(box_height * 0.9) if mask_type == 1 else int(box_height * 0.5)
