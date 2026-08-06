@@ -266,7 +266,8 @@ class VerticalTypesetter:
             if direction == 1:
                 is_horizontal = False
             elif direction == 0:
-                is_horizontal = box_width > box_height * 1.5
+                # ???????????????????????????? 1.5 ???????
+                is_horizontal = box_width > box_height * 1.1
             else:
                 is_horizontal = box_width > box_height * 1.5
 
