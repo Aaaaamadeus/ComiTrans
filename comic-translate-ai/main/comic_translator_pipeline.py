@@ -105,7 +105,7 @@ class ComicTranslatorPipeline:
             font_type = 'dialogue'
             if is_wide_caption:
                 font_type = 'serious'
-            elif detected_font_size > 0 and detected_font_size / box_height >= 0.7:
+            elif detected_font_size > 0 and detected_font_size / box_height >= 0.55:
                 font_type = 'radiating'
             elif detected_label == 2:
                 font_type = 'handwriting'

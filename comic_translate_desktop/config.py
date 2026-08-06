@@ -30,7 +30,7 @@ FONT_KEYS = {
     "serious": "font_serious",
 }
 FONT_DEFAULTS = {
-    "dialogue": "font_file/CN/SourceHanSerifCN-Regular-1.otf",
+    "dialogue": "font_file/CN/SourceHanSansSC-Medium-2.otf",
     "radiating": "font_file/CN/SourceHanSansSC-Heavy-2.otf",
     "handwriting": "font_file/CN/setofont.ttf",
     "serious": "font_file/CN/SourceHanSansSC-Medium-2.otf",
