@@ -234,6 +234,7 @@ class VerticalTypesetter:
             if target_font_size and target_font_size > 0:
                 preferred_size = max(10, int(target_font_size * (0.5 if len(clean_text) > 14 else 0.65)))
             available_area = 0
+            mask_center = None
             if mask is not None:
                 try:
                     # 1. 裁剪出当前扩充后气泡区域的 mask (保证能够抓取到真实泡泡的边缘)
@@ -248,16 +249,22 @@ class VerticalTypesetter:
                     # 稍微缩小一点范围以模拟 padding (比如只统计 80% 的像素)
                     mask_arr = np.array(bubble_mask)
                     # 统计值 > 0 的像素点个数
-                    pixel_count = np.count_nonzero(mask_arr)
-                    # available_area = pixel_count * 0.7
-                    available_area = pixel_count * 0.9
+                    ys, xs = np.nonzero(mask_arr)
+                    if xs.size > 0:
+                        mask_area = int((xs.max() - xs.min() + 1) * (ys.max() - ys.min() + 1))
+                        available_area = mask_area * 0.9
+                        mask_center = (
+                            expanded_x1 + int((xs.min() + xs.max()) // 2),
+                            expanded_y1 + int((ys.min() + ys.max()) // 2),
+                        )
                 except Exception as e:
                     print(f"Mask 计算失败: {e}")
                     available_area = 0
             if available_area == 0:
                 available_area = (box_width * box_height)
-            # 用原始气泡框面积估算可排版区域，避免文本 mask 导致字号过小。
-            available_area = max(1, raw_width * raw_height)
+            # ??????????????????????????
+            if mask_center is not None:
+                center_x, center_y = mask_center
             columns = self.wrap_text_vertical(clean_text, box_height, current_font)
             if not columns: return image
             # 智能寻找最佳字号

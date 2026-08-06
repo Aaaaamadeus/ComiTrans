@@ -233,18 +233,22 @@ class ComicTranslatorPipeline:
             # 只对筛选后的文字进行膨胀，增强边缘包围，防止遗留抗锯齿的灰色鬼影
             text_mask_union = text_mask.copy()
             text_mask_precise = text_mask.copy()
+            text_mask_erase = text_mask.copy()
             if hasattr(self, "last_detector_mask") and self.last_detector_mask is not None:
                 detector_roi = self.last_detector_mask[safe_y1:safe_y2, safe_x1:safe_x2]
                 if np.count_nonzero(detector_roi) > 0:
                     detector_bool = detector_roi > 0
                     text_mask_union = np.where(detector_bool | (text_mask > 0), 255, 0).astype(np.uint8)
                     text_mask_precise = np.where(detector_bool & (text_mask > 0), 255, 0).astype(np.uint8)
+                    # ????????????????/????????????
+                    text_mask_erase = np.where(detector_bool, 255, 0).astype(np.uint8)
                     if np.count_nonzero(text_mask_precise) == 0:
                         text_mask_precise = text_mask_union.copy()
 
             kernel = np.ones((3, 3), np.uint8)
             text_mask_precise_dilated = cv2.dilate(text_mask_precise, kernel, iterations=1)
             text_mask_union_dilated = cv2.dilate(text_mask_union, kernel, iterations=1)
+            text_mask_erase_dilated = cv2.dilate(text_mask_erase, kernel, iterations=1)
 
             layout_kernel = np.ones((5, 5), np.uint8)
             layout_mask_roi = cv2.dilate(text_mask_union, layout_kernel, iterations=2)
@@ -260,7 +264,7 @@ class ComicTranslatorPipeline:
                 offset_y : offset_y + (box_y2 - box_y1),
                 offset_x : offset_x + (box_x2 - box_x1),
             ]
-            inner_union = text_mask_union_dilated[
+            inner_erase = text_mask_erase_dilated[
                 offset_y : offset_y + (box_y2 - box_y1),
                 offset_x : offset_x + (box_x2 - box_x1),
             ]
@@ -272,11 +276,11 @@ class ComicTranslatorPipeline:
                 roi_img[
                     offset_y : offset_y + (box_y2 - box_y1),
                     offset_x : offset_x + (box_x2 - box_x1),
-                ][inner_union == 255] = [255, 255, 255]
+                ][inner_erase == 255] = [255, 255, 255]
             else:
                 # 调用模型处理
                 needs_ai_inpainting = True
-                lama_mask[safe_y1:safe_y2, safe_x1:safe_x2] = text_mask_union_dilated
+                lama_mask[safe_y1:safe_y2, safe_x1:safe_x2] = text_mask_erase_dilated
         
         # 循环结束后统一生成掩膜图像，避免重复转换
         self.current_mask_image = Image.fromarray(full_layout_mask)
