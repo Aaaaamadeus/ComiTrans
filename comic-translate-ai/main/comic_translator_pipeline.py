@@ -2,6 +2,7 @@ import os
 import base64
 import sys
 import json
+import re
 import threading
 from pathlib import Path
 import cv2
@@ -104,7 +105,7 @@ class ComicTranslatorPipeline:
             is_wide_caption = mask_type == 0 and box_width > box_height * 2.0
             font_type = 'dialogue'
             if is_wide_caption:
-                font_type = 'serious'
+                font_type = 'narration'
             elif detected_font_size > 0 and detected_font_size / box_height >= 0.55:
                 font_type = 'radiating'
             elif detected_label == 2:
@@ -502,7 +503,7 @@ class ComicTranslatorPipeline:
                 if idx < 0 or idx >= len(ocr_texts):
                     continue
                 style = item.get("font_style", "dialogue")
-                if style not in ("dialogue", "radiating", "handwriting", "serious"):
+                if style not in ("dialogue", "radiating", "handwriting", "serious", "narration", "next_preview", "title"):
                     style = "dialogue"
                 size = int(item.get("font_size") or 0)
                 direction = 1 if str(item.get("direction", "")).lower().startswith("v") else 0
@@ -548,11 +549,16 @@ class ComicTranslatorPipeline:
 
             raw_text = self.run_ocr(img_cv, box, method='manga-ocr')
             self._check_cancelled()
+            style = font_type
+            if raw_text and re.search(r"次回|つづく|続く|待续|下回|TO BE CONTINUED|次号", raw_text, re.IGNORECASE):
+                style = "next_preview"
+            elif font_type == "radiating" and len(raw_text.strip()) <= 8:
+                style = "title"
 
             bubble_metadata.append({
                 "box": box,
                 "raw": raw_text,
-                "style": font_type,
+                "style": style,
                 "direction": mask_type,
                 "target_font_size": target_font_size,
                 "non_bubble": detected_label == 2

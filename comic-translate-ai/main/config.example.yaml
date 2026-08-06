@@ -1,10 +1,13 @@
 ﻿api_base_url: ""
 api_key: ""
 detector_model: models/text_detector/comic-text-detector.onnx
-font_dialogue: font_file/CN/SourceHanSerifCN-Regular-1.otf
+font_dialogue: font_file/CN/SourceHanSansSC-Medium-2.otf
 font_handwriting: font_file/CN/setofont.ttf
-font_radiating: font_file/CN/SourceHanSansSC-Heavy-2.otf
+font_radiating: font_file/CN/special/SmileySans-Oblique.ttf
 font_serious: font_file/CN/SourceHanSansSC-Medium-2.otf
+font_narration: font_file/CN/special/LXGWWenKai-Regular.ttf
+font_next_preview: font_file/CN/special/KleeOne-Regular.ttf
+font_title: font_file/CN/SourceHanSansSC-Heavy-2.otf
 font_size: 16
 issue_url: ""
 lama_model: models/manga-lama/lama-manga-dynamic.onnx

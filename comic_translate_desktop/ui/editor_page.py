@@ -101,7 +101,7 @@ class EditorPage(QWidget):
 
         form = QFormLayout()
         self._style_combo = QComboBox()
-        self._style_combo.addItems(["dialogue", "radiating", "handwriting", "serious"])
+        self._style_combo.addItems(["dialogue", "radiating", "handwriting", "serious", "narration", "next_preview", "title"])
         self._size_spin = QSpinBox()
         self._size_spin.setRange(0, 200)
         self._size_spin.setSpecialValueText("自动")

@@ -28,12 +28,18 @@ FONT_KEYS = {
     "radiating": "font_radiating",
     "handwriting": "font_handwriting",
     "serious": "font_serious",
+    "narration": "font_narration",
+    "next_preview": "font_next_preview",
+    "title": "font_title",
 }
 FONT_DEFAULTS = {
     "dialogue": "font_file/CN/SourceHanSansSC-Medium-2.otf",
-    "radiating": "font_file/CN/SourceHanSansSC-Heavy-2.otf",
+    "radiating": "font_file/CN/special/SmileySans-Oblique.ttf",
     "handwriting": "font_file/CN/setofont.ttf",
     "serious": "font_file/CN/SourceHanSansSC-Medium-2.otf",
+    "narration": "font_file/CN/special/LXGWWenKai-Regular.ttf",
+    "next_preview": "font_file/CN/special/KleeOne-Regular.ttf",
+    "title": "font_file/CN/SourceHanSansSC-Heavy-2.otf",
 }
 
 
