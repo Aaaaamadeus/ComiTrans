@@ -232,7 +232,7 @@ class VerticalTypesetter:
             clean_text = text.replace('\n', '')
             preferred_size = None
             if target_font_size and target_font_size > 0:
-                preferred_size = max(10, int(target_font_size * 0.65))
+                preferred_size = max(10, int(target_font_size * (0.5 if len(clean_text) > 14 else 0.65)))
             available_area = 0
             if mask is not None:
                 try:
@@ -274,7 +274,9 @@ class VerticalTypesetter:
             # 智能预估起点
             try:
                 # 恢复至初版的保守字号预估，提供充沛的留白
-                estimated_size = int(math.sqrt(available_area / (len(clean_text) + 1) / 2.2))
+                text_len = len(clean_text)
+                density = 4.0 if text_len > 14 else 2.2
+                estimated_size = int(math.sqrt(available_area / (text_len + 1) / density))
                 max_allowed_size = min(box_width, box_height)
                 
                 # 恢复至初版极其严格的极限值封锁（基础值的 1.5 倍）
@@ -284,6 +286,8 @@ class VerticalTypesetter:
                     lower_bound = 16
                 else:
                     size_cap = int(min(box_width, box_height) * 0.35)
+                    if len(clean_text) > 14:
+                        size_cap = min(size_cap, int(min(box_width, box_height) * 0.28))
                     estimate_multiplier = 1.2
                     lower_bound = 12
                 if non_bubble:
