@@ -124,7 +124,8 @@ class EditorPage(QWidget):
 
     def load_page(self, output_path) -> None:
         self.output_path = Path(output_path)
-        self.cleaned_path = self.output_path.with_name(self.output_path.stem + "_cleaned.png")
+        cleaned_dir = self.output_path.parent.parent / f"{self.output_path.parent.name}_cleaned"
+        self.cleaned_path = cleaned_dir / f"{self.output_path.stem}_cleaned.png"
         layout_dir = self.output_path.parent.parent / f"{self.output_path.parent.name}_layout"
         layout_dir.mkdir(parents=True, exist_ok=True)
         layout_path = layout_dir / f"{self.output_path.stem}_layout.json"

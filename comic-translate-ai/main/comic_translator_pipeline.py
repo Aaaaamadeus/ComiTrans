@@ -606,7 +606,9 @@ class ComicTranslatorPipeline:
 
         # 5. 嵌字 (Typesetting)
         cleaned_canvas = final_canvas.copy()
-        cleaned_path = output_path.with_name(output_path.stem + "_cleaned.png")
+        cleaned_dir = output_path.parent.parent / f"{output_path.parent.name}_cleaned"
+        cleaned_dir.mkdir(parents=True, exist_ok=True)
+        cleaned_path = cleaned_dir / f"{output_path.stem}_cleaned.png"
         cleaned_canvas.save(cleaned_path)
         layout_dir = output_path.parent.parent / f"{output_path.parent.name}_layout"
         layout_dir.mkdir(parents=True, exist_ok=True)
