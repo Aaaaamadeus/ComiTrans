@@ -318,13 +318,13 @@ def examine_textblk(blk: TextBlock, im_w: int, im_h: int, sort: bool = False) ->
     box_w = max(1, blk.xyxy[2] - blk.xyxy[0])
     box_h = max(1, blk.xyxy[3] - blk.xyxy[1])
     if blk.language == 'ja':
-        # ?????????????????????????????????
-        if box_w > box_h * 1.25:
+        # ??????? >= ??????????????????????????
+        if box_w >= box_h:
             vertical = False
-        elif box_h > box_w * 1.25:
+        elif box_h > box_w * 1.5:
             vertical = True
         else:
-            vertical = norm_v > norm_h * 1.35
+            vertical = norm_v > norm_h * 2.0
     else:
         vertical = norm_v > norm_h * 2
     # calculate distance between textlines and origin 
