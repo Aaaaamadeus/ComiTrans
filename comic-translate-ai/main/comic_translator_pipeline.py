@@ -102,14 +102,8 @@ class ComicTranslatorPipeline:
             detected_label = int(getattr(line, 'label', 0))
             box_width = max(1, int(box[2] - box[0]))
             box_height = max(1, int(box[3] - box[1]))
-            is_wide_caption = mask_type == 0 and box_width > box_height * 2.0
-            font_type = 'dialogue'
-            if is_wide_caption:
-                font_type = 'narration'
-            elif detected_font_size > 0 and detected_font_size / box_height >= 0.55:
-                font_type = 'radiating'
-            elif detected_label == 2:
-                font_type = 'handwriting'
+            # ?????? radiating????????? OCR ???? next_preview
+            font_type = 'radiating'
             # ?????????????????????????????
             if detected_font_size > 0:
                 detected_font_size = max(10, min(detected_font_size, int(box_height * 0.5)))
@@ -552,8 +546,6 @@ class ComicTranslatorPipeline:
             style = font_type
             if raw_text and re.search(r"次回|つづく|続く|待续|下回|TO BE CONTINUED|次号", raw_text, re.IGNORECASE):
                 style = "next_preview"
-            elif font_type == "radiating" and len(raw_text.strip()) <= 8:
-                style = "title"
 
             bubble_metadata.append({
                 "box": box,
