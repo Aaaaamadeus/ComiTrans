@@ -14,7 +14,10 @@ import random
 from numpy.random import rand
 from trdg.utils import load_dict, load_fonts
 from tqdm import tqdm
-import pandas as pd
+try:
+    import pandas as pd
+except Exception:
+    pd = None
 import sys
 sys.path.append(os.getcwd())
 from utils.io_utils import find_all_imgs, imread, imwrite

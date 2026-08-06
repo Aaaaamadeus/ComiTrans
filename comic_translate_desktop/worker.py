@@ -88,8 +88,11 @@ class BatchWorker(QThread):
             sys.path.insert(0, main_dir)
         os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
+        self.log.emit("[预热] 开始导入 comic_translator_pipeline")
         from comic_translator_pipeline import ComicTranslatorPipeline
+        self.log.emit("[预热] pipeline 导入完成")
 
+        self.log.emit("[预热] 开始实例化 AI 管线")
         with self._capture_pipeline_output():
             pipeline = ComicTranslatorPipeline(
                 det_model_path=self._config["detector_model"],
@@ -107,6 +110,7 @@ class BatchWorker(QThread):
                 progress_callback=self._emit_stage,
                 cancel_callback=self._is_stopped,
             )
+        self.log.emit("[预热] 实例化完成")
         return pipeline
 
     @staticmethod
@@ -122,7 +126,13 @@ class BatchWorker(QThread):
         main_dir = str(app_config.MAIN_DIR)
         if main_dir not in sys.path:
             sys.path.insert(0, main_dir)
-        from comic_translator_pipeline import TaskCancelledError
+        try:
+            from comic_translator_pipeline import TaskCancelledError
+        except Exception as exc:
+            stack = traceback.format_exc().strip()
+            self.log.emit(f"[严重错误] 无法加载翻译管线: {exc}\n{stack}")
+            self.finished.emit(0, len(self._files))
+            return
 
         success_count = 0
         failed_count = 0

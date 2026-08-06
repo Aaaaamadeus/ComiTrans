@@ -9,13 +9,19 @@ import yaml
 
 
 if getattr(sys, "frozen", False):
-    PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+    PROJECT_ROOT = Path(sys.executable).resolve().parent
+    AI_ROOT = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)) / "comic-translate-ai"
 else:
     PROJECT_ROOT = Path(__file__).resolve().parents[1]
-AI_ROOT = PROJECT_ROOT / "comic-translate-ai"
+    AI_ROOT = PROJECT_ROOT / "comic-translate-ai"
 MAIN_DIR = AI_ROOT / "main"
-CONFIG_PATH = MAIN_DIR / "config.yaml"
-DEFAULT_OUTPUT_DIR = AI_ROOT / "page" / "test_page_output"
+MODELS_ROOT = PROJECT_ROOT / "comic-translate-ai" / "models"
+if getattr(sys, "frozen", False):
+    CONFIG_PATH = PROJECT_ROOT / "config.yaml"
+    DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "page" / "test_page_output"
+else:
+    CONFIG_PATH = MAIN_DIR / "config.yaml"
+    DEFAULT_OUTPUT_DIR = AI_ROOT / "page" / "test_page_output"
 
 FONT_KEYS = {
     "dialogue": "font_dialogue",
@@ -47,13 +53,16 @@ def _clean_text(value: Any) -> str:
     return str(value).strip()
 
 
-def _resolve_path(value: Any, default: str) -> Path:
+def _resolve_path(value: Any, default: str, base: Path | None = None) -> Path:
+    base = base or AI_ROOT
     raw = str(value).strip() if value else ""
     if not raw or raw in ("none", "None"):
-        return AI_ROOT / default
+        return base / default
     path = Path(raw).expanduser()
     if not path.is_absolute():
-        path = AI_ROOT / path
+        if base.name == "models" and path.parts and path.parts[0] == "models":
+            path = Path(*path.parts[1:])
+        path = base / path
     return path
 
 
@@ -74,9 +83,9 @@ def load_ai_config() -> dict[str, Any]:
         "issue_url": str(raw.get("issue_url") or ""),
         "use_gpu": bool(raw.get("use_gpu", False)),
         "font_map": font_map,
-        "detector_model": str(_resolve_path(raw.get("detector_model"), "models/text_detector/comictextdetector.pt")),
-        "lama_model": str(_resolve_path(raw.get("lama_model"), "models/manga-lama/lama-manga-dynamic.onnx")),
-        "ocr_model": str(_resolve_path(raw.get("ocr_model"), "models/manga-ocr-base")),
+        "detector_model": str(_resolve_path(raw.get("detector_model"), "text_detector/comictextdetector.pt", base=MODELS_ROOT)),
+        "lama_model": str(_resolve_path(raw.get("lama_model"), "manga-lama/lama-manga-dynamic.onnx", base=MODELS_ROOT)),
+        "ocr_model": str(_resolve_path(raw.get("ocr_model"), "manga-ocr-base", base=MODELS_ROOT)),
         "page_input_dir": str(_resolve_path(raw.get("page_input_dir"), "page/test_page")),
         "page_output_dir": str(_resolve_path(raw.get("page_output_dir"), "page/test_page_output")),
         "raw": raw,

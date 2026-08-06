@@ -17,5 +17,13 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
+$modelTarget = "dist\ComiTrans\comic-translate-ai\models"
+if (Test-Path "comic-translate-ai\models") {
+    New-Item -ItemType Directory -Force -Path $modelTarget | Out-Null
+    Copy-Item -Recurse -Force "comic-translate-ai\models\*" $modelTarget
+    Write-Host "模型已外置: $modelTarget"
+}
+
 Write-Host ""
 Write-Host "打包完成: dist\ComiTrans\ComiTrans.exe"
+Write-Host "注意: 发布压缩包必须包含 dist\ComiTrans\comic-translate-ai\models 目录"

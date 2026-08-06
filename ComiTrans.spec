@@ -1,6 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_submodules
+import os
+
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+import unidic_lite
+
+UNIDIC_DATA = os.path.join(os.path.dirname(unidic_lite.__file__), "dicdir")
 
 
 hidden_imports = [
@@ -9,20 +14,18 @@ hidden_imports = [
     "vertical_typesetter",
 ]
 hidden_imports += collect_submodules("comic_text_detector")
+hidden_imports += [
+    "pyclipper",
+    "shapely",
+    "tqdm",
+]
 
 datas = [
     ("comic-translate-ai/font_file", "comic-translate-ai/font_file"),
-    ("comic-translate-ai/models/manga-ocr-base", "comic-translate-ai/models/manga-ocr-base"),
-    (
-        "comic-translate-ai/models/manga-lama/lama-manga-dynamic.onnx",
-        "comic-translate-ai/models/manga-lama",
-    ),
-    (
-        "comic-translate-ai/models/text_detector/comictextdetector.pt",
-        "comic-translate-ai/models/text_detector",
-    ),
     ("comic-translate-ai/main/comic_text_detector", "comic-translate-ai/main/comic_text_detector"),
+    (UNIDIC_DATA, "unidic_lite/dicdir"),
 ]
+datas += collect_data_files("manga_ocr")
 
 a = Analysis(
     ["run.py"],
@@ -32,7 +35,21 @@ a = Analysis(
     hiddenimports=hidden_imports,
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        "matplotlib",
+        "pandas",
+        "wandb",
+        "torchsummary",
+        "tkinter",
+        "pytest",
+        "test",
+        "pydoc_data",
+        "setuptools.command",
+        "IPython",
+        "jupyter",
+        "notebook",
+        "numpy.testing",
+    ],
     noarchive=False,
 )
 

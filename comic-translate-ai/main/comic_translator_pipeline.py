@@ -13,8 +13,21 @@ from manga_ocr import MangaOcr
 from loguru import logger
 from manga_lama import MangaLama
 from vertical_typesetter import VerticalTypesetter
-current_dir = os.path.dirname(os.path.abspath(__file__))
-detector_lib_path = os.path.join(current_dir, 'comic_text_detector')
+def _detector_lib_path():
+    candidates = []
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", "")
+        candidates.append(os.path.join(meipass, "comic-translate-ai", "main", "comic_text_detector"))
+        candidates.append(os.path.join(os.path.dirname(sys.executable), "comic-translate-ai", "main", "comic_text_detector"))
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates.append(os.path.join(current_dir, "comic_text_detector"))
+    for cand in candidates:
+        if os.path.isdir(cand):
+            return cand
+    return candidates[-1]
+
+
+detector_lib_path = _detector_lib_path()
 sys.path.append(detector_lib_path)
 from inference import TextDetector
 

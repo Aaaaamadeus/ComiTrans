@@ -1,4 +1,4 @@
-# ComiTrans v2.0.0
+﻿# ComiTrans v2.0.0
 
 ComiTrans v2.0.0 是本地漫画自动汉化桌面客户端，从原来的 Web 架构重构为纯本地 PySide6 应用。AI 检测、OCR、翻译、背景修复和中文排版全部在当前机器上直接执行，不再依赖浏览器、Spring Boot、FastAPI、PostgreSQL、Redis 或 Nginx。
 
@@ -8,7 +8,7 @@ ComiTrans v2.0.0 是本地漫画自动汉化桌面客户端，从原来的 Web �
 2. 解压后双击 `ComiTrans.exe`。
 3. 在“API 配置”页填写你的翻译 API Key 和模型。
 
-Release 用户不需要安装 Python、PyTorch、pip 或 CUDA Toolkit。模型、字体和 AI 依赖都已打进程序。GPU 加速只需本机已有 NVIDIA 驱动。
+Release 用户不需要安装 Python、PyTorch、pip 或 CUDA Toolkit。AI 依赖已打进程序，模型和字体放在程序目录 `comic-translate-ai/` 下，解压后请保留整个目录。GPU 加速只需本机已有 NVIDIA 驱动。
 
 ## v2.0.0 重点改动
 
@@ -25,6 +25,7 @@ Release 用户不需要安装 Python、PyTorch、pip 或 CUDA Toolkit。模型�
 - **Issue 反馈**：右上角可跳转到自填的 GitHub Issue 链接，失败时弹窗提醒提交 Issue。
 - **可打包 exe**：提供 PyInstaller 打包配置，可生成 Windows 桌面程序。
 - **可调整布局**：左右主区域、预览与日志区域均可拖拽调整大小。
+- **体积优化与模型外置**：移除 matplotlib、wandb、pandas、torchsummary 等训练/可视化依赖；模型从程序内部移到 exe 旁 `comic-translate-ai/models/`，便于单独更新和发布。
 
 ## 核心流程
 
@@ -68,6 +69,10 @@ NVIDIA GPU 环境建议安装 CUDA 版 PyTorch：
 - Manga-OCR 模型：`comic-translate-ai/models/manga-ocr-base/`
 - LaMa 修复模型：`comic-translate-ai/models/manga-lama/lama-manga-dynamic.onnx`
 
+## 模型说明与可选模型
+
+检测、OCR 与修复模型当前分别来自 comic-text-detector、kha-white/manga-ocr 和 manga-lama。comictextdetector 的 ONNX 转换版、manga-ocr 的 ONNX 版以及效果更好的漫画文本检测模型候选见 [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md)。
+
 ## 启动客户端
 
 ```bash
@@ -101,7 +106,7 @@ Windows 下也可以直接双击 `start.bat`。
 .\build_app.ps1
 ```
 
-打包完成后，程序位于 `dist\ComiTrans\ComiTrans.exe`。模型、字体和 OCR 权重会一并打包。
+打包完成后，程序位于 `dist\ComiTrans\ComiTrans.exe`。模型不再打进 `_internal`，`build_app.ps1` 会自动把模型复制到 exe 旁的 `comic-translate-ai\models\`，发布时必须连同该目录一起分发。
 
 ## 命令行批量处理
 

@@ -47,6 +47,7 @@ pip-delete-this-directory.txt
 *.egg
 dist/
 build/
+release/
 
 # Python AI 模型文件（体积大，不上传）
 comic-translate-ai/models/**/*.pt

@@ -10,7 +10,10 @@ import glob
 import torch.nn as nn
 from utils.weight_init import init_weights
 from models.yolov5.common import C3, Conv
-from torchsummary import summary
+try:
+    from torchsummary import summary
+except Exception:
+    summary = None
 import torch.nn.functional as F
 import copy
 

@@ -389,13 +389,22 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self.warmup_worker.log.connect(self._append_log)
+        self.warmup_worker.log.connect(self._on_warmup_log)
         self.warmup_worker.pipeline_ready.connect(self._on_pipeline_ready)
         self.warmup_worker.finished.connect(self._on_warmup_finished)
+        self.progress_bar.setRange(0, 0)
         self.warmup_worker.start()
         self._append_log("正在预热 AI 管线...")
 
+    def _on_warmup_log(self, message: str) -> None:
+        if message and not message.startswith("["):
+            self.status_label.setText(f"预热: {message}")
+
     def _on_warmup_finished(self, success: int, failed: int) -> None:
         self.warmup_worker = None
+        self.progress_bar.setRange(0, 1)
+        self.progress_bar.setValue(0)
+        self.status_label.setText("AI 管线已就绪")
 
     def _start_translation(self) -> None:
         files = self._all_files()

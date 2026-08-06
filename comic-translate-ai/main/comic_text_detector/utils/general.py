@@ -1,7 +1,10 @@
 
 import os
 import logging
-import wandb
+try:
+    import wandb
+except Exception:
+    wandb = None
 import torch
 
 def set_logging(name=None, verbose=True):

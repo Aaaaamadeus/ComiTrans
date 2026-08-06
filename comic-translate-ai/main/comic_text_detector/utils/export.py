@@ -1,6 +1,5 @@
 
 from cv2 import imshow
-from matplotlib import lines
 import numpy as np
 import onnxruntime
 import cv2
