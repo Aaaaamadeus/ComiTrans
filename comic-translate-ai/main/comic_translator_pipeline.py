@@ -83,6 +83,16 @@ class ComicTranslatorPipeline:
         if self.cancel_callback and self.cancel_callback():
             raise TaskCancelledError("任务已取消")
 
+    @staticmethod
+    def _looks_like_english_garbage(text: str) -> bool:
+        if not text:
+            return False
+        latin = re.findall(r"[A-Za-z\uff21-\uff3a\uff41-\uff5a]", text)
+        if not latin:
+            return False
+        chars = [c for c in text if not c.isspace()]
+        return len(latin) / max(1, len(chars)) >= 0.4
+
     def detect_bubbles(self, img_cv):
         print("[INFO] 检测气泡中...")
         mask, mask_refined, text_lines = self.detector(img_cv)
@@ -103,7 +113,7 @@ class ComicTranslatorPipeline:
             box_width = max(1, int(box[2] - box[0]))
             box_height = max(1, int(box[3] - box[1]))
             # ???????????????????? radiating
-            if mask_type == 0 and box_width > box_height * 2.5:
+            if mask_type == 0 and box_width > box_height * 2.0:
                 font_type = 'narration'
             else:
                 font_type = 'radiating'
@@ -552,6 +562,9 @@ class ComicTranslatorPipeline:
 
             raw_text = self.run_ocr(img_cv, box, method='manga-ocr')
             self._check_cancelled()
+            if raw_text and self._looks_like_english_garbage(raw_text):
+                bubbles_data[i] = box[:8] + ('eng',)
+                raw_text = ""
             style = font_type
             if raw_text and re.search(r"次回|つづく|続く|待续|下回|TO BE CONTINUED|次号", raw_text, re.IGNORECASE):
                 style = "next_preview"
@@ -610,8 +623,7 @@ class ComicTranslatorPipeline:
 
         # 4. 图像修补 (获得干净的 PIL 画布)
         # 这一步会去除原有文字，生成适合嵌字的底图
-        clean_boxes = [b[:4] for b in bubbles_data]
-        final_canvas = self.inpaint_bubbles(img_cv, clean_boxes)
+        final_canvas = self.inpaint_bubbles(img_cv, bubbles_data)
         self._check_cancelled()
         self._report_progress("inpaint", "背景修复完成")
 
