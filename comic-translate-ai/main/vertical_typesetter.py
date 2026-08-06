@@ -232,7 +232,13 @@ class VerticalTypesetter:
             clean_text = text.replace('\n', '')
             preferred_size = None
             if target_font_size and target_font_size > 0:
-                preferred_size = max(10, int(target_font_size * (0.6 if len(clean_text) > 14 else 0.75)))
+                if direction == 1:
+                    pref_ratio = 0.8 if len(clean_text) > 14 else 0.95
+                else:
+                    pref_ratio = 0.55 if len(clean_text) > 14 else 0.7
+                preferred_size = max(10, int(target_font_size * pref_ratio))
+                if direction == 1:
+                    preferred_size = max(preferred_size, int(box_height * 0.25))
             available_area = 0
             mask_center = None
             if mask is not None:
@@ -283,12 +289,19 @@ class VerticalTypesetter:
                 # 恢复至初版的保守字号预估，提供充沛的留白
                 text_len = len(clean_text)
                 density = 4.0 if text_len > 14 else 2.2
+                if is_horizontal:
+                    density *= 1.3
+                else:
+                    density *= 0.75
                 estimated_size = int(math.sqrt(available_area / (text_len + 1) / density))
                 max_allowed_size = min(box_width, box_height)
                 
                 # 恢复至初版极其严格的极限值封锁（基础值的 1.5 倍）
                 if style in ("radiating", "handwriting"):
-                    size_cap = int(min(box_width, box_height) * 0.85)
+                    if is_horizontal:
+                        size_cap = int(min(box_width, box_height) * 0.6)
+                    else:
+                        size_cap = int(min(box_width, box_height) * 0.95)
                     estimate_multiplier = 1.5
                     lower_bound = 16
                 else:
