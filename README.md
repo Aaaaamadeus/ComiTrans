@@ -25,8 +25,8 @@ ComiTrans 是一款纯本地运行的漫画自动汉化桌面客户端。它把�
 
 | 翻译前 | 翻译后 |
 | --- | --- |
-| ![翻译前](docs/images/before.jpg) | ![翻译后](docs/images/after.jpg) |
-
+| ![翻译前](docs/images/before1.jpg) | ![翻译后](docs/images/after1.jpg) |
+| ![翻译前](docs/images/before2.jpg) | ![翻译后](docs/images/after2.jpg) |
 ## 目录
 
 1. [核心特性](#核心特性)
