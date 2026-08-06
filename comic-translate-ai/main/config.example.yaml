@@ -1,6 +1,6 @@
-api_base_url: ""
+﻿api_base_url: ""
 api_key: ""
-detector_model: models/text_detector/comictextdetector.pt
+detector_model: models/text_detector/comic-text-detector.onnx
 font_dialogue: font_file/CN/SourceHanSerifCN-Regular-1.otf
 font_handwriting: font_file/CN/setofont.ttf
 font_radiating: font_file/CN/SourceHanSansSC-Heavy-2.otf
@@ -10,7 +10,7 @@ issue_url: ""
 lama_model: models/manga-lama/lama-manga-dynamic.onnx
 max_workers: null
 multimodal: false
-ocr_model: models/manga-ocr-base
+ocr_model: models/manga-ocr-onnx
 page_input_dir: page/test_page
 page_output_dir: page/test_page_output
 translation_model: gemini-2.5-flash

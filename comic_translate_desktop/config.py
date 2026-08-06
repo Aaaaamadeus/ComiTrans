@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import sys
@@ -83,9 +83,9 @@ def load_ai_config() -> dict[str, Any]:
         "issue_url": str(raw.get("issue_url") or ""),
         "use_gpu": bool(raw.get("use_gpu", False)),
         "font_map": font_map,
-        "detector_model": str(_resolve_path(raw.get("detector_model"), "text_detector/comictextdetector.pt", base=MODELS_ROOT)),
+        "detector_model": str(_resolve_path(raw.get("detector_model"), "text_detector/comic-text-detector.onnx", base=MODELS_ROOT)),
         "lama_model": str(_resolve_path(raw.get("lama_model"), "manga-lama/lama-manga-dynamic.onnx", base=MODELS_ROOT)),
-        "ocr_model": str(_resolve_path(raw.get("ocr_model"), "manga-ocr-base", base=MODELS_ROOT)),
+        "ocr_model": str(_resolve_path(raw.get("ocr_model"), "manga-ocr-onnx", base=MODELS_ROOT)),
         "page_input_dir": str(_resolve_path(raw.get("page_input_dir"), "page/test_page")),
         "page_output_dir": str(_resolve_path(raw.get("page_output_dir"), "page/test_page_output")),
         "raw": raw,
@@ -127,6 +127,6 @@ def missing_models(config: dict[str, Any]) -> list[str]:
         path = Path(config[key])
         if not path.exists():
             missing.append(f"{key}: {path}")
-        elif key == "ocr_model" and path.is_dir() and not (path / "pytorch_model.bin").exists():
-            missing.append(f"{key}: {path} (缺少 pytorch_model.bin)")
+        elif key == "ocr_model" and path.is_dir() and not (path / "encoder_model.onnx").exists():
+            missing.append(f"{key}: {path} (缺少 encoder_model.onnx)")
     return missing

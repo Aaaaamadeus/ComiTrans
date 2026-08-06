@@ -4,11 +4,11 @@ ComiTrans v2.0.0 是本地漫画自动汉化桌面客户端，从原来的 Web �
 
 ## 即下即用（推荐）
 
-1. 从 GitHub Releases 下载最新 v2.0.0 压缩包。
-2. 解压后双击 `ComiTrans.exe`。
-3. 在“API 配置”页填写你的翻译 API Key 和模型。
+1. 从 GitHub Releases 下载主程序包 `ComiTrans-v2.0.0-app.zip` 和模型包 `ComiTrans-v2.0.0-models.zip`。
+2. 解压主程序包得到 `ComiTrans` 文件夹，再把模型包解压到同一 `ComiTrans` 文件夹内（模型会合并到 `ComiTrans\comic-translate-ai\models\`）。
+3. 双击 `ComiTrans.exe`，在“API 配置”页填写你的翻译 API Key 和模型。
 
-Release 用户不需要安装 Python、PyTorch、pip 或 CUDA Toolkit。AI 依赖已打进程序，模型和字体放在程序目录 `comic-translate-ai/` 下，解压后请保留整个目录。GPU 加速只需本机已有 NVIDIA 驱动。
+Release 用户不需要安装 Python、PyTorch、pip 或 CUDA Toolkit。检测、OCR、修复模型均为 ONNX，AI 依赖已打进程序；模型单独一个下载包，便于程序更新时复用。GPU 加速只需本机已有 NVIDIA 驱动。
 
 ## v2.0.0 重点改动
 
@@ -26,6 +26,7 @@ Release 用户不需要安装 Python、PyTorch、pip 或 CUDA Toolkit。AI 依�
 - **可打包 exe**：提供 PyInstaller 打包配置，可生成 Windows 桌面程序。
 - **可调整布局**：左右主区域、预览与日志区域均可拖拽调整大小。
 - **体积优化与模型外置**：移除 matplotlib、wandb、pandas、torchsummary 等训练/可视化依赖；模型从程序内部移到 exe 旁 `comic-translate-ai/models/`，便于单独更新和发布。
+- **全 ONNX 化与模型拆包**：检测、OCR、修复全部改为 ONNX 推理，彻底移除 PyTorch/torchvision/transformers 依赖，主程序压缩包从约 3.9GB 降到 0.4GB；模型单独发布，更新程序无需重新下载模型。
 
 ## 核心流程
 
@@ -61,17 +62,17 @@ NVIDIA GPU 环境建议安装 CUDA 版 PyTorch：
 .\.venv\Scripts\python -m pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cu128
 ```
 
-程序会自动把 PyTorch 自带的 CUDA/cuDNN 运行库加入 PATH，供 ONNX LaMa 使用。
+程序运行时全部使用 ONNX 推理，不再依赖 PyTorch。GPU 加速由 ONNX Runtime 提供，只需本机已有 NVIDIA 驱动。
 
 模型权重放在：
 
-- 气泡检测模型：`comic-translate-ai/models/text_detector/comictextdetector.pt`
-- Manga-OCR 模型：`comic-translate-ai/models/manga-ocr-base/`
+- 气泡检测模型：`comic-translate-ai/models/text_detector/comic-text-detector.onnx`
+- Manga-OCR 模型：`comic-translate-ai/models/manga-ocr-onnx/`
 - LaMa 修复模型：`comic-translate-ai/models/manga-lama/lama-manga-dynamic.onnx`
 
 ## 模型说明与可选模型
 
-检测、OCR 与修复模型当前分别来自 comic-text-detector、kha-white/manga-ocr 和 manga-lama。comictextdetector 的 ONNX 转换版、manga-ocr 的 ONNX 版以及效果更好的漫画文本检测模型候选见 [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md)。
+检测、OCR 与修复模型当前分别使用 comic-text-detector、kha-white/manga-ocr 和 manga-lama 的 ONNX 版本。模型来源、可替换的其它 ONNX 版本以及效果更好的漫画文本检测模型候选见 [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md)。
 
 ## 启动客户端
 
@@ -106,7 +107,13 @@ Windows 下也可以直接双击 `start.bat`。
 .\build_app.ps1
 ```
 
-打包完成后，程序位于 `dist\ComiTrans\ComiTrans.exe`。模型不再打进 `_internal`，`build_app.ps1` 会自动把模型复制到 exe 旁的 `comic-translate-ai\models\`，发布时必须连同该目录一起分发。
+默认只打包主程序，不复制模型；本地联调模型时使用 `.\build_app.ps1 -IncludeModels`。发布时运行：
+
+```powershell
+python package_release.py
+```
+
+会生成 `ComiTrans-v2.0.0-app.zip`（主程序，不含模型）和 `ComiTrans-v2.0.0-models.zip`（ONNX 模型），模型包解压到 `ComiTrans\comic-translate-ai\models\`。
 
 ## 命令行批量处理
 

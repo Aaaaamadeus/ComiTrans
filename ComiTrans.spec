@@ -1,31 +1,22 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-import os
-
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
-import unidic_lite
-
-UNIDIC_DATA = os.path.join(os.path.dirname(unidic_lite.__file__), "dicdir")
-
-
 hidden_imports = [
     "comic_translator_pipeline",
     "manga_lama",
     "vertical_typesetter",
-]
-hidden_imports += collect_submodules("comic_text_detector")
-hidden_imports += [
+    "onnx_text_detector",
+    "onnx_manga_ocr",
     "pyclipper",
     "shapely",
     "tqdm",
+    "jaconv",
+    "tokenizers",
 ]
 
 datas = [
     ("comic-translate-ai/font_file", "comic-translate-ai/font_file"),
     ("comic-translate-ai/main/comic_text_detector", "comic-translate-ai/main/comic_text_detector"),
-    (UNIDIC_DATA, "unidic_lite/dicdir"),
 ]
-datas += collect_data_files("manga_ocr")
 
 a = Analysis(
     ["run.py"],
@@ -36,6 +27,14 @@ a = Analysis(
     hookspath=[],
     runtime_hooks=[],
     excludes=[
+        "torch",
+        "torchvision",
+        "transformers",
+        "manga_ocr",
+        "unidic_lite",
+        "fugashi",
+        "optimum",
+        "accelerate",
         "matplotlib",
         "pandas",
         "wandb",

@@ -6,30 +6,13 @@ import threading
 from pathlib import Path
 import cv2
 import numpy as np
-import torch
 from PIL import Image
 from openai import OpenAI
-from manga_ocr import MangaOcr
-from loguru import logger
 from manga_lama import MangaLama
 from vertical_typesetter import VerticalTypesetter
-def _detector_lib_path():
-    candidates = []
-    if getattr(sys, "frozen", False):
-        meipass = getattr(sys, "_MEIPASS", "")
-        candidates.append(os.path.join(meipass, "comic-translate-ai", "main", "comic_text_detector"))
-        candidates.append(os.path.join(os.path.dirname(sys.executable), "comic-translate-ai", "main", "comic_text_detector"))
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates.append(os.path.join(current_dir, "comic_text_detector"))
-    for cand in candidates:
-        if os.path.isdir(cand):
-            return cand
-    return candidates[-1]
-
-
-detector_lib_path = _detector_lib_path()
-sys.path.append(detector_lib_path)
-from inference import TextDetector
+from onnx_manga_ocr import OnnxMangaOcr
+from onnx_text_detector import OnnxTextDetector
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 class TaskCancelledError(Exception):
@@ -56,7 +39,7 @@ class ComicTranslatorPipeline:
                  ocr_model_path=None,
                  progress_callback=None,
                  cancel_callback=None):
-        self.device = 'cuda' if torch.cuda.is_available() and use_gpu else 'cpu'
+        self.device = 'cuda' if use_gpu else 'cpu'
         self.translation_model = translation_model
         self.api_key = api_key
         self.api_base_url = api_base_url
@@ -65,18 +48,17 @@ class ComicTranslatorPipeline:
         self.multimodal = bool(multimodal)
         self.progress_callback = progress_callback
         self.cancel_callback = cancel_callback
-        self.ocr_model_path = ocr_model_path or os.path.join(current_dir, "..", "models", "manga-ocr-base")
+        self.ocr_model_path = ocr_model_path or os.path.join(current_dir, "..", "models", "manga-ocr-onnx")
         if not self.translation_model:
              print("[WARNING] Pipeline 初始化时未指定翻译模型")
         print("初始化管线")
 
         print("[INFO] 加载 Comic Text Detector...")
-        self.detector = TextDetector(model_path=det_model_path, input_size=1024, device=self.device, act="default")
+        self.detector = OnnxTextDetector(model_path=det_model_path, input_size=1024, device=self.device)
 
         # 2. OCR 模型
         print("[INFO] 加载 Manga-OCR...")
-        logger.disable("manga_ocr")
-        self.manga_ocr = MangaOcr(pretrained_model_name_or_path=self.ocr_model_path)
+        self.manga_ocr = OnnxMangaOcr(model_dir=self.ocr_model_path, device=self.device)
 
         # 3. 图像修补
         print("[INFO] 加载 Manga-lama...")
