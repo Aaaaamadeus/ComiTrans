@@ -109,9 +109,9 @@ class ComicTranslatorPipeline:
                 font_type = 'radiating'
             elif detected_label == 2:
                 font_type = 'handwriting'
-            # ?????????????????????????????
+            # ?????????????? 35% ?????????????
             if detected_font_size > 0:
-                detected_font_size = max(10, min(detected_font_size, int(box_height * 0.5)))
+                detected_font_size = max(10, min(detected_font_size, int(box_height * 0.35)))
 
             # 3. 按照你需要的格式存入 (确保转换为整数防止 OpenCV 报错)
             bubbles.append((

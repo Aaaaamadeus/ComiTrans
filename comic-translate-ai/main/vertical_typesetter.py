@@ -232,7 +232,7 @@ class VerticalTypesetter:
             clean_text = text.replace('\n', '')
             preferred_size = None
             if target_font_size and target_font_size > 0:
-                preferred_size = max(10, int(target_font_size * 0.85))
+                preferred_size = max(10, int(target_font_size * 0.65))
             available_area = 0
             if mask is not None:
                 try:
@@ -283,7 +283,7 @@ class VerticalTypesetter:
                     estimate_multiplier = 1.5
                     lower_bound = 16
                 else:
-                    size_cap = int(min(box_width, box_height) * 0.45)
+                    size_cap = int(min(box_width, box_height) * 0.35)
                     estimate_multiplier = 1.2
                     lower_bound = 12
                 if non_bubble:
