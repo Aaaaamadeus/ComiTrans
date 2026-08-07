@@ -233,7 +233,7 @@ class VerticalTypesetter:
             preferred_size = None
             if target_font_size and target_font_size > 0:
                 if style == "next_preview":
-                    pref_ratio = 1.0
+                    pref_ratio = 0.8
                 elif style == "narration":
                     pref_ratio = 0.95 if len(clean_text) > 14 else 1.0
                 elif direction == 1:
@@ -302,9 +302,9 @@ class VerticalTypesetter:
                 
                 # 恢复至初版极其严格的极限值封锁（基础值的 1.5 倍）
                 if style == "next_preview":
-                    size_cap = int(min(box_width, box_height) * 0.9)
-                    estimate_multiplier = 1.5
-                    lower_bound = 16
+                    size_cap = int(min(box_width, box_height) * 0.7)
+                    estimate_multiplier = 1.3
+                    lower_bound = 14
                 elif style == "narration":
                     size_cap = int(min(box_width, box_height) * 0.8)
                     if len(clean_text) > 14:
