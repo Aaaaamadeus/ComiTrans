@@ -233,7 +233,7 @@ class VerticalTypesetter:
             preferred_size = None
             if target_font_size and target_font_size > 0:
                 if style == "next_preview":
-                    pref_ratio = 1.05
+                    pref_ratio = 1.3
                 elif direction == 1:
                     pref_ratio = 0.8 if len(clean_text) > 14 else 0.95
                 else:
@@ -294,7 +294,7 @@ class VerticalTypesetter:
                 # 恢复至初版的保守字号预估，提供充沛的留白
                 text_len = len(clean_text)
                 if style == "next_preview":
-                    density = 1.8
+                    density = 1.2
                 else:
                     density = 4.0 if text_len > 14 else 2.2
                     if is_horizontal:
@@ -303,9 +303,15 @@ class VerticalTypesetter:
                         density *= 0.75
                 estimated_size = int(math.sqrt(available_area / (text_len + 1) / density))
                 max_allowed_size = min(box_width, box_height)
+                if style == "next_preview":
+                    max_allowed_size = int(max_allowed_size * 1.3)
                 
                 # 恢复至初版极其严格的极限值封锁（基础值的 1.5 倍）
-                if style in ("radiating", "handwriting", "next_preview"):
+                if style == "next_preview":
+                    size_cap = int(min(box_width, box_height) * 1.3)
+                    estimate_multiplier = 1.8
+                    lower_bound = 16
+                elif style in ("radiating", "handwriting"):
                     if is_horizontal:
                         size_cap = int(min(box_width, box_height) * 0.6)
                     else:
@@ -345,7 +351,9 @@ class VerticalTypesetter:
             high = upper_bound
 
             constraint_limit = box_width if is_horizontal else box_height  # 传给函数的限制
-            check_limit = box_height if is_horizontal else box_width  # 用于检查结果的限制
+            check_limit = box_height if is_horizontal else box_width
+            if style == "next_preview":
+                check_limit = int(check_limit * 1.3)  # 用于检查结果的限制
 
             while low <= high:
                 mid = (low + high) // 2
