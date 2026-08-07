@@ -18,10 +18,10 @@ MAIN_DIR = AI_ROOT / "main"
 MODELS_ROOT = PROJECT_ROOT / "comic-translate-ai" / "models"
 if getattr(sys, "frozen", False):
     CONFIG_PATH = PROJECT_ROOT / "config.yaml"
-    DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "page" / "test_page_output"
+    DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "page" / "output_page_output"
 else:
     CONFIG_PATH = MAIN_DIR / "config.yaml"
-    DEFAULT_OUTPUT_DIR = AI_ROOT / "page" / "test_page_output"
+    DEFAULT_OUTPUT_DIR = AI_ROOT / "page" / "output_page_output"
 
 FONT_KEYS = {
     "dialogue": "font_dialogue",
@@ -92,8 +92,9 @@ def load_ai_config() -> dict[str, Any]:
         "detector_model": str(_resolve_path(raw.get("detector_model"), "text_detector/comic-text-detector.onnx", base=MODELS_ROOT)),
         "lama_model": str(_resolve_path(raw.get("lama_model"), "manga-lama/lama-manga-dynamic.onnx", base=MODELS_ROOT)),
         "ocr_model": str(_resolve_path(raw.get("ocr_model"), "manga-ocr-onnx", base=MODELS_ROOT)),
-        "page_input_dir": str(_resolve_path(raw.get("page_input_dir"), "page/test_page")),
-        "page_output_dir": str(_resolve_path(raw.get("page_output_dir"), "page/test_page_output")),
+        "page_input_dir": str(_resolve_path(raw.get("page_input_dir"), "page/test")),
+        "page_output_dir": str(_resolve_path(raw.get("page_output_dir"), "page/output_page_output")),
+        "page_test_output_dir": str(_resolve_path(raw.get("page_test_output_dir"), "page/test_output")),
         "raw": raw,
     }
 

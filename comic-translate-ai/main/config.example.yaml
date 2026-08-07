@@ -14,7 +14,8 @@ lama_model: models/manga-lama/lama-manga-dynamic.onnx
 max_workers: null
 multimodal: false
 ocr_model: models/manga-ocr-onnx
-page_input_dir: page/test_page
-page_output_dir: page/test_page_output
+page_input_dir: page/test
+page_output_dir: page/output_page_output
+page_test_output_dir: page/test_output
 translation_model: gemini-2.5-flash
 use_gpu: false
