@@ -654,8 +654,10 @@ class ComicTranslatorPipeline:
                 "offset_x": 0,
                 "offset_y": 0,
             })
-        rendered_sizes = {}
-        for idx, item in enumerate(processed_data):
+        with open(layout_path, "w", encoding="utf-8") as f:
+            json.dump(layout_items, f, ensure_ascii=False, indent=2)
+
+        for item in processed_data:
             if item['trans']:
                 try:
                     final_canvas = self.typesetter.draw_text(
@@ -668,16 +670,11 @@ class ComicTranslatorPipeline:
                         target_font_size=item['target_font_size'],
                         non_bubble=item['non_bubble'],
                     )
-                    rendered_sizes[idx] = getattr(self.typesetter, "last_font_size", None)
 
                 except Exception as e:
                     import traceback
                     print(f"无法执行 draw_text，原因: {e}")
                     traceback.print_exc()
-        for item in layout_items:
-            item["rendered_font_size"] = rendered_sizes.get(item["index"])
-        with open(layout_path, "w", encoding="utf-8") as f:
-            json.dump(layout_items, f, ensure_ascii=False, indent=2)
         # 6. 保存
         self._check_cancelled()
         self._report_progress("typeset", "排版完成")

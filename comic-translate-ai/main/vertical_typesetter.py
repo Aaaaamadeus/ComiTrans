@@ -14,7 +14,6 @@ class VerticalTypesetter:
         self.font_cache = {}
         self.base_font_size = font_size
         self.color = color
-        self.last_font_size = None
 
         # 预加载所有字体
         # font_map 格式: {'dialogue': 'a.ttf', 'radiating': 'b.ttf', ...}
@@ -275,7 +274,7 @@ class VerticalTypesetter:
             if style == "next_preview":
                 available_area = max(1, raw_width * raw_height)
             # ??????????????????????????
-            if mask_center is not None and style != "next_preview":
+            if mask_center is not None:
                 center_x, center_y = mask_center
             columns = self.wrap_text_vertical(clean_text, box_height, current_font)
             if not columns: return image
@@ -354,8 +353,7 @@ class VerticalTypesetter:
             constraint_limit = box_width if is_horizontal else box_height  # 传给函数的限制
             check_limit = box_height if is_horizontal else box_width
             if style == "next_preview":
-                constraint_limit = int(constraint_limit * 1.5)
-                check_limit = int(check_limit * 1.5)  # 用于检查结果的限制
+                check_limit = int(check_limit * 1.3)  # 用于检查结果的限制
 
             while low <= high:
                 mid = (low + high) // 2
@@ -384,7 +382,6 @@ class VerticalTypesetter:
                 _, _, best_lines_struct, best_col_spacing = self._calculate_layout_fast(
                     clean_text, current_font, constraint_limit, is_horizontal=is_horizontal
                 )
-            self.last_font_size = best_size
             columns = best_lines_struct
             if not columns:
                 return image
