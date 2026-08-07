@@ -14,6 +14,7 @@ class VerticalTypesetter:
         self.font_cache = {}
         self.base_font_size = font_size
         self.color = color
+        self.last_font_size = None
 
         # 预加载所有字体
         # font_map 格式: {'dialogue': 'a.ttf', 'radiating': 'b.ttf', ...}
@@ -241,7 +242,7 @@ class VerticalTypesetter:
                 else:
                     pref_ratio = 0.55 if len(clean_text) > 14 else 0.7
                 preferred_size = max(10, int(target_font_size * pref_ratio))
-                if direction == 1:
+                if direction == 1 and style != "next_preview":
                     preferred_size = max(preferred_size, int(box_height * 0.25))
             available_area = 0
             mask_center = None
@@ -386,6 +387,7 @@ class VerticalTypesetter:
                 _, _, best_lines_struct, best_col_spacing = self._calculate_layout_fast(
                     clean_text, current_font, constraint_limit, is_horizontal=is_horizontal
                 )
+            self.last_font_size = best_size
             columns = best_lines_struct
             if not columns:
                 return image
