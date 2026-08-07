@@ -235,7 +235,7 @@ class VerticalTypesetter:
                 if style == "next_preview":
                     pref_ratio = 1.0
                 elif style == "narration":
-                    pref_ratio = 0.85 if len(clean_text) > 14 else 0.95
+                    pref_ratio = 0.95 if len(clean_text) > 14 else 1.0
                 elif direction == 1:
                     pref_ratio = 0.8 if len(clean_text) > 14 else 0.95
                 else:
@@ -306,10 +306,10 @@ class VerticalTypesetter:
                     estimate_multiplier = 1.5
                     lower_bound = 16
                 elif style == "narration":
-                    size_cap = int(min(box_width, box_height) * 0.7)
+                    size_cap = int(min(box_width, box_height) * 0.8)
                     if len(clean_text) > 14:
-                        size_cap = min(size_cap, int(min(box_width, box_height) * 0.6))
-                    estimate_multiplier = 1.3
+                        size_cap = min(size_cap, int(min(box_width, box_height) * 0.7))
+                    estimate_multiplier = 1.4
                     lower_bound = 14
                 elif style in ("radiating", "handwriting"):
                     if is_horizontal:
@@ -332,7 +332,10 @@ class VerticalTypesetter:
                 pref_cap = None
                 if preferred_size:
                     lower_bound = min(lower_bound, max(10, preferred_size))
-                    pref_cap = int(preferred_size * 0.9) if non_bubble else preferred_size
+                    if non_bubble and style in ("next_preview", "narration"):
+                        pref_cap = preferred_size
+                    else:
+                        pref_cap = int(preferred_size * 0.9) if non_bubble else preferred_size
                     size_cap = min(size_cap, pref_cap)
                 upper_bound = min(
                     max_allowed_size,
