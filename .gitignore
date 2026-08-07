@@ -1,4 +1,4 @@
-
+﻿
 # ===== IDE / Editor =====
 .idea/
 .vscode/
@@ -99,3 +99,4 @@ legacy/web/docker-compose.override.yml
 
 *.jpg
 *.png
+comic-translate-ai/page/
