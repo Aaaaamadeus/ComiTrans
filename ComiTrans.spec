@@ -16,6 +16,7 @@ hidden_imports = [
 datas = [
     ("comic-translate-ai/font_file", "comic-translate-ai/font_file"),
     ("comic-translate-ai/main/comic_text_detector", "comic-translate-ai/main/comic_text_detector"),
+    ("assets/ComiTrans.ico", "assets"),
 ]
 
 a = Analysis(

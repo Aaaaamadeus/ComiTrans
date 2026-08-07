@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSplitter,
+    QStyle,
     QTabWidget,
     QToolButton,
     QVBoxLayout,
@@ -93,6 +94,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("ComiTrans 本地漫画翻译")
+        self.setWindowIcon(QIcon(str(app_config.ICON_PATH)))
         self.resize(1240, 800)
         self.setAcceptDrops(True)
 
@@ -116,6 +118,17 @@ class MainWindow(QMainWindow):
         self._start_warmup()
 
     def _build_ui(self) -> None:
+        self.setStyleSheet(
+            "QPushButton { padding: 5px 12px; border: 1px solid #c9d2e0; border-radius: 4px; background: #f7f9fc; }"
+            " QPushButton:hover { background: #eaf0fa; border-color: #8fb4f5; }"
+            " QGroupBox { border: 1px solid #d7dee9; border-radius: 6px; margin-top: 8px; font-weight: 600; }"
+            " QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }"
+            " QTabWidget::pane { border: 1px solid #d7dee9; border-radius: 4px; }"
+            " QLineEdit, QPlainTextEdit { border: 1px solid #c9d2e0; border-radius: 4px; padding: 3px; }"
+            " QLineEdit:focus, QPlainTextEdit:focus { border-color: #2f6fed; }"
+            " QProgressBar { border: 1px solid #c9d2e0; border-radius: 4px; text-align: center; }"
+            " QProgressBar::chunk { background: #2f6fed; border-radius: 3px; }"
+        )
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
@@ -138,6 +151,15 @@ class MainWindow(QMainWindow):
             "background: #2f6fed; color: white; padding: 6px 18px; border-radius: 4px;"
         )
         self._stop_btn = QPushButton("停止")
+
+        self._add_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton))
+        self._folder_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
+        self._settings_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
+        self._logs_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning))
+        self._output_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
+        self._issue_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion))
+        self._start_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self._stop_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
 
         header.addWidget(title)
         header.addStretch(1)

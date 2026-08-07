@@ -17,6 +17,7 @@ else:
 MAIN_DIR = AI_ROOT / "main"
 MODELS_ROOT = PROJECT_ROOT / "comic-translate-ai" / "models"
 PAGE_BASE = PROJECT_ROOT if getattr(sys, "frozen", False) else AI_ROOT
+ICON_PATH = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)) / "assets" / "ComiTrans.ico" if getattr(sys, "frozen", False) else PROJECT_ROOT / "assets" / "ComiTrans.ico"
 if getattr(sys, "frozen", False):
     CONFIG_PATH = PROJECT_ROOT / "config.yaml"
     DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "page" / "output_page_output"
