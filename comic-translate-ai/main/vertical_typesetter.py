@@ -232,9 +232,7 @@ class VerticalTypesetter:
             clean_text = text.replace('\n', '')
             preferred_size = None
             if target_font_size and target_font_size > 0:
-                if style == "next_preview":
-                    pref_ratio = 1.05
-                elif direction == 1:
+                if direction == 1:
                     pref_ratio = 0.8 if len(clean_text) > 14 else 0.95
                 else:
                     pref_ratio = 0.55 if len(clean_text) > 14 else 0.7
@@ -299,7 +297,7 @@ class VerticalTypesetter:
                 max_allowed_size = min(box_width, box_height)
                 
                 # 恢复至初版极其严格的极限值封锁（基础值的 1.5 倍）
-                if style in ("radiating", "handwriting", "next_preview"):
+                if style in ("radiating", "handwriting"):
                     if is_horizontal:
                         size_cap = int(min(box_width, box_height) * 0.6)
                     else:
