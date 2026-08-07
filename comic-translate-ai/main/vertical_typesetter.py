@@ -232,7 +232,11 @@ class VerticalTypesetter:
             clean_text = text.replace('\n', '')
             preferred_size = None
             if target_font_size and target_font_size > 0:
-                if direction == 1:
+                if style == "next_preview":
+                    pref_ratio = 1.0
+                elif style == "narration":
+                    pref_ratio = 0.85 if len(clean_text) > 14 else 0.95
+                elif direction == 1:
                     pref_ratio = 0.8 if len(clean_text) > 14 else 0.95
                 else:
                     pref_ratio = 0.55 if len(clean_text) > 14 else 0.7
@@ -297,7 +301,17 @@ class VerticalTypesetter:
                 max_allowed_size = min(box_width, box_height)
                 
                 # 恢复至初版极其严格的极限值封锁（基础值的 1.5 倍）
-                if style in ("radiating", "handwriting"):
+                if style == "next_preview":
+                    size_cap = int(min(box_width, box_height) * 0.9)
+                    estimate_multiplier = 1.5
+                    lower_bound = 16
+                elif style == "narration":
+                    size_cap = int(min(box_width, box_height) * 0.7)
+                    if len(clean_text) > 14:
+                        size_cap = min(size_cap, int(min(box_width, box_height) * 0.6))
+                    estimate_multiplier = 1.3
+                    lower_bound = 14
+                elif style in ("radiating", "handwriting"):
                     if is_horizontal:
                         size_cap = int(min(box_width, box_height) * 0.6)
                     else:
@@ -311,7 +325,10 @@ class VerticalTypesetter:
                     estimate_multiplier = 1.2
                     lower_bound = 12
                 if non_bubble:
-                    size_cap = min(size_cap, int(min(box_width, box_height) * 0.35))
+                    if style in ("next_preview", "narration"):
+                        size_cap = min(size_cap, int(min(box_width, box_height) * 0.6))
+                    else:
+                        size_cap = min(size_cap, int(min(box_width, box_height) * 0.35))
                 pref_cap = None
                 if preferred_size:
                     lower_bound = min(lower_bound, max(10, preferred_size))

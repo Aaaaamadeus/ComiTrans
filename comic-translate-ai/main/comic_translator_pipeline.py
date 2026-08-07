@@ -566,7 +566,7 @@ class ComicTranslatorPipeline:
                 bubbles_data[i] = box[:8] + ('eng',)
                 raw_text = ""
             style = font_type
-            if raw_text and re.search(r"次回|つづく|続く|待续|下回|TO BE CONTINUED|次号", raw_text, re.IGNORECASE):
+            if raw_text and re.search(r"次回|つづく|続く|待续|下回|TO BE CONTINUED|次号|\u7b2c\s*\d+\s*话|后篇|後篇|预告|最终话|最終話|最终回|最終回", raw_text, re.IGNORECASE):
                 style = "next_preview"
 
             bubble_metadata.append({
