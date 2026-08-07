@@ -270,9 +270,6 @@ class VerticalTypesetter:
                     available_area = 0
             if available_area == 0:
                 available_area = (box_width * box_height)
-            # ?????????????????????
-            if style == "next_preview":
-                available_area = max(1, raw_width * raw_height)
             # ??????????????????????????
             if mask_center is not None:
                 center_x, center_y = mask_center
@@ -293,14 +290,11 @@ class VerticalTypesetter:
             try:
                 # 恢复至初版的保守字号预估，提供充沛的留白
                 text_len = len(clean_text)
-                if style == "next_preview":
-                    density = 1.8
+                density = 4.0 if text_len > 14 else 2.2
+                if is_horizontal:
+                    density *= 1.3
                 else:
-                    density = 4.0 if text_len > 14 else 2.2
-                    if is_horizontal:
-                        density *= 1.3
-                    else:
-                        density *= 0.75
+                    density *= 0.75
                 estimated_size = int(math.sqrt(available_area / (text_len + 1) / density))
                 max_allowed_size = min(box_width, box_height)
                 
