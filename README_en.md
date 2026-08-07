@@ -16,7 +16,7 @@
 
 ComiTrans is a fully local manga translation desktop client. Text detection, Japanese OCR, LLM translation, background inpainting, and Chinese typesetting all run locally on your machine, with no browser, server, or web backend required.
 
-Since v2.1.0, detection, OCR, and inpainting are powered entirely by **ONNX Runtime**, removing PyTorch / torchvision / transformers dependencies. The app and models are released as separate packages: the app archive is about 0.4GB, and model updates no longer require re-downloading the program.
+Since v2.2.1, detection, OCR, and inpainting are powered entirely by **ONNX Runtime**, removing PyTorch / torchvision / transformers dependencies. The app and models are released as separate packages: the app archive is about 0.4GB, and model updates no longer require re-downloading the program.
 
 ## Before / After
 
@@ -64,7 +64,7 @@ Since v2.1.0, detection, OCR, and inpainting are powered entirely by **ONNX Runt
 
 ### Release users (recommended)
 
-1. Download `ComiTrans-v2.1.0-app.zip` (program) and `ComiTrans-v2.1.0-models.zip` (models).
+1. Download `ComiTrans-v2.2.1-app.zip` (program) and `ComiTrans-v2.2.1-models.zip` (models).
 2. Extract the app archive into a `ComiTrans` folder.
 3. Extract the models archive into the same `ComiTrans` folder; models will be merged into `ComiTrans\comic-translate-ai\models\`.
 4. Double-click `ComiTrans.exe` and enter your translation API key and model on the "API Config" page.
@@ -166,8 +166,8 @@ python package_release.py
 
 This creates two archives:
 
-- `ComiTrans-v2.1.0-app.zip`: program only, no models
-- `ComiTrans-v2.1.0-models.zip`: ONNX models
+- `ComiTrans-v2.2.1-app.zip`: program only, no models
+- `ComiTrans-v2.2.1-models.zip`: ONNX models
 
 Extract the models archive into `ComiTrans\comic-translate-ai\models\`.
 
@@ -193,6 +193,22 @@ ComiTrans
 ```
 
 ## Changelog
+
+### v2.2.1 (2026-08-07)
+
+**New features**
+
+- Added an output directory setting on the translation workbench; the default output path stays unchanged and stays in sync with the API config page.
+- Applied the app icon to the main window and header buttons, and polished the UI styles.
+- Multi-page translation optimization: detection/OCR and inpainting/typesetting stay serial, while translation API requests across pages run in parallel (4 workers by default), significantly reducing total processing time.
+- Translation API request logs: model, text count, returned count, elapsed time, count mismatch and failure reasons; skipped typesetting now logs a clear warning.
+- Stricter translation system prompt: unified JSON object output, strict item count, and mandatory onomatopoeia translation to reduce missing typesetting.
+- Tiered font sizes for next-episode previews and narration, with expanded preview keywords (chapter N, preview, final episode, etc.).
+
+**Adjustments**
+
+- Output directories now use `output_page_*`; test assets live in `page/test`, and test output goes to `page/test_output`.
+- Test and output directories are excluded from uploads and packaging.
 
 ### v2.1.0 (2026-08-06)
 
@@ -235,7 +251,7 @@ No. Extract the app and models, then run. GPU acceleration only needs an existin
 
 **Where do models go?**
 
-Beside the exe at `comic-translate-ai/models/`. Release users must extract `ComiTrans-v2.1.0-models.zip` into the same `ComiTrans` folder.
+Beside the exe at `comic-translate-ai/models/`. Release users must extract `ComiTrans-v2.2.1-models.zip` into the same `ComiTrans` folder.
 
 **Why is English text not translated?**
 
@@ -243,7 +259,7 @@ The current OCR model is Japanese-only and garbles English. English is detected 
 
 **Why is the app archive so small?**
 
-Since v2.1.0 everything is ONNX and PyTorch is gone. Detection, OCR, and inpainting only need onnxruntime.
+Since v2.2.1 everything is ONNX and PyTorch is gone. Detection, OCR, and inpainting only need onnxruntime.
 
 ## Feedback
 

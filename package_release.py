@@ -6,8 +6,8 @@ DIST = os.path.join(ROOT, "dist", "ComiTrans")
 RELEASE = os.path.join(ROOT, "release")
 MODELS_SRC = os.path.join(ROOT, "comic-translate-ai", "models")
 
-APP_ZIP = os.path.join(RELEASE, "ComiTrans-v2.1.0-app.zip")
-MODEL_ZIP = os.path.join(RELEASE, "ComiTrans-v2.1.0-models.zip")
+APP_ZIP = os.path.join(RELEASE, "ComiTrans-v2.2.1-app.zip")
+MODEL_ZIP = os.path.join(RELEASE, "ComiTrans-v2.2.1-models.zip")
 
 MODEL_FILES = [
     "text_detector/comic-text-detector.onnx",

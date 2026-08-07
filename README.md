@@ -16,7 +16,7 @@
 
 ComiTrans 是一款纯本地运行的漫画自动汉化桌面客户端。它把文本检测、日文 OCR、大模型翻译、背景修复和中文排版全部放在本地桌面端完成，不依赖浏览器、服务器或 Web 后端。
 
-从 v2.1.0 开始，检测、OCR、修复全部切换为 **ONNX Runtime 推理**，彻底移除 PyTorch / torchvision / transformers 依赖；主程序和模型拆分发布，程序压缩包约 0.4GB，更新程序时不再需要重新下载模型。
+从 v2.2.1 开始，检测、OCR、修复全部切换为 **ONNX Runtime 推理**，彻底移除 PyTorch / torchvision / transformers 依赖；主程序和模型拆分发布，程序压缩包约 0.4GB，更新程序时不再需要重新下载模型。
 
 ## 翻译前后对比
 
@@ -62,7 +62,7 @@ ComiTrans 是一款纯本地运行的漫画自动汉化桌面客户端。它把�
 
 ### Release 用户（推荐）
 
-1. 下载 `ComiTrans-v2.1.0-app.zip`（主程序）和 `ComiTrans-v2.1.0-models.zip`（模型包）。
+1. 下载 `ComiTrans-v2.2.1-app.zip`（主程序）和 `ComiTrans-v2.2.1-models.zip`（模型包）。
 2. 解压主程序包得到 `ComiTrans` 文件夹。
 3. 将模型包解压到同一个 `ComiTrans` 文件夹内，模型会合并到 `ComiTrans\comic-translate-ai\models\`。
 4. 双击 `ComiTrans.exe`，在“API 配置”页填写翻译 API Key 和模型。
@@ -166,8 +166,8 @@ python package_release.py
 
 会生成两个 release 包：
 
-- `ComiTrans-v2.1.0-app.zip`：主程序，不含模型
-- `ComiTrans-v2.1.0-models.zip`：ONNX 模型包
+- `ComiTrans-v2.2.1-app.zip`：主程序，不含模型
+- `ComiTrans-v2.2.1-models.zip`：ONNX 模型包
 
 模型包解压到 `ComiTrans\comic-translate-ai\models\`。
 
@@ -192,6 +192,22 @@ ComiTrans
 └── package_release.py             # Release 拆包脚本
 ```
 ## 更新日志
+
+### v2.2.1（2026-08-07）
+
+**新功能**
+
+- 翻译工作台新增“输出目录”设置，默认输出路径不变，与 API 配置页双向同步。
+- 主窗口与按钮补齐应用图标，统一 UI 样式与交互观感。
+- 多图翻译优化：检测/OCR 与修复/嵌字串行，各页翻译 API 请求并行发起（默认 4 并发），整体处理时间显著压缩。
+- 翻译 API 请求日志：记录请求模型、文本条数、返回条数、耗时、数量不匹配与失败原因；未嵌字时输出明确警告。
+- 翻译系统提示词严谨化：统一 JSON 对象输出格式，严格约束数量一致，拟声词强制翻译，减少空译文导致的漏嵌字。
+- 下回预告与画外音字号分档：章节预告识别扩展（第 N 话、后篇、预告、最终话等），两档字号独立调优。
+
+**调整**
+
+- 输出目录系列改为 `output_page_*`；测试素材统一放在 `page/test`，测试输出写入 `page/test_output`。
+- 测试与输出目录不再上传、不再打包。
 
 ### v2.1.0（2026-08-06）
 
@@ -234,7 +250,7 @@ ComiTrans
 
 **模型放哪里？**
 
-模型位于 exe 旁的 `comic-translate-ai/models/`。Release 用户需要把 `ComiTrans-v2.1.0-models.zip` 解压到同一个 `ComiTrans` 文件夹内。
+模型位于 exe 旁的 `comic-translate-ai/models/`。Release 用户需要把 `ComiTrans-v2.2.1-models.zip` 解压到同一个 `ComiTrans` 文件夹内。
 
 **为什么英文文本没有被翻译？**
 
@@ -242,7 +258,7 @@ ComiTrans
 
 **为什么主程序包这么小？**
 
-v2.1.0 已全面 ONNX 化并移除 PyTorch。检测、OCR、修复均为 ONNX 模型，运行库只需 onnxruntime。
+v2.2.1 已全面 ONNX 化并移除 PyTorch。检测、OCR、修复均为 ONNX 模型，运行库只需 onnxruntime。
 
 ## 反馈与支持
 
