@@ -325,6 +325,9 @@ class ComicTranslatorPipeline:
         safe_key = f"{API_KEY[:4]}...{API_KEY[-4:]}" if len(API_KEY) > 8 else "***"
         print(f"[INFO] 使用翻译 API: {API_BASE_URL.split('?')[0]}")
         print(f"[INFO] API Key: {safe_key}")
+        import time as _time
+        _t0 = _time.time()
+        self._report_progress("translate", f"{zhengzai}: {self.translation_model}?{len(ocr_texts)} {tiaowen}")
         
         import urllib.request
         import httpx
@@ -436,6 +439,7 @@ class ComicTranslatorPipeline:
                 # 如果 AI 返回的数量不对，程序后续会崩，所以必须在这里兜底
                 if len(translations) != len(ocr_texts):
                     print(f"数量不匹配 (发:{len(ocr_texts)} vs 收:{len(translations)})，尝试自动补齐")
+                    self._report_progress("translate", f"警告：翻译返回数量不匹配（发 {len(ocr_texts)} 收 {len(translations)}），已补齐")
                     if len(translations) < len(ocr_texts):
                         # 少了就补空
                         translations.extend(["" for _ in range(len(translations), len(ocr_texts))])
@@ -443,14 +447,20 @@ class ComicTranslatorPipeline:
                         # 多了就截断
                         translations = translations[:len(ocr_texts)]
 
+                self._report_progress(
+                    "translate",
+                    f"翻译 API 返回 {len(translations)} 条结果，耗时 {_time.time() - _t0:.1f}s",
+                )
                 return translations
 
             except json.JSONDecodeError:
                 print(f"JSON解析失败: {content}")
+                self._report_progress("translate", "翻译响应 JSON 解析失败")
                 return None
 
         except Exception as e:
             print(f"PI请求出错: {e}")
+            self._report_progress("translate", f"翻译请求失败: {e}")
             return None
 
     def configure_fonts(self, ocr_texts, translated_list, image_input):
@@ -596,8 +606,7 @@ class ComicTranslatorPipeline:
         ocr_text_only = prepared["ocr_texts"]
         if isinstance(output_path, str):
             output_path = Path(output_path)
-        if prepared.get("mask") is not None:
-            self.last_detector_mask = prepared["mask"]
+        self.last_detector_mask = prepared.get("mask")
 
 
         # 批处理阶段
@@ -622,10 +631,13 @@ class ComicTranslatorPipeline:
         
         processed_data = []
         for i, item in enumerate(bubble_metadata):
-            if len(bubbles_data[i]) > 8 and bubbles_data[i][8] == 'eng':
+            is_eng = len(bubbles_data[i]) > 8 and bubbles_data[i][8] == 'eng'
+            if is_eng:
                 trans_text = ""
             else:
                 trans_text = translated_list[i] if i < len(translated_list) else ""
+                if not trans_text and item['raw']:
+                    print(f"  [??] 第 {i + 1} 块译文为空，跳过嵌字: {item['raw'][:20]}")
             font_cfg = font_config.get(i, {})
 
             processed_data.append({
