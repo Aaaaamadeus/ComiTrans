@@ -145,25 +145,65 @@ class BatchWorker(QThread):
             else:
                 self._apply_api_config(self._pipeline, self._config)
             self._configure_pipeline(self._pipeline)
-
             self._output_dir.mkdir(parents=True, exist_ok=True)
 
+            prepared_list = []
             for index, input_path in enumerate(self._files, start=1):
                 if self._stop:
                     self.log.emit("用户请求停止，跳过剩余图片。")
                     break
-
                 self._current_index = index
-                self.progress.emit(index - 1, total, f"{input_path.name}: 开始处理")
-                self.stage_changed.emit(index, "start", f"{input_path.name}: 开始处理")
+                self.progress.emit(index - 1, total, f"{input_path.name}: 准备中")
+                self.stage_changed.emit(index, "start", f"{input_path.name}: 准备中")
                 if not input_path.exists():
                     raise FileNotFoundError(f"文件不存在: {input_path}")
                 suffix = input_path.suffix.lower() or ".png"
                 output_path = self._output_dir / f"{input_path.stem}_translated{suffix}"
-
                 try:
                     with self._capture_pipeline_output():
-                        self._pipeline.process_comic_page(str(input_path), str(output_path))
+                        prepared = self._pipeline.prepare_comic_page(str(input_path))
+                    prepared_list.append((index, input_path, output_path, prepared))
+                except TaskCancelledError:
+                    self._stop = True
+                    self.stage_changed.emit(index, "cancelled", f"{input_path.name}: 已取消")
+                    self.log.emit(f"已取消: {input_path.name}")
+                    break
+                except Exception as exc:
+                    failed_count += 1
+                    self.image_failed.emit(input_path.name, str(exc))
+                    self.log.emit(f"[失败] {input_path.name}: {exc}")
+                    stack = traceback.format_exc().strip()
+                    if stack:
+                        self.log.emit(f"[失败堆栈]\n{stack}")
+                    self.progress.emit(index, total, f"{input_path.name}: 失败")
+
+            translations = [None] * len(prepared_list)
+            if prepared_list:
+                self.stage_changed.emit(0, "translate", f"并行翻译 {len(prepared_list)} 页")
+                max_workers = int(self._config.get("max_workers") or 4)
+                max_workers = max(1, min(max_workers, len(prepared_list)))
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {
+                        executor.submit(self._pipeline.translate_page_batch, prepared["ocr_texts"], prepared["img_cv"]): i
+                        for i, (_, _, _, prepared) in enumerate(prepared_list)
+                    }
+                    for future in as_completed(futures):
+                        idx = futures[future]
+                        try:
+                            translations[idx] = future.result()
+                        except Exception as exc:
+                            self.log.emit(f"[失败] 翻译请求异常（第{idx + 1}页）: {exc}")
+
+            for i, (index, input_path, output_path, prepared) in enumerate(prepared_list):
+                if self._stop:
+                    self.log.emit("用户请求停止，跳过剩余图片。")
+                    break
+                self._current_index = index
+                try:
+                    with self._capture_pipeline_output():
+                        self._pipeline.finish_comic_page(str(output_path), prepared, translations[i])
                     success_count += 1
                     self.image_done.emit(str(input_path), str(output_path))
                     self.progress.emit(index, total, f"{input_path.name}: 完成")

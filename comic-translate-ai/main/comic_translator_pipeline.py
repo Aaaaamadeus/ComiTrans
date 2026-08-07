@@ -530,9 +530,7 @@ class ComicTranslatorPipeline:
             print(f"[WARNING] 字体配置 AI 调用失败，使用默认字体: {exc}")
             return {}
 
-    def process_comic_page(self, input_path, output_path):
-        if isinstance(output_path, str):
-            output_path = Path(output_path)
+    def prepare_comic_page(self, input_path):
         print("[INFO] 开始处理漫画页面")
         # 1.读取原始图像 (OpenCV 格式用于裁剪 OCR)
         # Windows 下 cv2.imread 无法可靠读取含中文的路径，改用 imdecode。
@@ -580,11 +578,31 @@ class ComicTranslatorPipeline:
             })
             ocr_text_only.append(raw_text)
         self._report_progress("ocr", f"OCR 完成，识别 {len(ocr_text_only)} 条文本")
+        return {
+            "img_cv": img_cv,
+            "bubbles_data": bubbles_data,
+            "bubble_metadata": bubble_metadata,
+            "ocr_texts": ocr_text_only,
+            "input_path": str(input_path),
+            "mask": self.last_detector_mask.copy()
+            if hasattr(self, "last_detector_mask") and self.last_detector_mask is not None
+            else None,
+        }
+
+    def finish_comic_page(self, output_path, prepared, translated_list):
+        img_cv = prepared["img_cv"]
+        bubbles_data = prepared["bubbles_data"]
+        bubble_metadata = prepared["bubble_metadata"]
+        ocr_text_only = prepared["ocr_texts"]
+        if isinstance(output_path, str):
+            output_path = Path(output_path)
+        if prepared.get("mask") is not None:
+            self.last_detector_mask = prepared["mask"]
+
 
         # 批处理阶段
         print(f"[INFO] 正在翻译 {len(ocr_text_only)} 条文本...")
         
-        translated_list = self.translate_page_batch(ocr_text_only, img_cv)
         translation_failed = translated_list is None
         if translated_list is None:
             raise TranslationError(
@@ -685,3 +703,8 @@ class ComicTranslatorPipeline:
         final_canvas.save(output_path)
         self._report_progress("save", f"已保存: {os.path.basename(output_path)}")
         print(f"处理完成！已保存至: {output_path}")
+
+    def process_comic_page(self, input_path, output_path):
+        prepared = self.prepare_comic_page(input_path)
+        translated_list = self.translate_page_batch(prepared["ocr_texts"], prepared["img_cv"])
+        self.finish_comic_page(output_path, prepared, translated_list)

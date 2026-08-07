@@ -88,6 +88,7 @@ def load_ai_config() -> dict[str, Any]:
         "chinese_names": str(raw.get("chinese_names") or ""),
         "font_size": int(raw.get("font_size") or 16),
         "multimodal": bool(raw.get("multimodal", False)),
+        "max_workers": int(raw.get("max_workers") or 4),
         "issue_url": str(raw.get("issue_url") or ""),
         "use_gpu": bool(raw.get("use_gpu", False)),
         "font_map": font_map,
