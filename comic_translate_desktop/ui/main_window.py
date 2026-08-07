@@ -250,6 +250,18 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self._pref_toggle)
         layout.addWidget(self._pref_container)
+
+        output_row = QHBoxLayout()
+        output_label = QLabel("输出目录")
+        self._output_dir_input = QLineEdit(str(self.config.get("page_output_dir", "")))
+        self._output_dir_input.setPlaceholderText("默认: page/output_page_output")
+        browse_output_btn = QPushButton("浏览...")
+        browse_output_btn.clicked.connect(self._browse_output_dir)
+        output_row.addWidget(output_label)
+        output_row.addWidget(self._output_dir_input, 1)
+        output_row.addWidget(browse_output_btn)
+        layout.addLayout(output_row)
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(0)
@@ -285,6 +297,24 @@ class MainWindow(QMainWindow):
         layout.addWidget(log_label)
         layout.addWidget(self.work_splitter, 1)
         return group
+
+    def _browse_output_dir(self) -> None:
+        path = QFileDialog.getExistingDirectory(self, "选择输出目录", self._output_dir_input.text())
+        if path:
+            self._output_dir_input.setText(path)
+            self._apply_output_dir()
+
+    def _apply_output_dir(self) -> None:
+        value = self._output_dir_input.text().strip()
+        if value:
+            self.config["page_output_dir"] = value
+            try:
+                app_config.save_ai_config({"page_output_dir": value})
+            except Exception:
+                pass
+            if hasattr(self, "api_config_page"):
+                self.api_config_page._output_input.setText(value)
+            self._append_log(f"输出目录已更新: {value}")
 
     def _add_paths(self, paths) -> None:
         if self.worker is not None and self.worker.isRunning():
@@ -627,6 +657,7 @@ class MainWindow(QMainWindow):
             return
         self.config = save_ai_config(updates)
         self.api_config_page.load_config(self.config)
+        self._output_dir_input.setText(self.config.get("page_output_dir", ""))
         self.api_config_page.mark_saved()
         fingerprint = config_fingerprint(self.config)
         if self.pipeline and self.pipeline_fingerprint == fingerprint:
