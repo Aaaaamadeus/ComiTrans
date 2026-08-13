@@ -330,7 +330,7 @@ class ComicTranslatorPipeline:
         print(f"[INFO] API Key: {safe_key}")
         import time as _time
         _t0 = _time.time()
-        self._report_progress("translate", f"{zhengzai}: {self.translation_model}?{len(ocr_texts)} {tiaowen}")
+        self._report_progress("translate", f"正在请求翻译 API: {self.translation_model}，{len(ocr_texts)} 条文本")
         
         import urllib.request
         import httpx
