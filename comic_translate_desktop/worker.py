@@ -145,6 +145,9 @@ class BatchWorker(QThread):
             else:
                 self._apply_api_config(self._pipeline, self._config)
             self._configure_pipeline(self._pipeline)
+            _ak = str(self._config.get("api_key") or "")
+            _mask = (_ak[:4] + "****" + _ak[-4:]) if len(_ak) > 8 else ("***" if _ak else "空")
+            self.log.emit(f"[INFO] 翻译模型: {self._config.get('translation_model', '')}?API Key: {_mask}")
             self._output_dir.mkdir(parents=True, exist_ok=True)
 
             prepared_list = []

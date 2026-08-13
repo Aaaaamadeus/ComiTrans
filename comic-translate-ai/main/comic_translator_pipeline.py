@@ -320,8 +320,11 @@ class ComicTranslatorPipeline:
         
         if not API_KEY or not API_BASE_URL:
             print("[ERROR] 翻译 API 未正确配置。请在 config.yaml 中填写 api_key 和 api_base_url。")
+            self._report_progress(
+                "translate",
+                f"翻译 API 未正确配置：api_key={'空' if not API_KEY else '已设置'}，base_url={'空' if not API_BASE_URL else API_BASE_URL}",
+            )
             return None
-        
         safe_key = f"{API_KEY[:4]}...{API_KEY[-4:]}" if len(API_KEY) > 8 else "***"
         print(f"[INFO] 使用翻译 API: {API_BASE_URL.split('?')[0]}")
         print(f"[INFO] API Key: {safe_key}")
