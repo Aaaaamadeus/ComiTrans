@@ -1,15 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import (
-    QAbstractItemView,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+
+from .theme import refresh_style
 
 
 STAGE_ORDER = ["start", "detect", "ocr", "translate", "inpaint", "typeset", "save"]
@@ -36,12 +29,12 @@ STATUS_TEXT = {
     FAILED: "失败",
     CANCELLED: "已取消",
 }
-STATUS_COLOR = {
-    PENDING: QColor("#999999"),
-    RUNNING: QColor("#2f6fed"),
-    DONE: QColor("#2e7d32"),
-    FAILED: QColor("#c62828"),
-    CANCELLED: QColor("#ef6c00"),
+STATUS_NAMES = {
+    PENDING: "pending",
+    RUNNING: "running",
+    DONE: "done",
+    FAILED: "failed",
+    CANCELLED: "cancelled",
 }
 
 
@@ -49,26 +42,41 @@ class StepPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._states = {stage: PENDING for stage in STAGE_ORDER}
+        self._cards: dict[str, tuple[QFrame, QLabel]] = {}
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
+        layout.setSpacing(7)
 
         self._file_label = QLabel("等待任务")
-        self._file_label.setStyleSheet("font-weight: 600; color: #333;")
+        self._file_label.setObjectName("sectionTitle")
         layout.addWidget(self._file_label)
 
-        self._list = QListWidget()
-        self._list.setSelectionMode(QAbstractItemView.NoSelection)
-        self._list.setFocusPolicy(Qt.NoFocus)
-        self._list.setMinimumHeight(170)
-        self._list.setMaximumHeight(420)
-        self._list.setStyleSheet(
-            "QListWidget { border: 1px solid #d9d9d9; border-radius: 4px; padding: 4px; }"
-        )
-        for stage in STAGE_ORDER:
-            QListWidgetItem(STAGE_LABELS[stage], self._list)
-        layout.addWidget(self._list)
+        stage_row = QHBoxLayout()
+        stage_row.setSpacing(7)
+        for index, stage in enumerate(STAGE_ORDER, start=1):
+            card = QFrame()
+            card.setObjectName("stageCard")
+            card.setProperty("stageState", "pending")
+
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(9, 7, 9, 7)
+            card_layout.setSpacing(1)
+
+            number_label = QLabel(f"{index:02d}")
+            number_label.setObjectName("stageNumber")
+            name_label = QLabel(STAGE_LABELS[stage])
+            name_label.setObjectName("stageName")
+            status_label = QLabel(STATUS_TEXT[PENDING])
+            status_label.setObjectName("stageStatus")
+
+            card_layout.addWidget(number_label)
+            card_layout.addWidget(name_label)
+            card_layout.addWidget(status_label)
+            stage_row.addWidget(card, 1)
+            self._cards[stage] = (card, status_label)
+
+        layout.addLayout(stage_row)
         self._refresh()
 
     def reset(self) -> None:
@@ -77,7 +85,8 @@ class StepPanel(QWidget):
         self._refresh()
 
     def start_file(self, name: str) -> None:
-        self._file_label.setText(f"正在处理: {name}")
+        self._file_label.setText(f"正在处理 · {name}")
+        self._file_label.setToolTip(name)
         self._states = {stage: PENDING for stage in STAGE_ORDER}
         self._states[STAGE_ORDER[0]] = RUNNING
         self._refresh()
@@ -114,11 +123,9 @@ class StepPanel(QWidget):
         self._refresh()
 
     def _refresh(self) -> None:
-        bold = QFont()
-        bold.setBold(True)
-        for index, stage in enumerate(STAGE_ORDER):
-            item = self._list.item(index)
+        for stage in STAGE_ORDER:
             state = self._states[stage]
-            item.setText(f"{index + 1:02d}  {STAGE_LABELS[stage]}  {STATUS_TEXT[state]}")
-            item.setForeground(STATUS_COLOR[state])
-            item.setFont(bold if state == RUNNING else QFont())
+            card, status_label = self._cards[stage]
+            status_label.setText(STATUS_TEXT[state])
+            card.setProperty("stageState", STATUS_NAMES[state])
+            refresh_style(card)

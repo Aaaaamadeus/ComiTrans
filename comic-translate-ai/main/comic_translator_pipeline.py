@@ -12,7 +12,56 @@ from openai import OpenAI
 from manga_lama import MangaLama
 from vertical_typesetter import VerticalTypesetter
 from onnx_manga_ocr import OnnxMangaOcr
+from onnx_baberu_ocr import OnnxBaberuOcr
 from onnx_text_detector import OnnxTextDetector
+from text_style import (
+    FONT_STYLES,
+    choose_font_style,
+    choose_layout_direction,
+    estimate_text_emphasis,
+)
+
+
+def _parse_translation_response(content):
+    """返回（完整译文条目, JSON 是否完整），并恢复截断前的完整字符串。"""
+    cleaned = (content or "").replace("```json", "").replace("```", "").strip()
+    if not cleaned:
+        return [], False
+
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        data = None
+    else:
+        if isinstance(data, dict):
+            data = data.get("translations")
+        if isinstance(data, list):
+            return ["" if item is None else str(item) for item in data], True
+        return [], True
+
+    match = re.search(r'"translations"\s*:\s*\[', cleaned)
+    if match:
+        cursor = match.end()
+    elif cleaned.startswith("["):
+        cursor = 1
+    else:
+        return [], False
+
+    decoder = json.JSONDecoder()
+    recovered = []
+    while cursor < len(cleaned):
+        while cursor < len(cleaned) and cleaned[cursor] in " \t\r\n,":
+            cursor += 1
+        if cursor >= len(cleaned) or cleaned[cursor] == "]":
+            break
+        try:
+            item, cursor = decoder.raw_decode(cleaned, cursor)
+        except json.JSONDecodeError:
+            break
+        recovered.append("" if item is None else str(item))
+    return recovered, False
+
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -21,7 +70,9 @@ class TaskCancelledError(Exception):
 
 
 class TranslationError(Exception):
-    pass
+    def __init__(self, message, *, fatal=False):
+        super().__init__(message)
+        self.fatal = bool(fatal)
 
 
 class ComicTranslatorPipeline:
@@ -38,6 +89,8 @@ class ComicTranslatorPipeline:
                  chinese_names=None,
                  multimodal=False,
                  ocr_model_path=None,
+                 baberu_ocr_model_path=None,
+                 ocr_backend="auto",
                  progress_callback=None,
                  cancel_callback=None):
         self.device = 'cuda' if use_gpu else 'cpu'
@@ -50,6 +103,10 @@ class ComicTranslatorPipeline:
         self.progress_callback = progress_callback
         self.cancel_callback = cancel_callback
         self.ocr_model_path = ocr_model_path or os.path.join(current_dir, "..", "models", "manga-ocr-onnx")
+        self.baberu_ocr_model_path = baberu_ocr_model_path or os.path.join(
+            current_dir, "..", "models", "baberu-ocr"
+        )
+        self.ocr_backend_requested = str(ocr_backend or "auto").strip().lower()
         if not self.translation_model:
              print("[WARNING] Pipeline 初始化时未指定翻译模型")
         print("初始化管线")
@@ -57,9 +114,31 @@ class ComicTranslatorPipeline:
         print("[INFO] 加载 Comic Text Detector...")
         self.detector = OnnxTextDetector(model_path=det_model_path, input_size=1024, device=self.device)
 
-        # 2. OCR 模型
-        print("[INFO] 加载 Manga-OCR...")
-        self.manga_ocr = OnnxMangaOcr(model_dir=self.ocr_model_path, device=self.device)
+        # 2. OCR 模型。auto 优先 Baberu，模型不存在或加载失败时回退 manga-ocr。
+        self.ocr = None
+        self.manga_ocr = None
+        self.ocr_backend_active = ""
+        if self.ocr_backend_requested in ("auto", "baberu") and OnnxBaberuOcr.is_complete(
+            self.baberu_ocr_model_path
+        ):
+            try:
+                print("[INFO] 加载 Baberu OCR...")
+                self.ocr = OnnxBaberuOcr(
+                    model_dir=self.baberu_ocr_model_path, device=self.device
+                )
+                self.ocr_backend_active = "baberu"
+            except Exception as exc:
+                print(f"[WARNING] Baberu OCR 加载失败，将回退 manga-ocr: {exc}")
+        if self.ocr is None:
+            if self.ocr_backend_requested == "baberu":
+                print("[WARNING] Baberu OCR 模型不完整，将回退 manga-ocr。")
+            print("[INFO] 加载 Manga-OCR...")
+            self.manga_ocr = OnnxMangaOcr(
+                model_dir=self.ocr_model_path, device=self.device
+            )
+            self.ocr = self.manga_ocr
+            self.ocr_backend_active = "manga-ocr"
+        print(f"[INFO] OCR 后端: {self.ocr_backend_active}")
 
         # 3. 图像修补
         print("[INFO] 加载 Manga-lama...")
@@ -107,17 +186,19 @@ class ComicTranslatorPipeline:
             # 2. 类型提取：列表中没有 mask_type，我们使用 vertical (横排/竖排)
             # 如果后续逻辑必须叫 mask_type，我们在这里做一个转换
             # 通常 0 代表横排，1 代表竖排
-            mask_type = 1 if getattr(line, 'vertical', False) else 0
             detected_font_size = int(getattr(line, 'font_size', -1) or -1)
             detected_label = int(getattr(line, 'label', 0))
             box_width = max(1, int(box[2] - box[0]))
             box_height = max(1, int(box[3] - box[1]))
-            # ???????????????????? radiating
-            if mask_type == 0 and box_width > box_height * 2.0:
-                font_type = 'narration'
-            else:
-                font_type = 'radiating'
-            # ?????????????????????????
+            mask_type = choose_layout_direction(
+                bool(getattr(line, 'vertical', False)), box_width, box_height
+            )
+            # 普通对话保持正文体，强调/音效体在 OCR 后结合文本和笔画强度判断。
+            font_type = (
+                'narration'
+                if mask_type == 0 and box_width > box_height * 2.0
+                else 'dialogue'
+            )
             if detected_font_size > 0:
                 size_limit = int(box_height * 0.9) if mask_type == 1 else int(box_height * 0.5)
                 detected_font_size = max(10, min(detected_font_size, size_limit))
@@ -145,15 +226,19 @@ class ComicTranslatorPipeline:
         x1, y1 = max(0, x1), max(0, y1)
         x2, y2 = min(w, x2), min(h, y2)
 
-        crop_img = img_array[y1:y2, x1:x2]
+        detected_font_size = int(box[6]) if len(box) > 6 and int(box[6]) > 0 else 16
+        padding = max(2, min(16, int(round(detected_font_size * 0.25))))
+        crop_img = img_array[
+            max(0, y1 - padding):min(h, y2 + padding),
+            max(0, x1 - padding):min(w, x2 + padding),
+        ]
         if crop_img.size == 0: return ""
         if len(box) > 8 and box[8] == 'eng':
             return ""
 
-        if method == 'manga-ocr':
-            # 必须转为 RGB PIL
+        if method in ('manga-ocr', 'baberu', 'auto'):
             pil_crop = Image.fromarray(cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB))
-            return self.manga_ocr(pil_crop)
+            return self.ocr(pil_crop)
         # elif method == 'paddle':
         #     #ocr线程锁
         #     with self.lock:
@@ -177,14 +262,24 @@ class ComicTranslatorPipeline:
         print(f"亮度:{mean_val:.2f},标准差:{std_val:.2f}->{'白气泡' if white else '复杂背景'}")
         return white
 
-    def _is_simple_bubble_v2(self, roi_img, text_ratio=0.0):
+    def _is_simple_bubble_v2(self, roi_img, erase_mask=None):
         if roi_img is None or roi_img.size == 0:
             return False
         gray = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
-        mean_val = float(np.mean(gray))
-        std_val = float(np.std(gray))
-        white_ratio = float(np.mean(gray > 220))
-        simple = mean_val > 200 and white_ratio >= 0.6
+        background = gray.reshape(-1)
+        text_ratio = 0.0
+        if erase_mask is not None and erase_mask.shape == gray.shape:
+            mask_bool = erase_mask > 0
+            text_ratio = float(np.mean(mask_bool))
+            available = gray[~mask_bool]
+            if available.size >= max(16, gray.size * 0.05):
+                background = available
+        mean_val = float(np.mean(background))
+        std_val = float(np.std(background))
+        white_ratio = float(np.mean(background > 225))
+        # 必须依据“去掉文字后的背景”判断。直接把原文字纳入统计，会把粗体
+        # 或大字号的纯白气泡误判成复杂背景，LaMa 随后容易留下浅色鬼影。
+        simple = mean_val > 232 and white_ratio >= 0.82
         print(
             f"亮度:{mean_val:.2f},标准差:{std_val:.2f},白像素占比:{white_ratio:.2f},文字占比:{text_ratio:.2f}"
             f"->{'白气泡' if simple else '复杂背景'}"
@@ -217,6 +312,7 @@ class ComicTranslatorPipeline:
             roi_img = img_cv[safe_y1:safe_y2, safe_x1:safe_x2]
             # 生成掩膜，提取黑色文字
             gray_roi = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
+            roi_h, roi_w = gray_roi.shape
             # 二值化
             _, initial_mask = cv2.threshold(gray_roi, 235, 255, cv2.THRESH_BINARY_INV)
             # 查找所有黑色连通块
@@ -227,46 +323,75 @@ class ComicTranslatorPipeline:
             for i in range(1, num_labels):
                 x, y, w_box, h_box, area = stats[i]
                 # 边界触碰检测
-                is_touching_border = (x <= 1) or (y <= 1) or (x + w_box >= w - 1) or (y + h_box >= h - 1)
+                is_touching_border = (
+                    x <= 1
+                    or y <= 1
+                    or x + w_box >= roi_w - 1
+                    or y + h_box >= roi_h - 1
+                )
                 if is_touching_border:
                     continue
                 # 筛选规则
                 # 比较面积和长宽，基于 h/w
                 # 如果一个块的面积超过了“当前切片”总面积的 50%
-                if area > (h * w) * 0.5:
+                if area > (roi_h * roi_w) * 0.5:
                     continue
                 # 如果一个块的宽或高占据了“当前切片”的 90% 以上
-                if w_box > w * 0.9 or h_box > h * 0.9:
+                if w_box > roi_w * 0.9 or h_box > roi_h * 0.9:
                     continue
                 # 去除微小噪点
-                if area < 5:
+                if area < 2:
                     continue
                 # 将通过筛选的画到mask上
                 text_mask[labels == i] = 255
 
             # 只对筛选后的文字进行膨胀，增强边缘包围，防止遗留抗锯齿的灰色鬼影
             text_mask_union = text_mask.copy()
-            text_mask_precise = text_mask.copy()
             text_mask_erase = text_mask.copy()
             if hasattr(self, "last_detector_mask") and self.last_detector_mask is not None:
                 detector_roi = self.last_detector_mask[safe_y1:safe_y2, safe_x1:safe_x2]
                 if np.count_nonzero(detector_roi) > 0:
                     detector_bool = detector_roi > 0
-                    text_mask_union = np.where(detector_bool | (text_mask > 0), 255, 0).astype(np.uint8)
-                    text_mask_precise = np.where(detector_bool & (text_mask > 0), 255, 0).astype(np.uint8)
-                    # ????????????????/????????????
-                    text_mask_erase = np.where(detector_bool, 255, 0).astype(np.uint8)
-                    if np.count_nonzero(text_mask_precise) == 0:
-                        text_mask_precise = text_mask_union.copy()
+                    detected_size = int(data[6]) if len(data) > 6 and int(data[6]) > 0 else 16
+                    proximity_radius = max(4, min(8, round(detected_size * 0.25)))
+                    proximity_kernel = cv2.getStructuringElement(
+                        cv2.MORPH_ELLIPSE,
+                        (proximity_radius * 2 + 1, proximity_radius * 2 + 1),
+                    )
+                    detector_near = cv2.dilate(
+                        detector_bool.astype(np.uint8), proximity_kernel, iterations=1
+                    ) > 0
+                    # 检测器掩膜通常只覆盖字形中心，直接使用会留下灰边和半截笔画。
+                    # 仅补入检测器邻域内的深色连通像素，既补全完整字形，又避免误擦
+                    # 气泡轮廓、分镜线和邻近画面。
+                    nearby_dark_text = (text_mask > 0) & detector_near
+                    text_mask_union = np.where(
+                        detector_bool | nearby_dark_text, 255, 0
+                    ).astype(np.uint8)
+                    text_mask_erase = text_mask_union.copy()
 
-            kernel = np.ones((3, 3), np.uint8)
-            text_mask_precise_dilated = cv2.dilate(text_mask_precise, kernel, iterations=1)
-            text_mask_union_dilated = cv2.dilate(text_mask_union, kernel, iterations=1)
-            text_mask_erase_dilated = cv2.dilate(text_mask_erase, kernel, iterations=1)
+            detected_size = int(data[6]) if len(data) > 6 and int(data[6]) > 0 else 16
+            erase_radius = max(3, min(5, round(detected_size * 0.15)))
+            erase_kernel = cv2.getStructuringElement(
+                cv2.MORPH_ELLIPSE,
+                (erase_radius * 2 + 1, erase_radius * 2 + 1),
+            )
+            text_mask_erase_closed = cv2.morphologyEx(
+                text_mask_erase,
+                cv2.MORPH_CLOSE,
+                cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
+            )
+            text_mask_erase_dilated = cv2.dilate(
+                text_mask_erase_closed, erase_kernel, iterations=1
+            )
+            raw_dark_dilated = cv2.dilate(
+                initial_mask, erase_kernel, iterations=1
+            )
 
             layout_kernel = np.ones((5, 5), np.uint8)
             layout_mask_roi = cv2.dilate(text_mask_union, layout_kernel, iterations=2)
-            full_layout_mask[safe_y1:safe_y2, safe_x1:safe_x2] = layout_mask_roi
+            layout_target = full_layout_mask[safe_y1:safe_y2, safe_x1:safe_x2]
+            cv2.bitwise_or(layout_target, layout_mask_roi, dst=layout_target)
 
             # 分流处理
             box_x1, box_y1 = max(0, x1), max(0, y1)
@@ -274,27 +399,35 @@ class ComicTranslatorPipeline:
             box_roi = img_cv[box_y1:box_y2, box_x1:box_x2]
             offset_x = box_x1 - safe_x1
             offset_y = box_y1 - safe_y1
-            inner_text = text_mask_precise_dilated[
-                offset_y : offset_y + (box_y2 - box_y1),
-                offset_x : offset_x + (box_x2 - box_x1),
-            ]
             inner_erase = text_mask_erase_dilated[
                 offset_y : offset_y + (box_y2 - box_y1),
                 offset_x : offset_x + (box_x2 - box_x1),
             ]
-            text_ratio = (
-                float(np.count_nonzero(inner_text) / inner_text.size) if inner_text.size else 0.0
-            )
-            if self._is_simple_bubble_v2(box_roi, text_ratio):
-                # 直接涂白
+            simple_background = self._is_simple_bubble_v2(box_roi, inner_erase)
+            if not simple_background:
+                simple_background = self._is_simple_bubble_v2(
+                    roi_img, text_mask_erase_dilated
+                )
+            if simple_background:
+                # 纯白背景内可以安全使用完整深色连通字形，解决检测器完全漏掉
+                # 某个笔画/标点时仅扩大检测掩膜仍无法清除的问题。
+                inner_simple_erase = raw_dark_dilated[
+                    offset_y : offset_y + (box_y2 - box_y1),
+                    offset_x : offset_x + (box_x2 - box_x1),
+                ]
+                # 检测器边框有时会截掉最外侧笔画或注音。先清除扩展区内与
+                # 检测掩膜相连的字形，再在检测框内补清所有深色笔画；前者
+                # 解决框外残边，后者解决检测掩膜内部漏笔画。
+                roi_img[text_mask_erase_dilated > 0] = [255, 255, 255]
                 roi_img[
                     offset_y : offset_y + (box_y2 - box_y1),
                     offset_x : offset_x + (box_x2 - box_x1),
-                ][inner_erase == 255] = [255, 255, 255]
+                ][inner_simple_erase > 0] = [255, 255, 255]
             else:
                 # 调用模型处理
                 needs_ai_inpainting = True
-                lama_mask[safe_y1:safe_y2, safe_x1:safe_x2] = text_mask_erase_dilated
+                lama_target = lama_mask[safe_y1:safe_y2, safe_x1:safe_x2]
+                cv2.bitwise_or(lama_target, text_mask_erase_dilated, dst=lama_target)
         
         # 循环结束后统一生成掩膜图像，避免重复转换
         self.current_mask_image = Image.fromarray(full_layout_mask)
@@ -312,19 +445,27 @@ class ComicTranslatorPipeline:
         return img_pil_final
 
     def translate_page_batch(self, ocr_texts, image_input):
-        if not ocr_texts: return []
+        # 空白页不需要访问翻译 API。此前空白页会在后续排版阶段被误报成
+        # “API 未打通”，对 PDF 中常见的封面/插页尤其不友好。
+        if not ocr_texts:
+            return []
 
         # 使用初始化时传入的配置（来自 config.yaml）
         API_KEY = self.api_key or ""
         API_BASE_URL = self.api_base_url or ""
         
-        if not API_KEY or not API_BASE_URL:
-            print("[ERROR] 翻译 API 未正确配置。请在 config.yaml 中填写 api_key 和 api_base_url。")
-            self._report_progress(
-                "translate",
-                f"翻译 API 未正确配置：api_key={'空' if not API_KEY else '已设置'}，base_url={'空' if not API_BASE_URL else API_BASE_URL}",
-            )
-            return None
+        missing = []
+        if not API_KEY:
+            missing.append("API Key")
+        if not API_BASE_URL:
+            missing.append("Base URL")
+        if not self.translation_model:
+            missing.append("翻译模型")
+        if missing:
+            message = f"翻译 API 配置不完整：缺少{'、'.join(missing)}"
+            print(f"[ERROR] {message}")
+            self._report_progress("translate", message)
+            raise TranslationError(message, fatal=True)
         safe_key = f"{API_KEY[:4]}...{API_KEY[-4:]}" if len(API_KEY) > 8 else "***"
         print(f"[INFO] 使用翻译 API: {API_BASE_URL.split('?')[0]}")
         print(f"[INFO] API Key: {safe_key}")
@@ -339,36 +480,30 @@ class ComicTranslatorPipeline:
         proxy_url = proxies.get('http') or proxies.get('https')
         http_client = httpx.Client(proxy=proxy_url, timeout=90.0) if proxy_url else httpx.Client(timeout=90.0)
 
-        client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL, http_client=http_client, max_retries=2)
-
         # 2. 构造带序号的文本清单，方便 AI 对照
         text_list_str = "\n".join([f"[{i}] {text}" for i, text in enumerate(ocr_texts)])
 
         # 3. 构造 Prompt
-        system_prompt = """?????????????????????OCR????????????????????????????
+        system_prompt = """你是专业的日中漫画翻译助手。输入是按漫画阅读顺序排列的 OCR 文本。
 
-??????
-???????????????????
-[0] ????
-[1] ?????
-[2] ?????
+输入示例：
+[0] こんにちは
+[1] また明日
+[2] ……
 
-??????
-?????????? JSON ??????????
-{"translations": ["??1", "??2", "??3"]}
-????????????? Markdown???? JSON ????????
+输出要求：
+只返回合法 JSON，格式必须为：
+{"translations": ["译文1", "译文2", "译文3"]}
+不要输出 Markdown 代码块、说明文字或其他字段。
 
-??????
-1. "translations" ??????????????????????????????????????????
-2. ??????????????????????????????????? "?????" -> "???"??
-3. ??????????????????????????????
-4. ???????????????????? ""?
-   - ????????????
-   - ??????????????????????
-   ?????????????????????
-5. ?????????????????????????????????
-6. ??????????????????????????????????
-7. ????????????????????????????????????"""
+翻译规则：
+1. translations 数组必须与输入数量、顺序完全一致。
+2. 译文应自然、简洁，符合中文漫画对白习惯，不要逐字硬译。
+3. 保留说话人的语气、敬语、称呼和情绪强度。
+4. OCR 为空、纯符号或明显无法识别时返回空字符串，不得臆造内容。
+5. 拟声词优先使用自然的中文拟声表达。
+6. 人名和术语在整页内保持一致。
+7. 不得在译文中加入解释、注释、序号或引号。"""
 
         custom_context = []
         if self.translation_prompt.strip():
@@ -390,95 +525,159 @@ class ComicTranslatorPipeline:
         user_prompt = f'\u8bf7\u4e25\u683c\u6309\u987a\u5e8f\u7ffb\u8bd1\u4ee5\u4e0b {len(ocr_texts)} \u6761\u65e5\u6587\u6587\u672c\uff0c\u8fd4\u56de {{"translations": [...]}}\uff0c\u6570\u91cf\u5fc5\u987b\u4e0e\u8f93\u5165\u4e00\u81f4\uff1a\n{text_list_str}'
 
         try:
-            # 读取整页图片
-            if isinstance(image_input, str):
-                with open(image_input, "rb") as image_file:
-                    base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-            else:
-                # 假设是 numpy 数组 (OpenCV 图像)
-                _, buffer = cv2.imencode('.jpg', image_input)
-                base64_image = base64.b64encode(buffer).decode('utf-8')
-
+            client = OpenAI(
+                api_key=API_KEY,
+                base_url=API_BASE_URL,
+                http_client=http_client,
+                max_retries=2,
+            )
             use_image = bool(getattr(self, "multimodal", False))
-            response = None
-            last_error = None
-            for _attempt in range(2):
-                content_parts = [{"type": "text", "text": user_prompt}]
-                if use_image:
-                    content_parts.append(
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                        }
-                    )
+            base64_image = ""
+            if use_image:
+                # 只有多模态模式才编码整页图，纯文本翻译避免无谓的 CPU 与内存开销。
+                if isinstance(image_input, str):
+                    with open(image_input, "rb") as image_file:
+                        base64_image = base64.b64encode(image_file.read()).decode("utf-8")
                 else:
-                    content_parts[0]["text"] = (
-                        user_prompt + "\n（本次未附带整页图片，请仅依据文本列表翻译）"
-                    )
-                try:
-                    response = client.chat.completions.create(
-                        model=self.translation_model,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": content_parts},
-                        ],
-                        response_format={"type": "json_object"},
-                    )
-                    break
-                except Exception as exc:
-                    last_error = exc
-                    if use_image and "image_url" in str(exc):
-                        print("[WARNING] 当前模型不支持图片上下文，降级为纯文本翻译重试...")
-                        use_image = False
-                        continue
-                    raise
-            if response is None:
-                raise last_error
+                    success, buffer = cv2.imencode(".jpg", image_input)
+                    if not success:
+                        raise TranslationError("无法编码多模态翻译所需的页面图片")
+                    base64_image = base64.b64encode(buffer).decode("utf-8")
 
-            content = response.choices[0].message.content.strip()
+            translations = []
+            remaining = list(ocr_texts)
+            last_content = ""
+            last_finish_reason = ""
+            send_max_tokens = True
 
-            # 4. 清洗与解析数据
-            # 去除可能存在的 markdown 标记
-            content = content.replace("```json", "").replace("```", "").strip()
-
-            try:
-                data = json.loads(content)
-                # 兼容处理：有时候模型会返回 {"translations": [...]} 有时候直接返回 [...]
-                if isinstance(data, list):
-                    translations = data
-                elif isinstance(data, dict):
-                    # 尝试取字典里的第一个列表值
-                    translations = list(data.values())[0] if data else []
-                else:
-                    translations = []
-
-                # 5. 数量对齐检查
-                # 如果 AI 返回的数量不对，程序后续会崩，所以必须在这里兜底
-                if len(translations) != len(ocr_texts):
-                    print(f"数量不匹配 (发:{len(ocr_texts)} vs 收:{len(translations)})，尝试自动补齐")
-                    self._report_progress("translate", f"警告：翻译返回数量不匹配（发 {len(ocr_texts)} 收 {len(translations)}），已补齐")
-                    if len(translations) < len(ocr_texts):
-                        # 少了就补空
-                        translations.extend(["" for _ in range(len(translations), len(ocr_texts))])
-                    else:
-                        # 多了就截断
-                        translations = translations[:len(ocr_texts)]
-
-                self._report_progress(
-                    "translate",
-                    f"翻译 API 返回 {len(translations)} 条结果，耗时 {_time.time() - _t0:.1f}s",
+            # 服务端可能在输出 token 达到上限时截断 JSON。保留已经完整输出的
+            # 数组元素，并只续译尚未返回的后缀，避免重复翻译或静默补空。
+            for continuation_attempt in range(3):
+                start_index = len(translations)
+                text_list_str = "\n".join(
+                    f"[{start_index + i}] {text}" for i, text in enumerate(remaining)
                 )
-                return translations
+                user_prompt = (
+                    f"请严格按顺序翻译以下 {len(remaining)} 条日文文本，返回 "
+                    f'{{"translations": [...]}}，数组只能包含本次列出的 {len(remaining)} 条译文：\n'
+                    f"{text_list_str}"
+                )
+                if continuation_attempt:
+                    user_prompt = (
+                        "上次响应被截断或数量不足。请从以下条目继续，务必输出完整闭合的 JSON。\n"
+                        + user_prompt
+                    )
 
-            except json.JSONDecodeError:
-                print(f"JSON解析失败: {content}")
-                self._report_progress("translate", "翻译响应 JSON 解析失败")
-                return None
+                response = None
+                last_error = None
+                for _request_attempt in range(3):
+                    content_parts = [{"type": "text", "text": user_prompt}]
+                    if use_image:
+                        content_parts.append(
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                            }
+                        )
+                    else:
+                        content_parts[0]["text"] += "\n（本次未附带整页图片，请仅依据文本列表翻译）"
+                    try:
+                        request_options = dict(
+                            model=self.translation_model,
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": content_parts},
+                            ],
+                            response_format={"type": "json_object"},
+                        )
+                        if send_max_tokens:
+                            request_options["max_tokens"] = 8192
+                        response = client.chat.completions.create(**request_options)
+                        break
+                    except Exception as exc:
+                        last_error = exc
+                        if use_image and "image_url" in str(exc):
+                            print("[WARNING] 当前模型不支持图片上下文，降级为纯文本翻译重试...")
+                            use_image = False
+                            continue
+                        if send_max_tokens and "max_tokens" in str(exc).lower():
+                            print("[WARNING] 当前接口不支持 max_tokens 参数，移除该参数后重试...")
+                            send_max_tokens = False
+                            continue
+                        raise
+                if response is None:
+                    raise last_error
 
-        except Exception as e:
-            print(f"PI请求出错: {e}")
-            self._report_progress("translate", f"翻译请求失败: {e}")
-            return None
+                choice = response.choices[0]
+                last_finish_reason = str(getattr(choice, "finish_reason", "") or "")
+                last_content = (choice.message.content or "").strip()
+                items, json_complete = _parse_translation_response(last_content)
+                accepted = items[:len(remaining)]
+                if accepted:
+                    translations.extend(accepted)
+                    remaining = remaining[len(accepted):]
+
+                if not remaining:
+                    self._report_progress(
+                        "translate",
+                        f"翻译 API 返回 {len(translations)} 条结果，耗时 {_time.time() - _t0:.1f}s",
+                    )
+                    return translations
+
+                reason = f"，finish_reason={last_finish_reason}" if last_finish_reason else ""
+                status = "JSON 被截断" if not json_complete else "返回数量不足"
+                print(
+                    f"[WARNING] 翻译{status}{reason}；已收到 {len(translations)}/{len(ocr_texts)} 条，继续请求剩余内容"
+                )
+                if continuation_attempt < 2:
+                    self._report_progress(
+                        "translate",
+                        f"翻译响应{status}，正在续译剩余 {len(remaining)} 条（第 {continuation_attempt + 2}/3 次）",
+                    )
+
+            preview = last_content.replace("\r", " ").replace("\n", " ")[:160]
+            reason = f"，finish_reason={last_finish_reason}" if last_finish_reason else ""
+            if translations:
+                message = (
+                    f"翻译响应连续 3 次被截断或数量不足（已收到 {len(translations)}/{len(ocr_texts)} 条{reason}）："
+                    f"{preview or '空响应'}"
+                )
+            else:
+                message = (
+                    f"翻译响应不是合法 JSON（连续 3 次解析失败{reason}）："
+                    f"{preview or '空响应'}"
+                )
+            raise TranslationError(message)
+
+        except TranslationError:
+            raise
+        except Exception as exc:
+            status_code = getattr(exc, "status_code", None)
+            if status_code in (401, 403):
+                hint = "鉴权失败，请检查 API Key"
+            elif status_code == 402:
+                hint = "账户余额不足，请充值或更换有额度的 API Key"
+            elif status_code == 404:
+                hint = "接口或模型不存在，请检查 Base URL 和翻译模型"
+            elif status_code == 429:
+                hint = "请求过于频繁或额度不足"
+            elif status_code and status_code >= 500:
+                hint = "翻译服务暂时不可用"
+            else:
+                hint = "请检查网络、Base URL 和翻译模型"
+            detail = " ".join(str(exc).split())[:300]
+            if API_KEY:
+                detail = detail.replace(API_KEY, "***")
+            message = f"翻译 API 请求失败：{hint}"
+            if detail:
+                message += f"（{detail}）"
+            print(f"[ERROR] {message}")
+            self._report_progress("translate", message)
+            raise TranslationError(
+                message, fatal=status_code in (401, 402, 403, 404)
+            ) from exc
+        finally:
+            http_client.close()
 
     def configure_fonts(self, ocr_texts, translated_list, image_input):
         if not self.multimodal or not ocr_texts:
@@ -512,7 +711,7 @@ class ComicTranslatorPipeline:
             system_prompt = (
                 "你是漫画排版字体配置助手。请根据整页漫画画面、原文和译文，为每个文本块返回 JSON，"
                 '格式为 {"items": [{"index": 0, "font_style": "dialogue", "font_size": 18, "direction": "vertical"}]}。'
-                "font_style 只能取 dialogue、radiating、handwriting、serious 之一；"
+                f"font_style 只能取 {', '.join(FONT_STYLES)} 之一；"
                 "direction 只能取 vertical 或 horizontal；font_size 为整数像素。"
             )
             user_prompt = f"请为以下文本块配置字体：\n{text_pairs}"
@@ -543,7 +742,7 @@ class ComicTranslatorPipeline:
                 if idx < 0 or idx >= len(ocr_texts):
                     continue
                 style = item.get("font_style", "dialogue")
-                if style not in ("dialogue", "radiating", "handwriting", "serious", "narration", "next_preview", "title"):
+                if style not in FONT_STYLES:
                     style = "dialogue"
                 size = int(item.get("font_size") or 0)
                 direction = 1 if str(item.get("direction", "")).lower().startswith("v") else 0
@@ -585,23 +784,41 @@ class ComicTranslatorPipeline:
         for i, box in enumerate(bubbles_data):
             x1, y1, x2, y2, mask_type, font_type, target_font_size, detected_label, language = box
 
-            raw_text = self.run_ocr(img_cv, box, method='manga-ocr')
+            raw_text = self.run_ocr(img_cv, box, method='auto')
             self._check_cancelled()
             if raw_text and self._looks_like_english_garbage(raw_text):
                 bubbles_data[i] = box[:8] + ('eng',)
                 raw_text = ""
-            style = font_type
-            if raw_text and re.search(r"次回|つづく|続く|待续|下回|TO BE CONTINUED|次号|\u7b2c\s*\d+\s*话|后篇|後篇|预告|最终话|最終話|最终回|最終回", raw_text, re.IGNORECASE):
-                style = "next_preview"
+            box_width = max(1, x2 - x1)
+            box_height = max(1, y2 - y1)
+            direction = choose_layout_direction(
+                mask_type == 1, box_width, box_height, raw_text
+            )
+            non_bubble = detected_label == 2 or (
+                direction == 0 and box_width > box_height * 2.0
+            )
+            crop = img_cv[
+                max(0, y1):min(img_cv.shape[0], y2),
+                max(0, x1):min(img_cv.shape[1], x2),
+            ]
+            emphasis = estimate_text_emphasis(crop, target_font_size)
+            style = choose_font_style(
+                raw_text,
+                direction=direction,
+                width=box_width,
+                height=box_height,
+                non_bubble=non_bubble,
+                emphasis=emphasis,
+            )
 
             bubble_metadata.append({
                 "box": box,
                 "raw": raw_text,
                 "style": style,
-                "direction": mask_type,
+                "direction": direction,
                 "target_font_size": target_font_size,
-                "non_bubble": detected_label == 2
-                or (mask_type == 0 and (x2 - x1) > (y2 - y1) * 2.0),
+                "non_bubble": non_bubble,
+                "emphasis": round(emphasis, 3),
             })
             ocr_text_only.append(raw_text)
         self._report_progress("ocr", f"OCR 完成，识别 {len(ocr_text_only)} 条文本")
@@ -629,18 +846,14 @@ class ComicTranslatorPipeline:
         # 批处理阶段
         print(f"[INFO] 正在翻译 {len(ocr_text_only)} 条文本...")
         
-        translation_failed = translated_list is None
         if translated_list is None:
             raise TranslationError(
-                "翻译 API 未打通，请检查 API Key、Base URL 和翻译模型；本次未生成译文"
+                "翻译阶段未返回结果，已停止排版以避免生成错误文件"
             )
         self._check_cancelled()
-        self._report_progress(
-            "translate", "翻译失败，跳过原文嵌入" if translation_failed else "翻译完成"
-        )
+        self._report_progress("translate", "翻译完成")
         
-        if translated_list is not None:
-            print(f"[INFO] 翻译完成，获取 {len(translated_list)} 条结果")
+        print(f"[INFO] 翻译完成，获取 {len(translated_list)} 条结果")
 
         font_config = {}
         if self.multimodal:
@@ -665,6 +878,7 @@ class ComicTranslatorPipeline:
                 "direction": font_cfg.get("direction", item['direction']),
                 "target_font_size": font_cfg.get("font_size") or item['target_font_size'],
                 "non_bubble": item['non_bubble'],
+                "emphasis": item.get('emphasis', 0.0),
             })
             
             raw_short = item['raw'][:15] + "..." if len(item['raw']) > 15 else item['raw']
@@ -698,11 +912,15 @@ class ComicTranslatorPipeline:
                 if isinstance(item["target_font_size"], int) and item["target_font_size"] > 0
                 else None,
                 "non_bubble": bool(item["non_bubble"]),
+                "emphasis": item.get("emphasis", 0.0),
                 "rendered_font_size": None,
                 "offset_x": 0,
                 "offset_y": 0,
             })
         rendered_sizes = {}
+        layout_mask = getattr(self, "current_mask_image", None)
+        if layout_mask is None and hasattr(self, "last_detector_mask"):
+            layout_mask = Image.fromarray(self.last_detector_mask)
         for idx, item in enumerate(processed_data):
             if item['trans']:
                 try:
@@ -711,7 +929,9 @@ class ComicTranslatorPipeline:
                         item['box'],
                         item['trans'],
                         item['style'],
-                        mask=Image.fromarray(self.last_detector_mask) if hasattr(self, 'last_detector_mask') else None,
+                        # 使用擦字阶段补全并合并过的掩膜计算文字中心，避免窄框、
+                        # 相邻框被原始检测器的缺口带偏。
+                        mask=layout_mask,
                         direction=item['direction'],
                         target_font_size=item['target_font_size'],
                         non_bubble=item['non_bubble'],

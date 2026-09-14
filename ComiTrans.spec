@@ -6,11 +6,15 @@ hidden_imports = [
     "vertical_typesetter",
     "onnx_text_detector",
     "onnx_manga_ocr",
+    "onnx_baberu_ocr",
+    "text_style",
+    "punctuation_layout",
     "pyclipper",
     "shapely",
     "tqdm",
     "jaconv",
     "tokenizers",
+    "PySide6.QtPdf",
 ]
 
 datas = [

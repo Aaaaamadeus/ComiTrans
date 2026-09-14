@@ -24,6 +24,22 @@ from PySide6.QtWidgets import (
 from ..config import load_ai_config
 
 
+STYLE_LABELS = {
+    "dialogue": "普通对话",
+    "bold_dialogue": "粗体对话",
+    "radiating": "强调/放射",
+    "handwriting": "手写注记",
+    "thought": "内心独白",
+    "whisper": "轻声/低语",
+    "serious": "严肃/正式",
+    "narration": "旁白",
+    "sfx": "拟声/音效",
+    "cute": "可爱/活泼",
+    "next_preview": "下回预告",
+    "title": "标题",
+}
+
+
 class _Preview(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -31,9 +47,10 @@ class _Preview(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._label = QLabel("选择已翻译图片后，在这里预览并编辑")
+        self._label.setObjectName("previewLabel")
         self._label.setAlignment(Qt.AlignCenter)
-        self._label.setStyleSheet("color: #888;")
         self._scroll = QScrollArea()
+        self._scroll.setObjectName("previewCanvas")
         self._scroll.setWidget(self._label)
         self._scroll.setWidgetResizable(True)
         self._scroll.setAlignment(Qt.AlignCenter)
@@ -82,6 +99,8 @@ class EditorPage(QWidget):
 
     def _build_ui(self) -> None:
         root = QHBoxLayout(self)
+        root.setContentsMargins(14, 14, 14, 14)
+        root.setSpacing(10)
 
         left_group = QGroupBox("文本块")
         left = QVBoxLayout(left_group)
@@ -90,6 +109,7 @@ class EditorPage(QWidget):
         left.addWidget(self.block_list, 1)
         self._apply_btn = QPushButton("应用修改")
         self._save_btn = QPushButton("保存图片")
+        self._save_btn.setProperty("role", "primary")
         left.addWidget(self._apply_btn)
         left.addWidget(self._save_btn)
         root.addWidget(left_group, 0)
@@ -101,12 +121,15 @@ class EditorPage(QWidget):
 
         form = QFormLayout()
         self._style_combo = QComboBox()
-        self._style_combo.addItems(["dialogue", "radiating", "handwriting", "serious", "narration", "next_preview", "title"])
+        for style, label in STYLE_LABELS.items():
+            self._style_combo.addItem(label, style)
         self._size_spin = QSpinBox()
         self._size_spin.setRange(0, 200)
         self._size_spin.setSpecialValueText("自动")
         self._direction_combo = QComboBox()
-        self._direction_combo.addItems(["竖排", "横排"])
+        self._direction_combo.addItem("自动判断", -1)
+        self._direction_combo.addItem("竖排", 1)
+        self._direction_combo.addItem("横排", 0)
         self._offset_x = QSpinBox()
         self._offset_x.setRange(-300, 300)
         self._offset_y = QSpinBox()
@@ -149,10 +172,12 @@ class EditorPage(QWidget):
         if row < 0 or row >= len(self.items):
             return
         item = self.items[row]
-        self._style_combo.setCurrentText(item.get("style", "dialogue"))
+        style_index = self._style_combo.findData(item.get("style", "dialogue"))
+        self._style_combo.setCurrentIndex(max(0, style_index))
         size = int(item.get("font_size") or 0)
         self._size_spin.setValue(size)
-        self._direction_combo.setCurrentIndex(0 if int(item.get("direction", 1)) == 1 else 1)
+        direction_index = self._direction_combo.findData(int(item.get("direction", 1)))
+        self._direction_combo.setCurrentIndex(max(0, direction_index))
         self._offset_x.setValue(int(item.get("offset_x", 0)))
         self._offset_y.setValue(int(item.get("offset_y", 0)))
 
@@ -161,9 +186,9 @@ class EditorPage(QWidget):
         if row < 0 or row >= len(self.items):
             return
         item = self.items[row]
-        item["style"] = self._style_combo.currentText()
+        item["style"] = self._style_combo.currentData()
         item["font_size"] = self._size_spin.value()
-        item["direction"] = 1 if self._direction_combo.currentIndex() == 0 else 0
+        item["direction"] = int(self._direction_combo.currentData())
         item["offset_x"] = self._offset_x.value()
         item["offset_y"] = self._offset_y.value()
         self.render()

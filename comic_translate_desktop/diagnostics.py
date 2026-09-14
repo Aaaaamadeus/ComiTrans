@@ -75,7 +75,9 @@ class Diagnostics:
                 f"- 字体大小: {config.get('font_size', 16)}",
                 f"- 使用 GPU: {config.get('use_gpu', False)}",
                 f"- 检测模型: {config.get('detector_model', '')}",
-                f"- OCR 模型: {config.get('ocr_model', '')}",
+                f"- OCR 后端: {config.get('ocr_backend', 'auto')}",
+                f"- Baberu OCR: {config.get('baberu_ocr_model', '')}",
+                f"- manga-ocr: {config.get('ocr_model', '')}",
                 f"- 修复模型: {config.get('lama_model', '')}",
                 f"- 输出目录: {config.get('page_output_dir', '')}",
             ]

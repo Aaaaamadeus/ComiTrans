@@ -4,12 +4,35 @@ import contextlib
 import io
 import os
 import sys
+import tempfile
 import traceback
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
 from . import config as app_config
+from .pdf_utils import build_pdf_from_images, render_pdf_pages
+
+
+@dataclass
+class _PageJob:
+    document: "_DocumentJob"
+    input_path: Path
+    output_path: Path
+    page_number: int = 1
+    page_size_points: tuple[float, float] | None = None
+
+
+@dataclass
+class _DocumentJob:
+    index: int
+    source_path: Path
+    output_path: Path
+    is_pdf: bool
+    pages: list[_PageJob] = field(default_factory=list)
+    error: str = ""
+    error_stack: str = ""
 
 
 class QtTextStream(io.TextIOBase):
@@ -101,6 +124,8 @@ class BatchWorker(QThread):
                 use_gpu=self._config["use_gpu"],
                 lama_path=self._config["lama_model"],
                 ocr_model_path=self._config.get("ocr_model"),
+                baberu_ocr_model_path=self._config.get("baberu_ocr_model"),
+                ocr_backend=self._config.get("ocr_backend", "auto"),
                 translation_model=self._config["translation_model"],
                 api_key=self._config["api_key"],
                 api_base_url=self._config["api_base_url"],
@@ -112,6 +137,71 @@ class BatchWorker(QThread):
             )
         self.log.emit("[预热] 实例化完成")
         return pipeline
+
+    def _make_document_jobs(self, temporary_root: Path) -> list[_DocumentJob]:
+        documents: list[_DocumentJob] = []
+        pdf_dpi = max(96, min(400, int(self._config.get("pdf_dpi") or 200)))
+        for index, input_path in enumerate(self._files, start=1):
+            is_pdf = input_path.suffix.lower() == ".pdf"
+            suffix = ".pdf" if is_pdf else (input_path.suffix.lower() or ".png")
+            document = _DocumentJob(
+                index=index,
+                source_path=input_path,
+                output_path=self._output_dir / f"{input_path.stem}_translated{suffix}",
+                is_pdf=is_pdf,
+            )
+            documents.append(document)
+            self._current_index = index
+
+            if self._stop:
+                break
+            try:
+                if not input_path.exists():
+                    raise FileNotFoundError(f"文件不存在: {input_path}")
+                if is_pdf:
+                    source_dir = temporary_root / f"document_{index:04d}"
+                    rendered = render_pdf_pages(input_path, source_dir / "source", dpi=pdf_dpi)
+                    for page in rendered:
+                        document.pages.append(
+                            _PageJob(
+                                document=document,
+                                input_path=page.image_path,
+                                output_path=source_dir
+                                / "translated"
+                                / f"page_{page.page_index + 1:04d}.png",
+                                page_number=page.page_index + 1,
+                                page_size_points=(page.width_points, page.height_points),
+                            )
+                        )
+                    self.log.emit(f"[PDF] {input_path.name}: 已渲染 {len(document.pages)} 页")
+                else:
+                    document.pages.append(
+                        _PageJob(
+                            document=document,
+                            input_path=input_path,
+                            output_path=document.output_path,
+                        )
+                    )
+            except Exception as exc:
+                document.error = str(exc)
+                document.error_stack = traceback.format_exc().strip()
+        return documents
+
+    @staticmethod
+    def _page_label(page: _PageJob) -> str:
+        if page.document.is_pdf:
+            return f"{page.document.source_path.name} 第 {page.page_number}/{len(page.document.pages)} 页"
+        return page.document.source_path.name
+
+    @staticmethod
+    def _set_document_error(
+        document: _DocumentJob, exc: Exception, *, include_stack: bool = True
+    ) -> None:
+        if document.error:
+            return
+        document.error = str(exc) or exc.__class__.__name__
+        if include_stack:
+            document.error_stack = traceback.format_exc().strip()
 
     @staticmethod
     def _apply_api_config(pipeline, config) -> None:
@@ -127,7 +217,7 @@ class BatchWorker(QThread):
         if main_dir not in sys.path:
             sys.path.insert(0, main_dir)
         try:
-            from comic_translator_pipeline import TaskCancelledError
+            from comic_translator_pipeline import TaskCancelledError, TranslationError
         except Exception as exc:
             stack = traceback.format_exc().strip()
             self.log.emit(f"[严重错误] 无法加载翻译管线: {exc}\n{stack}")
@@ -147,84 +237,135 @@ class BatchWorker(QThread):
             self._configure_pipeline(self._pipeline)
             _ak = str(self._config.get("api_key") or "")
             _mask = (_ak[:4] + "****" + _ak[-4:]) if len(_ak) > 8 else ("***" if _ak else "空")
-            self.log.emit(f"[INFO] 翻译模型: {self._config.get('translation_model', '')}?API Key: {_mask}")
+            self.log.emit(
+                f"[INFO] 翻译模型: {self._config.get('translation_model', '')}，API Key: {_mask}"
+            )
             self._output_dir.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix="comitrans_pdf_") as temporary_dir:
+                documents = self._make_document_jobs(Path(temporary_dir))
+                page_jobs = [page for document in documents for page in document.pages]
+                max_workers = max(1, int(self._config.get("max_workers") or 4))
 
-            prepared_list = []
-            for index, input_path in enumerate(self._files, start=1):
-                if self._stop:
-                    self.log.emit("用户请求停止，跳过剩余图片。")
-                    break
-                self._current_index = index
-                self.progress.emit(index - 1, total, f"{input_path.name}: 准备中")
-                self.stage_changed.emit(index, "start", f"{input_path.name}: 准备中")
-                if not input_path.exists():
-                    raise FileNotFoundError(f"文件不存在: {input_path}")
-                suffix = input_path.suffix.lower() or ".png"
-                output_path = self._output_dir / f"{input_path.stem}_translated{suffix}"
-                try:
-                    with self._capture_pipeline_output():
-                        prepared = self._pipeline.prepare_comic_page(str(input_path))
-                    prepared_list.append((index, input_path, output_path, prepared))
-                except TaskCancelledError:
-                    self._stop = True
-                    self.stage_changed.emit(index, "cancelled", f"{input_path.name}: 已取消")
-                    self.log.emit(f"已取消: {input_path.name}")
-                    break
-                except Exception as exc:
-                    failed_count += 1
-                    self.image_failed.emit(input_path.name, str(exc))
-                    self.log.emit(f"[失败] {input_path.name}: {exc}")
-                    stack = traceback.format_exc().strip()
-                    if stack:
-                        self.log.emit(f"[失败堆栈]\n{stack}")
-                    self.progress.emit(index, total, f"{input_path.name}: 失败")
-
-            translations = [None] * len(prepared_list)
-            if prepared_list:
-                self.stage_changed.emit(0, "translate", f"并行翻译 {len(prepared_list)} 页")
-                max_workers = int(self._config.get("max_workers") or 4)
-                max_workers = max(1, min(max_workers, len(prepared_list)))
+                # 每批最多保留 max_workers 页的检测/OCR 图像，避免大型 PDF
+                # 一次把所有页面驻留在内存中。
                 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-                with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    futures = {
-                        executor.submit(self._pipeline.translate_page_batch, prepared["ocr_texts"], prepared["img_cv"]): i
-                        for i, (_, _, _, prepared) in enumerate(prepared_list)
-                    }
-                    for future in as_completed(futures):
-                        idx = futures[future]
+                fatal_translation_error = ""
+                for offset in range(0, len(page_jobs), max_workers):
+                    if self._stop or fatal_translation_error:
+                        break
+                    batch = [
+                        page
+                        for page in page_jobs[offset : offset + max_workers]
+                        if not page.document.error
+                    ]
+                    prepared_batch: list[tuple[_PageJob, object]] = []
+                    for page in batch:
+                        if self._stop or page.document.error:
+                            continue
+                        self._current_index = page.document.index
+                        label = self._page_label(page)
+                        self.stage_changed.emit(page.document.index, "start", f"{label}: 准备中")
                         try:
-                            translations[idx] = future.result()
+                            with self._capture_pipeline_output():
+                                prepared = self._pipeline.prepare_comic_page(str(page.input_path))
+                            prepared_batch.append((page, prepared))
+                        except TaskCancelledError:
+                            self._stop = True
+                            self.stage_changed.emit(page.document.index, "cancelled", f"{label}: 已取消")
+                            break
                         except Exception as exc:
-                            self.log.emit(f"[失败] 翻译请求异常（第{idx + 1}页）: {exc}")
+                            self._set_document_error(page.document, exc)
 
-            for i, (index, input_path, output_path, prepared) in enumerate(prepared_list):
-                if self._stop:
-                    self.log.emit("用户请求停止，跳过剩余图片。")
-                    break
-                self._current_index = index
-                try:
-                    with self._capture_pipeline_output():
-                        self._pipeline.finish_comic_page(str(output_path), prepared, translations[i])
-                    success_count += 1
-                    self.image_done.emit(str(input_path), str(output_path))
-                    self.progress.emit(index, total, f"{input_path.name}: 完成")
-                except TaskCancelledError:
-                    self._stop = True
-                    self.stage_changed.emit(index, "cancelled", f"{input_path.name}: 已取消")
-                    self.log.emit(f"已取消: {input_path.name}")
-                    break
-                except Exception as exc:
-                    failed_count += 1
-                    self.image_failed.emit(input_path.name, str(exc))
-                    self.log.emit(f"[失败] {input_path.name}: {exc}")
-                    stack = traceback.format_exc().strip()
-                    if stack:
-                        self.log.emit(f"[失败堆栈]\n{stack}")
-                    self.progress.emit(index, total, f"{input_path.name}: 失败")
+                    translations: dict[int, list[str]] = {}
+                    translatable = [
+                        (page, prepared)
+                        for page, prepared in prepared_batch
+                        if not page.document.error
+                    ]
+                    if translatable and not self._stop:
+                        self.stage_changed.emit(0, "translate", f"并行翻译 {len(translatable)} 页")
+                        with ThreadPoolExecutor(max_workers=min(max_workers, len(translatable))) as executor:
+                            futures = {
+                                executor.submit(
+                                    self._pipeline.translate_page_batch,
+                                    prepared["ocr_texts"],
+                                    prepared["img_cv"],
+                                ): (page, prepared)
+                                for page, prepared in translatable
+                            }
+                            for future in as_completed(futures):
+                                page, _prepared = futures[future]
+                                try:
+                                    translations[id(page)] = future.result()
+                                except TranslationError as exc:
+                                    self._set_document_error(
+                                        page.document, exc, include_stack=False
+                                    )
+                                    if getattr(exc, "fatal", False):
+                                        fatal_translation_error = str(exc)
+                                    self.log.emit(f"[失败] {self._page_label(page)}: {exc}")
+                                except Exception as exc:
+                                    self._set_document_error(page.document, exc)
+
+                    if fatal_translation_error:
+                        for document in documents:
+                            if not document.error:
+                                document.error = fatal_translation_error
+                        self.log.emit(
+                            "[失败] 翻译服务返回全局配置/账户错误，已停止请求剩余页面。"
+                        )
+
+                    for page, prepared in prepared_batch:
+                        if self._stop or page.document.error:
+                            continue
+                        self._current_index = page.document.index
+                        label = self._page_label(page)
+                        try:
+                            page.output_path.parent.mkdir(parents=True, exist_ok=True)
+                            with self._capture_pipeline_output():
+                                self._pipeline.finish_comic_page(
+                                    str(page.output_path), prepared, translations[id(page)]
+                                )
+                        except TaskCancelledError:
+                            self._stop = True
+                            self.stage_changed.emit(page.document.index, "cancelled", f"{label}: 已取消")
+                            break
+                        except Exception as exc:
+                            self._set_document_error(page.document, exc)
+
+                completed = 0
+                for document in documents:
+                    if self._stop:
+                        break
+                    self._current_index = document.index
+                    if not document.error and document.is_pdf:
+                        try:
+                            build_pdf_from_images(
+                                [page.output_path for page in document.pages],
+                                [page.page_size_points for page in document.pages],
+                                document.output_path,
+                            )
+                            self.log.emit(
+                                f"[PDF] {document.source_path.name}: 已生成 {len(document.pages)} 页译文 PDF"
+                            )
+                        except Exception as exc:
+                            self._set_document_error(document, exc)
+
+                    completed += 1
+                    if document.error:
+                        failed_count += 1
+                        self.image_failed.emit(document.source_path.name, document.error)
+                        self.log.emit(f"[失败] {document.source_path.name}: {document.error}")
+                        if document.error_stack:
+                            self.log.emit(f"[失败堆栈]\n{document.error_stack}")
+                        self.progress.emit(completed, total, f"{document.source_path.name}: 失败")
+                    else:
+                        success_count += 1
+                        self.image_done.emit(str(document.source_path), str(document.output_path))
+                        self.progress.emit(completed, total, f"{document.source_path.name}: 完成")
         except Exception as exc:
-            failed_count = total
+            failed_count = max(failed_count, total - success_count)
             stack = traceback.format_exc().strip()
             self.log.emit(f"[严重错误] {exc}\n{stack}")
 

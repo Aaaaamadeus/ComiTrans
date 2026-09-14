@@ -5,15 +5,17 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 DIST = os.path.join(ROOT, "dist", "ComiTrans")
 RELEASE = os.path.join(ROOT, "release")
 MODELS_SRC = os.path.join(ROOT, "comic-translate-ai", "models")
+VERSION = "2.2.2"
 
-APP_ZIP = os.path.join(RELEASE, "ComiTrans-v2.2.1-app.zip")
-MODEL_ZIP = os.path.join(RELEASE, "ComiTrans-v2.2.1-models.zip")
+APP_ZIP = os.path.join(RELEASE, f"ComiTrans-v{VERSION}-app.zip")
+MODEL_ZIP = os.path.join(RELEASE, f"ComiTrans-v{VERSION}-models.zip")
 
 MODEL_FILES = [
     "text_detector/comic-text-detector.onnx",
     "manga-lama/lama-manga-dynamic.onnx",
 ]
 MODEL_DIRS = [
+    "baberu-ocr",
     "manga-ocr-onnx",
 ]
 
@@ -47,6 +49,7 @@ def zip_models():
         for rel_dir in MODEL_DIRS:
             src_dir = os.path.join(MODELS_SRC, rel_dir)
             for root, dirs, files in os.walk(src_dir):
+                dirs[:] = [directory for directory in dirs if directory != ".cache"]
                 for f in files:
                     full = os.path.join(root, f)
                     rel = os.path.relpath(full, MODELS_SRC)

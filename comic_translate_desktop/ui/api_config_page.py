@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -25,13 +26,17 @@ class ApiConfigPage(QWidget):
         self._config = config
 
         root = QVBoxLayout(self)
+        root.setContentsMargins(20, 18, 20, 20)
         root.setSpacing(14)
 
         header = QLabel("API 配置")
-        header.setStyleSheet("font-size: 18px; font-weight: 600;")
+        header.setObjectName("brandTitle")
         root.addWidget(header)
+        subtitle = QLabel("配置翻译服务与本地推理选项，保存后将在下一次任务生效。")
+        subtitle.setProperty("muted", True)
+        root.addWidget(subtitle)
 
-        api_group = QGroupBox("翻译 API")
+        api_group = QGroupBox("翻译服务")
         api_form = QFormLayout(api_group)
         api_form.setLabelAlignment(Qt.AlignRight)
         api_form.setSpacing(12)
@@ -64,6 +69,10 @@ class ApiConfigPage(QWidget):
         runtime_form.setSpacing(12)
 
         self._gpu_check = QCheckBox("使用 GPU（需要本机 CUDA 可用）")
+        self._ocr_backend = QComboBox()
+        self._ocr_backend.addItem("自动（优先 Baberu，缺失时回退）", "auto")
+        self._ocr_backend.addItem("Baberu OCR（多字体/竖排推荐）", "baberu")
+        self._ocr_backend.addItem("manga-ocr（兼容模式）", "manga-ocr")
 
         self._output_input = QLineEdit()
         browse_btn = QPushButton("浏览...")
@@ -77,9 +86,10 @@ class ApiConfigPage(QWidget):
 
         self._model_info = QLabel()
         self._model_info.setWordWrap(True)
-        self._model_info.setStyleSheet("color: #666; font-size: 12px;")
+        self._model_info.setProperty("muted", True)
 
         runtime_form.addRow("硬件", self._gpu_check)
+        runtime_form.addRow("日文 OCR", self._ocr_backend)
         runtime_form.addRow("输出目录", output_row)
         runtime_form.addRow("Issue 链接", self._issue_input)
         runtime_form.addRow("模型路径", self._model_info)
@@ -87,11 +97,9 @@ class ApiConfigPage(QWidget):
 
         actions = QHBoxLayout()
         self._save_btn = QPushButton("保存配置")
-        self._save_btn.setStyleSheet(
-            "background: #2f6fed; color: white; padding: 6px 18px; border-radius: 4px;"
-        )
+        self._save_btn.setProperty("role", "primary")
         self._save_status = QLabel("")
-        self._save_status.setStyleSheet("color: #2e7d32;")
+        self._save_status.setProperty("muted", True)
         actions.addWidget(self._save_btn)
         actions.addWidget(self._save_status)
         actions.addStretch(1)
@@ -118,11 +126,15 @@ class ApiConfigPage(QWidget):
         self._model_input.setText(config.get("translation_model", ""))
         self._multimodal_check.setChecked(bool(config.get("multimodal", False)))
         self._gpu_check.setChecked(bool(config.get("use_gpu", False)))
+        backend = str(config.get("ocr_backend") or "auto")
+        backend_index = self._ocr_backend.findData(backend)
+        self._ocr_backend.setCurrentIndex(max(0, backend_index))
         self._output_input.setText(config.get("page_output_dir", ""))
         self._issue_input.setText(config.get("issue_url", ""))
         self._model_info.setText(
             f"检测: {config.get('detector_model', '')}\n"
-            f"OCR: {config.get('ocr_model', '')}\n"
+            f"Baberu OCR: {config.get('baberu_ocr_model', '')}\n"
+            f"manga-ocr: {config.get('ocr_model', '')}\n"
             f"修复: {config.get('lama_model', '')}"
         )
 
@@ -132,6 +144,7 @@ class ApiConfigPage(QWidget):
             "translation_model": self._model_input.text().strip(),
             "multimodal": self._multimodal_check.isChecked(),
             "use_gpu": self._gpu_check.isChecked(),
+            "ocr_backend": self._ocr_backend.currentData(),
             "page_output_dir": self._output_input.text().strip(),
             "issue_url": self._issue_input.text().strip(),
         }

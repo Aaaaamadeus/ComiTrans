@@ -46,16 +46,17 @@ Since v2.2.1, detection, OCR, and inpainting are powered entirely by **ONNX Runt
 ## Key Features
 
 - **Fully local desktop client**: PySide6 desktop app with no web pages or backend services.
-- **All-ONNX inference**: text detection, Manga-OCR, and LaMa inpainting are all ONNX models; no PyTorch required.
+- **All-ONNX inference**: text detection, Baberu/manga-ocr, and LaMa inpainting all use ONNX; no PyTorch required.
 - **Split release packages**: the app archive is about 0.4GB; models ship separately, so app updates do not require re-downloading models.
 - **Startup warmup**: the AI pipeline loads automatically when the app opens.
 - **GPU inference**: NVIDIA CUDA supported when the machine already has an NVIDIA driver.
 - **Multimodal translation toggle**: sends the full page image to the AI and lets it configure font, size, and direction after translation; pure-text mode uses automatic typesetting.
-- **Special font classification**: narration, onomatopoeia, next-episode previews, and titles are automatically matched with different open-source fonts.
+- **Whole-PDF translation**: import PDFs alongside images, translate them page by page, and create one `*_translated.pdf` with the original page order and page sizes.
+- **12 font categories**: dialogue, bold dialogue, emphasis, handwriting, thought, whisper, serious, narration, SFX, cute, preview, and title styles with per-glyph fallback.
 - **Mask-based erasing and typesetting**: erasing only removes the detector text mask; layout area and center follow the mask.
 - **Manual typesetting editor**: adjust font style, size, direction, and position per text block, then save over the output.
 - **Error logs with AI diagnosis**: logs go to `Log/app.log`, diagnosis prompts are auto-generated, and multi-turn AI diagnosis is supported.
-- **Batch folder selection**: pick a whole folder and images are added recursively.
+- **Batch folder selection**: pick a whole folder and images/PDFs are added recursively.
 - **Instant stop**: clicking stop immediately enters a cancelled state.
 - **Issue feedback**: jump to your configured GitHub Issues link from the top-right button.
 - **Adjustable layout**: resize the main areas, preview, and log panels by dragging.
@@ -64,7 +65,7 @@ Since v2.2.1, detection, OCR, and inpainting are powered entirely by **ONNX Runt
 
 ### Release users (recommended)
 
-1. Download `ComiTrans-v2.2.1-app.zip` (program) and `ComiTrans-v2.2.1-models.zip` (models).
+1. Download `ComiTrans-v2.2.2-app.zip` (program) and `ComiTrans-v2.2.2-models.zip` (models).
 2. Extract the app archive into a `ComiTrans` folder.
 3. Extract the models archive into the same `ComiTrans` folder; models will be merged into `ComiTrans\comic-translate-ai\models\`.
 4. Double-click `ComiTrans.exe` and enter your translation API key and model on the "API Config" page.
@@ -96,27 +97,31 @@ Run the client:
 You can also double-click `start.bat`. The AI pipeline warms up automatically after launch.
 ## Usage
 
-1. Click "Add Images" or "Add Folder", or drag images/folders into the window.
-2. Enter API Key, Base URL, translation model, and Issue link on the "API Config" page.
+1. Click "Add Files" or "Add Folder", or drag images, PDFs, or folders into the window.
+2. Enter API Key, Base URL, translation model, and Issue link on the "API Config" page. OCR defaults to Auto (Baberu first) and can be switched back to manga-ocr.
 3. Enable "Multimodal Translation" to send the full page image to the AI and let it configure fonts; disable it to use pure-text translation and automatic typesetting.
 4. Expand "Preferences" on the translation page to fill in background prompts and Chinese character names (one per line; the AI maps them automatically).
 5. Click "Start Translation" and watch the live step/status logs.
 6. On failure, open the "Error Logs" page for diagnosis prompts, or click the Issue button.
 7. Use the "Typesetting Editor" page to fine-tune font style, size, direction, and position per block, then save.
 
+A PDF is shown as one file task and processed internally in page-sized batches. On success, ComiTrans writes `<original_name>_translated.pdf`, preserving page count, order, and page sizes while rasterizing page content. Password-protected PDFs are not supported, and PDF pages cannot yet be adjusted block-by-block in the Typesetting Editor.
+
 ### Font styles
 
 | Style | Usage | Default font |
 | --- | --- | --- |
-| `radiating` | Normal text / onomatopoeia | Smiley Sans Oblique |
-| `narration` | Ultra-wide narration boxes | LXGW WenKai |
-| `next_preview` | Next-episode preview | Klee One |
-| `dialogue` | Fallback dialogue font | Source Han Sans Medium |
-| `serious` | Fallback narration font | Source Han Sans Medium |
-| `handwriting` | Fallback handwriting font | setofont |
-| `title` | Fallback title font | Source Han Sans Heavy |
+| `dialogue` / `bold_dialogue` | Normal / bold dialogue | LXGW WenKai / Source Han Sans Heavy |
+| `radiating` / `sfx` | Emphasis / sound effects | Smiley Sans Oblique |
+| `handwriting` | Handwritten notes | setofont |
+| `thought` / `serious` | Thoughts / formal text | Source Han Serif |
+| `whisper` / `cute` | Whisper / playful text | Klee One with glyph fallback |
+| `narration` | Wide narration strips | LXGW WenKai |
+| `next_preview` / `title` | Preview / title | Klee One / Source Han Sans Heavy |
 
-Except for next-episode previews, all text defaults to `radiating`. Ultra-wide horizontal boxes (width > height × 2.5) are automatically classified as `narration`. Every block can be overridden manually in the editor.
+Normal bubbles default to `dialogue`; OCR content, detector class, original stroke weight, and box geometry select the other styles. Detector orientation is preserved unless the aspect ratio strongly contradicts it. The editor offers Auto, explicit Vertical, and explicit Horizontal modes.
+
+Typesetting renders text on a local 3x supersampled surface and downsamples it with Lanczos, so small dialogue is no longer drawn directly at low resolution. Normal bubbles also avoid a forced white outline for softer edges, while non-bubble text on complex backgrounds keeps an outline for readability.
 
 ### Error logs & AI diagnosis
 
@@ -128,18 +133,22 @@ Except for next-episode previews, all text defaults to `radiating`. Ultra-wide h
 ## Translation Pipeline
 
 1. **Bubble & text detection**: an ONNX detector outputs bubbles, text masks, and text lines.
-2. **Japanese OCR**: ONNX Manga-OCR recognizes Japanese text. Blocks detected as English, or whose OCR output looks like garbled Latin, are kept whole: no OCR, no erasing, and no typesetting.
+2. **Japanese OCR**: Baberu ONNX handles vertical text, varied fonts, SFX, and mixed scripts, with manga-ocr as a compatibility fallback. English-detected or Latin-garbage blocks are preserved.
 3. **LLM translation**: pure-text mode translates OCR results; multimodal mode sends the page image and asks the AI to configure font, size, and direction.
 4. **Background inpainting**: erases only the detector text mask; simple white bubbles are filled directly, complex backgrounds use LaMa ONNX.
 5. **Chinese typesetting**: font size is estimated from the mask area, text is centered on the mask centroid, orientation adapts automatically, and long text gets tighter sizing.
 6. **Save & edit**: output images are saved, cleaned canvases go to `<output_dir>_cleaned/`, layout JSON goes to `<output_dir>_layout/`, and the editor lets you refine everything manually.
+7. **PDF assembly**: once every page succeeds, pages are rebuilt at their original sizes and the PDF is reopened for validation; no partial PDF is emitted if a page fails.
+
+When the translation provider returns 401/403 (authentication), 402 (insufficient balance), or 404 (endpoint/model not found), the client reports the real cause and stops scheduling remaining pages. HTTP 402 requires funding the API account or switching to a key with available credit.
 
 ## Models
 
 | Purpose | Model | Source |
 | --- | --- | --- |
 | Bubble & text detection | `comic-text-detector.onnx` | [mayocream/comic-text-detector-onnx](https://huggingface.co/mayocream/comic-text-detector-onnx), exported from [dmMaze/comic-text-detector](https://github.com/dmMaze/comic-text-detector) |
-| Japanese OCR | `manga-ocr-onnx/` | [l0wgear/manga-ocr-2025-onnx](https://huggingface.co/l0wgear/manga-ocr-2025-onnx), based on [kha-white/manga-ocr](https://github.com/kha-white/manga-ocr) |
+| Japanese OCR (default) | `baberu-ocr/` | [genshiai-daichi/baberu-ocr](https://huggingface.co/genshiai-daichi/baberu-ocr), Apache-2.0, 121 MB quantized ONNX tier |
+| Japanese OCR (fallback) | `manga-ocr-onnx/` | [l0wgear/manga-ocr-2025-onnx](https://huggingface.co/l0wgear/manga-ocr-2025-onnx), based on [kha-white/manga-ocr](https://github.com/kha-white/manga-ocr) |
 | LaMa inpainting | `lama-manga-dynamic.onnx` | manga-lama |
 
 More model sources, alternative ONNX versions, and better detection candidates: [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md).
@@ -166,8 +175,8 @@ python package_release.py
 
 This creates two archives:
 
-- `ComiTrans-v2.2.1-app.zip`: program only, no models
-- `ComiTrans-v2.2.1-models.zip`: ONNX models
+- `ComiTrans-v2.2.2-app.zip`: program only, no models
+- `ComiTrans-v2.2.2-models.zip`: ONNX models
 
 Extract the models archive into `ComiTrans\comic-translate-ai\models\`.
 
@@ -181,6 +190,7 @@ ComiTrans
 │   │   ├── comic_translator_pipeline.py
 │   │   ├── onnx_text_detector.py  # ONNX text detection
 │   │   ├── onnx_manga_ocr.py      # ONNX Japanese OCR
+│   │   ├── onnx_baberu_ocr.py     # Baberu ONNX OCR (default)
 │   │   ├── manga_lama.py          # ONNX inpainting
 │   │   └── vertical_typesetter.py # Chinese typesetting
 │   ├── models/                    # model weights (beside exe in releases)
@@ -193,6 +203,21 @@ ComiTrans
 ```
 
 ## Changelog
+
+### v2.2.2 (2026-09-14)
+
+**New and improved**
+
+- Refreshed the desktop UI and operation feedback with restrained transitions, recursive folder import, and drag-and-drop support.
+- Added whole-book PDF import, page-by-page translation, and PDF export.
+- Made Baberu ONNX OCR the default, with manga-ocr-onnx kept as a fallback.
+- Improved comic typesetting with rounder font choices and 3x supersampling to reduce visible pixelation.
+- Rendered double em dashes (`——`) in vertical text as one continuous long vertical line, with expanded font styles and punctuation layout rules.
+
+**Fixes**
+
+- Fixed Issue #19, where an undefined `zhengzai` identifier in the translation API progress log crashed before the request was sent.
+- Improved API error classification and guidance for authentication, balance, model, rate-limit, and server failures; fatal failures now stop remaining tasks.
 
 ### v2.2.1 (2026-08-07)
 
@@ -251,11 +276,11 @@ No. Extract the app and models, then run. GPU acceleration only needs an existin
 
 **Where do models go?**
 
-Beside the exe at `comic-translate-ai/models/`. Release users must extract `ComiTrans-v2.2.1-models.zip` into the same `ComiTrans` folder.
+Beside the exe at `comic-translate-ai/models/`. Release users must extract `ComiTrans-v2.2.2-models.zip` into the same `ComiTrans` folder.
 
 **Why is English text not translated?**
 
-The current OCR model is Japanese-only and garbles English. English is detected in two layers: detector labels marked as English, and OCR output where Latin/full-width Latin characters account for at least 40%. Matched blocks skip OCR, erasing, and typesetting so the original English stays on the page. To translate English, enable multimodal translation or wait for a future English OCR.
+Baberu covers Japanese, Chinese, and English characters, but the current translation flow intentionally preserves detector-labeled English blocks. OCR output with at least 40% Latin/full-width Latin characters is also preserved to avoid erasing site marks and English SFX. Enable multimodal translation when English must be translated.
 
 **Why is the app archive so small?**
 

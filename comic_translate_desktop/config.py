@@ -27,19 +27,29 @@ else:
 
 FONT_KEYS = {
     "dialogue": "font_dialogue",
+    "bold_dialogue": "font_bold_dialogue",
     "radiating": "font_radiating",
     "handwriting": "font_handwriting",
+    "thought": "font_thought",
+    "whisper": "font_whisper",
     "serious": "font_serious",
     "narration": "font_narration",
+    "sfx": "font_sfx",
+    "cute": "font_cute",
     "next_preview": "font_next_preview",
     "title": "font_title",
 }
 FONT_DEFAULTS = {
-    "dialogue": "font_file/CN/SourceHanSansSC-Medium-2.otf",
+    "dialogue": "font_file/CN/special/LXGWWenKai-Regular.ttf",
+    "bold_dialogue": "font_file/CN/SourceHanSansSC-Heavy-2.otf",
     "radiating": "font_file/CN/special/SmileySans-Oblique.ttf",
     "handwriting": "font_file/CN/setofont.ttf",
-    "serious": "font_file/CN/SourceHanSansSC-Medium-2.otf",
+    "thought": "font_file/CN/SourceHanSerifCN-Regular-1.otf",
+    "whisper": "font_file/CN/special/KleeOne-Regular.ttf",
+    "serious": "font_file/CN/SourceHanSerifCN-Regular-1.otf",
     "narration": "font_file/CN/special/LXGWWenKai-Regular.ttf",
+    "sfx": "font_file/CN/special/SmileySans-Oblique.ttf",
+    "cute": "font_file/CN/special/KleeOne-Regular.ttf",
     "next_preview": "font_file/CN/special/KleeOne-Regular.ttf",
     "title": "font_file/CN/SourceHanSansSC-Heavy-2.otf",
 }
@@ -79,6 +89,9 @@ def load_ai_config() -> dict[str, Any]:
     font_map = {}
     for style, key in FONT_KEYS.items():
         font_map[style] = str(_resolve_path(raw.get(key), FONT_DEFAULTS[style]))
+    ocr_backend = str(raw.get("ocr_backend") or "auto").strip().lower()
+    if ocr_backend not in ("auto", "baberu", "manga", "manga-ocr"):
+        ocr_backend = "auto"
 
     return {
         "api_key": _clean_text(raw.get("api_key")),
@@ -89,12 +102,15 @@ def load_ai_config() -> dict[str, Any]:
         "font_size": int(raw.get("font_size") or 16),
         "multimodal": bool(raw.get("multimodal", False)),
         "max_workers": int(raw.get("max_workers") or 4),
+        "pdf_dpi": int(raw.get("pdf_dpi") or 200),
         "issue_url": str(raw.get("issue_url") or ""),
         "use_gpu": bool(raw.get("use_gpu", False)),
         "font_map": font_map,
         "detector_model": str(_resolve_path(raw.get("detector_model"), "text_detector/comic-text-detector.onnx", base=MODELS_ROOT)),
         "lama_model": str(_resolve_path(raw.get("lama_model"), "manga-lama/lama-manga-dynamic.onnx", base=MODELS_ROOT)),
+        "ocr_backend": ocr_backend,
         "ocr_model": str(_resolve_path(raw.get("ocr_model"), "manga-ocr-onnx", base=MODELS_ROOT)),
+        "baberu_ocr_model": str(_resolve_path(raw.get("baberu_ocr_model"), "baberu-ocr", base=MODELS_ROOT)),
         "page_input_dir": str(_resolve_path(raw.get("page_input_dir"), "page/test", base=PAGE_BASE)),
         "page_output_dir": str(_resolve_path(raw.get("page_output_dir"), "page/output_page_output", base=PAGE_BASE)),
         "page_test_output_dir": str(_resolve_path(raw.get("page_test_output_dir"), "page/test_output", base=PAGE_BASE)),
@@ -126,17 +142,52 @@ def config_fingerprint(config: dict[str, Any]) -> tuple:
         config["use_gpu"],
         config["detector_model"],
         config["lama_model"],
+        config["ocr_backend"],
         config["ocr_model"],
+        config["baberu_ocr_model"],
         tuple(sorted(config["font_map"].items())),
+    )
+
+
+def _manga_ocr_complete(path: Path) -> bool:
+    return path.is_dir() and all(
+        (path / name).exists()
+        for name in ("encoder_model.onnx", "decoder_model.onnx", "tokenizer.json")
+    )
+
+
+def _baberu_ocr_complete(path: Path) -> bool:
+    onnx_dir = path / "onnx"
+    return path.is_dir() and (
+        (onnx_dir / "vision_fp16.onnx").exists()
+        or (onnx_dir / "vision_int4.onnx").exists()
+    ) and all(
+        (path / name).exists()
+        for name in (
+            "onnx/decoder_prefill_int8.onnx",
+            "onnx/decoder_step_int8.onnx",
+            "tokenizer/vocab.json",
+        )
     )
 
 
 def missing_models(config: dict[str, Any]) -> list[str]:
     missing = []
-    for key in ("detector_model", "lama_model", "ocr_model"):
+    for key in ("detector_model", "lama_model"):
         path = Path(config[key])
         if not path.exists():
             missing.append(f"{key}: {path}")
-        elif key == "ocr_model" and path.is_dir() and not (path / "encoder_model.onnx").exists():
-            missing.append(f"{key}: {path} (缺少 encoder_model.onnx)")
+    backend = str(config.get("ocr_backend") or "auto").lower()
+    manga_path = Path(config["ocr_model"])
+    baberu_path = Path(config["baberu_ocr_model"])
+    manga_ok = _manga_ocr_complete(manga_path)
+    baberu_ok = _baberu_ocr_complete(baberu_path)
+    if backend == "baberu" and not baberu_ok:
+        missing.append(f"baberu_ocr_model: {baberu_path} (模型文件不完整)")
+    elif backend in ("manga", "manga-ocr") and not manga_ok:
+        missing.append(f"ocr_model: {manga_path} (manga-ocr 模型文件不完整)")
+    elif backend == "auto" and not (baberu_ok or manga_ok):
+        missing.append(
+            f"OCR: Baberu ({baberu_path}) 与 manga-ocr ({manga_path}) 均不完整"
+        )
     return missing

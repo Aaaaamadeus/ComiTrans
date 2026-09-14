@@ -42,14 +42,15 @@ class ErrorLogPage(QWidget):
         self._worker = None
 
         root = QVBoxLayout(self)
+        root.setContentsMargins(20, 18, 20, 20)
         root.setSpacing(10)
 
         header = QLabel("报错日志与 AI 诊断")
-        header.setStyleSheet("font-size: 18px; font-weight: 600;")
+        header.setObjectName("brandTitle")
         root.addWidget(header)
 
         self._file_label = QLabel(f"日志文件: {self._diagnostics.log_path}")
-        self._file_label.setStyleSheet("color: #666;")
+        self._file_label.setProperty("muted", True)
         root.addWidget(self._file_label)
 
         splitter = QSplitter(Qt.Vertical)
@@ -68,7 +69,7 @@ class ErrorLogPage(QWidget):
         self.prompt_view = QPlainTextEdit()
         self.prompt_view.setReadOnly(True)
         self.prompt_view.setPlaceholderText("暂无报错日志")
-        self.prompt_view.setStyleSheet("font-family: Consolas, monospace;")
+        self.prompt_view.setProperty("code", True)
         layout.addWidget(self.prompt_view, 1)
 
         buttons = QHBoxLayout()
@@ -76,8 +77,9 @@ class ErrorLogPage(QWidget):
         self._copy_raw_btn = QPushButton("复制原始日志")
         self._open_log_btn = QPushButton("打开日志文件")
         self._clear_btn = QPushButton("清空日志")
+        self._clear_btn.setProperty("role", "danger")
         self._status_label = QLabel("")
-        self._status_label.setStyleSheet("color: #2e7d32;")
+        self._status_label.setProperty("muted", True)
 
         buttons.addWidget(self._copy_prompt_btn)
         buttons.addWidget(self._copy_raw_btn)
@@ -110,10 +112,11 @@ class ErrorLogPage(QWidget):
 
         buttons = QHBoxLayout()
         self._send_btn = QPushButton("发送诊断")
+        self._send_btn.setProperty("role", "primary")
         self._copy_result_btn = QPushButton("复制诊断结果")
         self._clear_context_btn = QPushButton("清空上下文")
         self._ai_status = QLabel("")
-        self._ai_status.setStyleSheet("color: #2e7d32;")
+        self._ai_status.setProperty("muted", True)
 
         buttons.addWidget(self._send_btn)
         buttons.addWidget(self._copy_result_btn)

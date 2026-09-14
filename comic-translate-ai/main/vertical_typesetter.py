@@ -2,19 +2,48 @@ import math
 import traceback
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+from punctuation_layout import (
+    CENTERED_PUNCTUATION,
+    CLOSING_PUNCTUATION,
+    OPENING_PUNCTUATION,
+    UPPER_RIGHT_PUNCTUATION,
+    normalize_cjk_punctuation,
+    vertical_form,
+    wrap_vertical_text,
+)
+
+try:
+    from fontTools.ttLib import TTFont
+except ImportError:  # 打包异常时仍可排版，只是不做逐字缺字回退。
+    TTFont = None
 
 
-UPRIGHT_VERTICAL_PUNCTUATION = set("，。！？；：、")
+ROTATE_FALLBACK_PUNCTUATION = set("—-…（）【】［］｛｝《》「」『』〔〕～~")
+VERTICAL_DASH_CHARS = frozenset("—―")
+DEFAULT_RENDER_SCALE = 3
+MAX_RENDER_SURFACE_PIXELS = 16_000_000
 
 
 class VerticalTypesetter:
-    def __init__(self, font_map, font_size, color=(0, 0, 0)):
+    def __init__(
+        self,
+        font_map,
+        font_size,
+        color=(0, 0, 0),
+        render_scale=DEFAULT_RENDER_SCALE,
+    ):
         self.fonts = {}
         self.font_map = font_map
         self.font_cache = {}
         self.base_font_size = font_size
         self.color = color
         self.last_font_size = None
+        self.last_direction = None
+        self.last_render_scale = 1
+        self.last_layout_debug = []
+        self.render_scale = max(1, int(render_scale))
+        self._font_coverage_cache = {}
+        self._glyph_visibility_cache = {}
 
         # 预加载所有字体
         # font_map 格式: {'dialogue': 'a.ttf', 'radiating': 'b.ttf', ...}
@@ -44,6 +73,112 @@ class VerticalTypesetter:
             return self._load_font_to_cache(style, path, size)
         return ImageFont.load_default()
 
+    def _font_supports(self, path, char):
+        if not path or not char or char.isspace() or TTFont is None:
+            return True
+        if path not in self._font_coverage_cache:
+            try:
+                font = TTFont(path, lazy=True, fontNumber=0)
+                self._font_coverage_cache[path] = set((font.getBestCmap() or {}).keys())
+                font.close()
+            except Exception:
+                # 无法检查的字体交给 Pillow 尝试，避免把可用字体错误排除。
+                self._font_coverage_cache[path] = None
+        coverage = self._font_coverage_cache[path]
+        if coverage is not None and ord(char) not in coverage:
+            return False
+        glyph_key = (path, ord(char))
+        if glyph_key not in self._glyph_visibility_cache:
+            try:
+                probe_font = self._load_font_to_cache("_coverage", path, 32)
+                self._glyph_visibility_cache[glyph_key] = (
+                    probe_font.getmask(char).getbbox() is not None
+                )
+            except Exception:
+                self._glyph_visibility_cache[glyph_key] = True
+        return self._glyph_visibility_cache[glyph_key]
+
+    def _font_path_for_char(self, style, char):
+        candidates = [
+            self.font_map.get(style),
+            self.font_map.get("dialogue"),
+            self.font_map.get("bold_dialogue"),
+            self.font_map.get("serious"),
+            self.font_map.get("title"),
+        ]
+        seen = set()
+        for path in candidates:
+            if path and path not in seen:
+                seen.add(path)
+                if self._font_supports(path, char):
+                    return path
+        return self.font_map.get(style) or self.font_map.get("dialogue")
+
+    def _style_for_text(self, style, text):
+        fallback_styles = {
+            "handwriting": ("narration", "dialogue"),
+            "whisper": ("narration", "thought", "dialogue"),
+            "cute": ("narration", "dialogue"),
+            "next_preview": ("narration", "dialogue"),
+            "radiating": ("bold_dialogue", "dialogue"),
+            "sfx": ("bold_dialogue", "dialogue"),
+        }
+        visible_chars = [char for char in text if not char.isspace()]
+        for candidate in (style, *fallback_styles.get(style, ("dialogue",))):
+            path = self.font_map.get(candidate)
+            if path and all(self._font_supports(path, char) for char in visible_chars):
+                return candidate
+        return style
+
+    def _get_font_for_char(self, style, size, char):
+        path = self._font_path_for_char(style, char)
+        if path:
+            return self._load_font_to_cache(style, path, size)
+        return ImageFont.load_default()
+
+    @staticmethod
+    def _stroke_width(style, size, non_bubble=False):
+        if style in ("radiating", "bold_dialogue", "sfx", "title"):
+            return max(1, min(3, int(round(size * 0.045))))
+        if non_bubble:
+            return max(1, min(2, int(round(size * 0.035))))
+        return 0
+
+    def _make_render_surface(
+        self,
+        image,
+        center_x,
+        center_y,
+        box_width,
+        box_height,
+        font_size,
+        stroke_width,
+    ):
+        padding = max(5, int(math.ceil(font_size * 0.22)) + stroke_width)
+        left = max(0, int(math.floor(center_x - box_width / 2)) - padding)
+        top = max(0, int(math.floor(center_y - box_height / 2)) - padding)
+        right = min(image.width, int(math.ceil(center_x + box_width / 2)) + padding)
+        bottom = min(image.height, int(math.ceil(center_y + box_height / 2)) + padding)
+        width = max(1, right - left)
+        height = max(1, bottom - top)
+
+        scale = self.render_scale
+        while scale > 1 and width * height * scale * scale > MAX_RENDER_SURFACE_PIXELS:
+            scale -= 1
+        self.last_render_scale = scale
+
+        surface = Image.new("RGBA", (width * scale, height * scale), (0, 0, 0, 0))
+        return surface, ImageDraw.Draw(surface), left, top, scale
+
+    @staticmethod
+    def _composite_render_surface(image, surface, left, top, scale):
+        if scale > 1:
+            surface = surface.resize(
+                (max(1, surface.width // scale), max(1, surface.height // scale)),
+                Image.Resampling.LANCZOS,
+            )
+        image.paste(surface, (left, top), surface)
+
     def _calculate_layout_fast(self, text, font, limit, is_horizontal=False, spacing=None):
         if spacing is None:
             # 动态间距：字号的 25% (最小 2px)
@@ -57,9 +192,15 @@ class VerticalTypesetter:
             if not lines_struct:
                 return False, 0, [], spacing
 
-            # 计算总宽度：列数 * 字宽 + 间距
-            # 假设字宽等于字号
-            col_width = font.size
+            cell_size = self._vertical_cell_size(font)
+            char_spacing = self._vertical_char_spacing(font)
+            max_column_height = max(
+                len(column) * cell_size + max(0, len(column) - 1) * char_spacing
+                for column in lines_struct
+            )
+            if max_column_height > limit:
+                return False, 0, lines_struct, spacing
+            col_width = cell_size
             layout_size = len(lines_struct) * col_width + (len(lines_struct) - 1) * spacing
 
         else:
@@ -74,8 +215,22 @@ class VerticalTypesetter:
 
     def _is_punctuation_to_rotate(self, char):
         """判断是否需要旋转的标点符号"""
-        rotate_chars = ['—', '-', '…', '...', '(', ')', '（', '）', '【', '】', '[', ']', '{', '}', '《', '》', '～', '~']
-        return char in rotate_chars
+        return char in ROTATE_FALLBACK_PUNCTUATION
+
+    @staticmethod
+    def _vertical_cell_size(font):
+        return max(1, int(round(getattr(font, "size", 16))))
+
+    @staticmethod
+    def _vertical_char_spacing(font):
+        return max(1, int(round(getattr(font, "size", 16) * 0.06)))
+
+    @staticmethod
+    def _font_advance(font, text):
+        if hasattr(font, "getlength"):
+            return float(font.getlength(text))
+        bbox = font.getbbox(text)
+        return float(bbox[2] - bbox[0])
 
     def _get_char_size(self, char, font):
         """获取字符宽高"""
@@ -86,87 +241,226 @@ class VerticalTypesetter:
             # 兼容旧版 Pillow
             return font.getsize(char)
 
+    @staticmethod
+    def _draw_glyph_at_ink_center(
+        draw, center_x, center_y, char, font, fill, stroke_width
+    ):
+        bbox = draw.textbbox(
+            (0, 0), char, font=font, stroke_width=stroke_width
+        )
+        ink_center_x = (bbox[0] + bbox[2]) / 2
+        ink_center_y = (bbox[1] + bbox[3]) / 2
+        draw.text(
+            (center_x - ink_center_x, center_y - ink_center_y),
+            char,
+            font=font,
+            fill=fill,
+            stroke_width=stroke_width,
+            stroke_fill="white",
+        )
+
+    @staticmethod
+    def _render_tight_glyph(char, font, fill, stroke_width):
+        probe = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+        probe_draw = ImageDraw.Draw(probe)
+        bbox = probe_draw.textbbox(
+            (0, 0), char, font=font, stroke_width=stroke_width
+        )
+        padding = max(2, stroke_width + 2)
+        width = max(1, int(math.ceil(bbox[2] - bbox[0])) + padding * 2)
+        height = max(1, int(math.ceil(bbox[3] - bbox[1])) + padding * 2)
+        glyph = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        glyph_draw = ImageDraw.Draw(glyph)
+        glyph_draw.text(
+            (padding - bbox[0], padding - bbox[1]),
+            char,
+            font=font,
+            fill=fill,
+            stroke_width=stroke_width,
+            stroke_fill="white",
+        )
+        alpha_bbox = glyph.getchannel("A").getbbox()
+        return glyph.crop(alpha_bbox) if alpha_bbox else glyph
+
+    def _draw_vertical_cell(
+        self,
+        image,
+        draw,
+        *,
+        char,
+        font_style,
+        font_size,
+        center_x,
+        center_y,
+        cell_size,
+        stroke_width,
+    ):
+        style_path = self.font_map.get(font_style)
+        display_char = vertical_form(char)
+        use_vertical_form = bool(
+            display_char
+            and style_path
+            and self._font_supports(style_path, display_char)
+        )
+        if use_vertical_form:
+            char_font = self._load_font_to_cache(font_style, style_path, font_size)
+        else:
+            display_char = char
+            char_font = self._get_font_for_char(font_style, font_size, char)
+
+        is_punctuation = (
+            use_vertical_form
+            or char in UPPER_RIGHT_PUNCTUATION
+            or char in CENTERED_PUNCTUATION
+            or char in OPENING_PUNCTUATION
+            or char in CLOSING_PUNCTUATION
+            or self._is_punctuation_to_rotate(char)
+        )
+        if not is_punctuation:
+            self._draw_glyph_at_ink_center(
+                draw,
+                center_x,
+                center_y,
+                display_char,
+                char_font,
+                self.color,
+                stroke_width,
+            )
+            return
+
+        glyph = self._render_tight_glyph(
+            display_char, char_font, self.color, stroke_width
+        )
+        if not use_vertical_form and self._is_punctuation_to_rotate(char):
+            glyph = glyph.rotate(-90, expand=True, resample=Image.Resampling.BICUBIC)
+            alpha_bbox = glyph.getchannel("A").getbbox()
+            if alpha_bbox:
+                glyph = glyph.crop(alpha_bbox)
+
+        margin = max(1, int(round(cell_size * 0.08)))
+        cell_left = int(round(center_x - cell_size / 2))
+        cell_top = int(round(center_y - cell_size / 2))
+        cell_right = cell_left + cell_size
+        cell_bottom = cell_top + cell_size
+
+        if char in UPPER_RIGHT_PUNCTUATION:
+            paste_x = cell_right - margin - glyph.width
+            paste_y = cell_top + margin
+        elif char in OPENING_PUNCTUATION:
+            paste_x = int(round(center_x - glyph.width / 2))
+            paste_y = cell_top + margin
+        elif char in CLOSING_PUNCTUATION:
+            paste_x = int(round(center_x - glyph.width / 2))
+            paste_y = cell_bottom - margin - glyph.height
+        else:
+            paste_x = int(round(center_x - glyph.width / 2))
+            paste_y = int(round(center_y - glyph.height / 2))
+        image.paste(glyph, (paste_x, paste_y), glyph)
+
+    def _horizontal_runs(self, text, font_style, font_size):
+        runs = []
+        for char in text:
+            font = self._get_font_for_char(font_style, font_size, char)
+            if runs and runs[-1][0] is font:
+                runs[-1] = (font, runs[-1][1] + char)
+            else:
+                runs.append((font, char))
+        return runs
+
+    def _draw_horizontal_row(
+        self,
+        draw,
+        text,
+        font_style,
+        font_size,
+        center_x,
+        center_y,
+        stroke_width,
+    ):
+        runs = self._horizontal_runs(text, font_style, font_size)
+        if not runs:
+            return
+        widths = [self._font_advance(font, run_text) for font, run_text in runs]
+        total_width = sum(widths)
+        top = float("inf")
+        bottom = float("-inf")
+        for font, run_text in runs:
+            try:
+                bbox = draw.textbbox(
+                    (0, 0),
+                    run_text,
+                    font=font,
+                    anchor="ls",
+                    stroke_width=stroke_width,
+                )
+            except ValueError:
+                bbox = draw.textbbox(
+                    (0, 0), run_text, font=font, stroke_width=stroke_width
+                )
+            top = min(top, bbox[1])
+            bottom = max(bottom, bbox[3])
+        baseline_y = center_y - (top + bottom) / 2
+        current_x = center_x - total_width / 2
+        for (font, run_text), width in zip(runs, widths):
+            try:
+                draw.text(
+                    (current_x, baseline_y),
+                    run_text,
+                    font=font,
+                    fill=self.color,
+                    anchor="ls",
+                    stroke_width=stroke_width,
+                    stroke_fill="white",
+                )
+            except ValueError:
+                bbox = draw.textbbox(
+                    (0, 0), run_text, font=font, stroke_width=stroke_width
+                )
+                draw.text(
+                    (current_x - bbox[0], center_y - (bbox[1] + bbox[3]) / 2),
+                    run_text,
+                    font=font,
+                    fill=self.color,
+                    stroke_width=stroke_width,
+                    stroke_fill="white",
+                )
+            current_x += width
+
     def wrap_text_horizontal(self, text, max_width, font):
         """【新增】根据宽度自动分行（横排模式）"""
+        text = normalize_cjk_punctuation(text)
         lines = []
         current_line = ""
-        current_width = 0
         # 简单的溢出容忍系数
-        sample_w, _ = self._get_char_size("国", font)
+        sample_w = self._font_advance(font, "国")
         overflow_tolerance = sample_w * 0.8
 
         for i, char in enumerate(text):
-            w, h = self._get_char_size(char, font)
+            proposed = current_line + char
+            proposed_width = self._font_advance(font, proposed)
 
             # 核心逻辑：当前行宽 + 新字宽 > 最大宽度
-            if current_width + w > max_width:
+            if current_line and proposed_width > max_width:
                 # 容忍逻辑：如果是最后一个字，且超出不多，不换行
                 is_last_char = (i == len(text) - 1)
-                if is_last_char and (current_width + w <= max_width + overflow_tolerance):
+                if is_last_char and proposed_width <= max_width + overflow_tolerance:
                     current_line += char
                     break
 
                 lines.append(current_line)
                 current_line = char
-                current_width = w
             else:
-                current_line += char
-                current_width += w
+                current_line = proposed
 
         if current_line:
             lines.append(current_line)
         return lines
 
     def wrap_text_vertical(self, text, max_height, font):
-        """
-        根据高度自动分列
-        1. 加入避头逻辑 (防止标点在列首)
-        2. 加入溢出容忍 (如果只剩一个字符且超出不多，不换列)
-        """
-        lines = []
-        current_line = ""
-        current_height = 0
-        line_spacing = 4
-
-        # 获取标准字号作为参考（用于计算容忍度）
-        sample_w, sample_h = self._get_char_size("国", font)
-        # 容忍度：允许最后一列超出 max_height 的比例（0.8 表示允许超出一个小标点或大半个字）
-        overflow_tolerance = sample_h * 0.8
-
-        # 避头符号
-        punctuations_avoid_start = "，。！？；：、）》】」』”’"
-
-        for i, char in enumerate(text):
-            w, h = self._get_char_size(char, font)
-
-            if current_height + h > max_height:
-
-                # --- 溢出容忍逻辑 ---
-                is_last_char = (i == len(text) - 1)
-                if is_last_char and (current_height + h <= max_height + overflow_tolerance):
-                    current_line += char
-                    break
-
-                # --- 避头逻辑 ---
-                if char in punctuations_avoid_start and len(current_line) > 1:
-                    last_char = current_line[-1]
-                    current_line = current_line[:-1]
-                    lines.append(current_line)
-                    current_line = last_char + char
-                    lw, lh = self._get_char_size(last_char, font)
-                    current_height = lh + line_spacing + h + line_spacing
-                else:
-                    lines.append(current_line)
-                    current_line = char
-                    current_height = h + line_spacing
-            else:
-                # 高度充足，正常累加
-                current_line += char
-                current_height += h + line_spacing
-
-        if current_line:
-            lines.append(current_line)
-        return lines
+        cell_size = self._vertical_cell_size(font)
+        char_spacing = self._vertical_char_spacing(font)
+        max_cells = max(1, int((max_height + char_spacing) // (cell_size + char_spacing)))
+        return wrap_vertical_text(text, max_cells)
 
     def draw_text(
         self,
@@ -181,6 +475,7 @@ class VerticalTypesetter:
     ):
         """执行竖排绘制 (使用绝对居中算法 anchor='mm')"""
         try:
+            self.last_layout_debug = []
             x1, y1, x2, y2 = map(int, box[:4])
 
             scale_ratio = 0.9
@@ -219,31 +514,29 @@ class VerticalTypesetter:
                 box_width = int(raw_width * scale_ratio)
                 box_height = int(raw_height * scale_ratio)
 
-            base_font = self.fonts.get(style, self.fonts.get('dialogue'))
-            current_font = base_font
+            clean_text = normalize_cjk_punctuation(text.replace('\n', ''))
+            font_style = self._style_for_text(style, clean_text)
+            current_font = self.fonts.get(font_style, self.fonts.get('dialogue'))
 
             # 简单的字号预处理
             if box_width < self.base_font_size * 2:
                 try:
                     new_size = max(12, int(box_width // 2))
-                    current_font = self._get_font_object(style, new_size)
+                    current_font = self._get_font_object(font_style, new_size)
                 except:
                     pass
 
-            clean_text = text.replace('\n', '')
             preferred_size = None
             if target_font_size and target_font_size > 0:
                 if style == "next_preview":
-                    pref_ratio = 0.8
-                elif style == "narration":
+                    pref_ratio = 0.95
+                elif style in ("narration", "serious", "thought", "whisper"):
                     pref_ratio = 0.95 if len(clean_text) > 14 else 1.0
                 elif direction == 1:
-                    pref_ratio = 0.8 if len(clean_text) > 14 else 0.95
+                    pref_ratio = 1.0
                 else:
-                    pref_ratio = 0.55 if len(clean_text) > 14 else 0.7
+                    pref_ratio = 0.8 if len(clean_text) > 14 else 0.95
                 preferred_size = max(10, int(target_font_size * pref_ratio))
-                if direction == 1 and style != "next_preview":
-                    preferred_size = max(preferred_size, int(box_height * 0.25))
             available_area = 0
             mask_center = None
             if mask is not None:
@@ -284,10 +577,10 @@ class VerticalTypesetter:
             if direction == 1:
                 is_horizontal = False
             elif direction == 0:
-                # ???????????????????????????? 1.5 ???????
-                is_horizontal = box_width > box_height * 1.1
+                is_horizontal = True
             else:
-                is_horizontal = box_width > box_height * 1.5
+                is_horizontal = box_width > box_height * 1.35
+            self.last_direction = "horizontal" if is_horizontal else "vertical"
 
             # 智能预估起点
             try:
@@ -302,17 +595,17 @@ class VerticalTypesetter:
                 max_allowed_size = min(box_width, box_height)
                 
                 # 恢复至初版极其严格的极限值封锁（基础值的 1.5 倍）
-                if style == "next_preview":
+                if style in ("next_preview", "title"):
                     size_cap = int(min(box_width, box_height) * 0.7)
                     estimate_multiplier = 1.3
                     lower_bound = 14
-                elif style == "narration":
+                elif style in ("narration", "serious", "thought", "whisper"):
                     size_cap = int(min(box_width, box_height) * 0.8)
                     if len(clean_text) > 14:
                         size_cap = min(size_cap, int(min(box_width, box_height) * 0.7))
                     estimate_multiplier = 1.4
                     lower_bound = 14
-                elif style in ("radiating", "handwriting"):
+                elif style in ("radiating", "handwriting", "bold_dialogue", "sfx", "cute"):
                     if is_horizontal:
                         size_cap = int(min(box_width, box_height) * 0.6)
                     else:
@@ -326,14 +619,14 @@ class VerticalTypesetter:
                     estimate_multiplier = 1.2
                     lower_bound = 12
                 if non_bubble:
-                    if style in ("next_preview", "narration"):
+                    if style in ("next_preview", "narration", "title", "sfx"):
                         size_cap = min(size_cap, int(min(box_width, box_height) * 0.6))
                     else:
                         size_cap = min(size_cap, int(min(box_width, box_height) * 0.35))
                 pref_cap = None
                 if preferred_size:
                     lower_bound = min(lower_bound, max(10, preferred_size))
-                    if non_bubble and style in ("next_preview", "narration"):
+                    if non_bubble and style in ("next_preview", "narration", "title", "sfx"):
                         pref_cap = preferred_size
                     else:
                         pref_cap = int(preferred_size * 0.9) if non_bubble else preferred_size
@@ -365,7 +658,7 @@ class VerticalTypesetter:
                 if mid % 2 != 0: mid -= 1
                 if mid < lower_bound: mid = lower_bound
 
-                font = self._get_font_object(style, mid)
+                font = self._get_font_object(font_style, mid)
 
                 valid, calculated_size, lines_struct, sp = self._calculate_layout_fast(
                     clean_text, font, constraint_limit, is_horizontal=is_horizontal
@@ -383,7 +676,7 @@ class VerticalTypesetter:
             # 保底逻辑
             if current_font is None:
                 best_size = 12
-                current_font = self._get_font_object(style, 12)
+                current_font = self._get_font_object(font_style, 12)
                 _, _, best_lines_struct, best_col_spacing = self._calculate_layout_fast(
                     clean_text, current_font, constraint_limit, is_horizontal=is_horizontal
                 )
@@ -391,105 +684,159 @@ class VerticalTypesetter:
             columns = best_lines_struct
             if not columns:
                 return image
-            draw = ImageDraw.Draw(image)
-
-            # 获取标准字宽 (作为格子的宽度)
-            sample_w, sample_h = self._get_char_size("国", current_font)
-
-
-
-            # 计算整个文本块的总宽度
-            total_text_width = len(columns) * sample_w + (len(columns) - 1) * best_col_spacing
-
-            current_col_center_x = center_x + (total_text_width // 2) - (sample_w // 2)
+            stroke_width = self._stroke_width(style, best_size, non_bubble=non_bubble)
+            text_surface, draw, render_left, render_top, render_scale = (
+                self._make_render_surface(
+                    image,
+                    center_x + GLOBAL_OFFSET_X,
+                    center_y + GLOBAL_OFFSET_Y,
+                    box_width,
+                    box_height,
+                    best_size,
+                    stroke_width,
+                )
+            )
+            scaled_font_size = best_size * render_scale
+            scaled_stroke_width = stroke_width * render_scale
 
             if is_horizontal:
-
-                total_height = len(columns) * sample_h + (len(columns) - 1) * best_col_spacing
-
-                current_row_center_y = center_y - (total_height // 2) + (sample_h // 2)
-
+                row_height = max(1, best_size)
+                total_height = len(columns) * row_height + (len(columns) - 1) * best_col_spacing
+                current_row_center_y = center_y - total_height / 2 + row_height / 2
                 for row_text in columns:
-                    row_width = 0
-                    for char in row_text:
-                        w, _ = self._get_char_size(char, current_font)
-                        row_width += w
-
-                    current_x = center_x - (row_width // 2)
-
-                    for char in row_text:
-                        w, h = self._get_char_size(char, current_font)
-
-                        target_center_x = int(current_x + w // 2) + GLOBAL_OFFSET_X
-                        target_center_y = int(current_row_center_y) + GLOBAL_OFFSET_Y
-
-                        draw.text(
-                            (target_center_x, target_center_y),
-                            char,
-                            font=current_font,
-                            fill=self.color,
-                            anchor='mm',
-                            stroke_width=1,
-                            stroke_fill='white'
+                    self._draw_horizontal_row(
+                        draw,
+                        row_text,
+                        font_style,
+                        scaled_font_size,
+                        (center_x + GLOBAL_OFFSET_X - render_left) * render_scale,
+                        (
+                            current_row_center_y
+                            + GLOBAL_OFFSET_Y
+                            - render_top
                         )
-                        current_x += w  # 指针右移
-
-                    current_row_center_y += (sample_h + best_col_spacing)
+                        * render_scale,
+                        scaled_stroke_width,
+                    )
+                    current_row_center_y += row_height + best_col_spacing
 
             else:
-                for col_text in columns:
-                    # 计算该列总高
-                    col_height = 0
-                    for char in col_text:
-                        _, h = self._get_char_size(char, current_font)
-                        col_height += h
-                    col_height += (len(col_text) - 1) * 2  # 行内字间距
+                cell_size = self._vertical_cell_size(current_font)
+                char_spacing = self._vertical_char_spacing(current_font)
+                total_text_width = (
+                    len(columns) * cell_size
+                    + (len(columns) - 1) * best_col_spacing
+                )
+                current_col_center_x = (
+                    center_x + total_text_width / 2 - cell_size / 2
+                )
+                for column_index, col_text in enumerate(columns):
+                    col_height = (
+                        len(col_text) * cell_size
+                        + max(0, len(col_text) - 1) * char_spacing
+                    )
+                    current_y = center_y - col_height / 2
 
-                    # 新算法：绝对几何中心对齐 (从物理中心往上推算起点，防下坠防偏移)
-                    start_y = center_y - (col_height // 2)
-                    current_y = start_y
+                    row_index = 0
+                    while row_index < len(col_text):
+                        char = col_text[row_index]
+                        dash_run = 1
+                        if char in VERTICAL_DASH_CHARS:
+                            while (
+                                row_index + dash_run < len(col_text)
+                                and col_text[row_index + dash_run] == char
+                            ):
+                                dash_run += 1
 
-                    for char in col_text:
-                        w, h = self._get_char_size(char, current_font)
+                        if dash_run >= 2:
+                            cell_center_x = current_col_center_x + GLOBAL_OFFSET_X
+                            for dash_index in range(dash_run):
+                                cell_center_y = (
+                                    current_y
+                                    + dash_index * (cell_size + char_spacing)
+                                    + cell_size / 2
+                                    + GLOBAL_OFFSET_Y
+                                )
+                                self.last_layout_debug.append(
+                                    {
+                                        "char": char,
+                                        "center_x": float(cell_center_x),
+                                        "center_y": float(cell_center_y),
+                                        "cell_size": int(cell_size),
+                                        "column": column_index,
+                                        "row": row_index + dash_index,
+                                    }
+                                )
 
-                        # 目标 X = 当前列的中心线
-                        # 目标 Y = 当前高度 + 半个字高
-                        target_center_x = int(current_col_center_x) + GLOBAL_OFFSET_X
-                        target_center_y = int(current_y + h // 2) + GLOBAL_OFFSET_Y
-
-                        if self._is_punctuation_to_rotate(char):
-                            # 标点旋转处理
-                            temp_size = max(sample_w, h) * 2
-                            txt_img = Image.new('RGBA', (temp_size, temp_size), (255, 255, 255, 0))
-                            d = ImageDraw.Draw(txt_img)
-                            # 在小画布里也是用 mm 居中，并加上与正常文字一样的白边描边
-                            d.text((temp_size / 2, temp_size / 2), char, font=current_font, fill=self.color, anchor='mm', stroke_width=1, stroke_fill='white')
-                            rotated_txt = txt_img.rotate(-90, expand=False, resample=Image.BICUBIC)
-
-                            # 粘贴到绝对中心 (paste 需要左上角坐标，所以减去半径)
-                            paste_x = target_center_x - temp_size // 2
-                            paste_y = target_center_y - temp_size // 2
-                            image.paste(rotated_txt, (paste_x, paste_y), rotated_txt)
-                        else:
-                            punct_offset = (
-                                int(sample_w * 0.25)
-                                if char in UPRIGHT_VERTICAL_PUNCTUATION
-                                else 0
+                            dash_margin = cell_size * 0.12
+                            dash_span = (
+                                dash_run * cell_size
+                                + (dash_run - 1) * char_spacing
                             )
-                            draw.text(
-                                (target_center_x + punct_offset, target_center_y),
-                                char,
-                                font=current_font,
+                            dash_x = (
+                                cell_center_x - render_left
+                            ) * render_scale
+                            dash_top = (
+                                current_y
+                                + GLOBAL_OFFSET_Y
+                                + dash_margin
+                                - render_top
+                            ) * render_scale
+                            dash_bottom = (
+                                current_y
+                                + GLOBAL_OFFSET_Y
+                                + dash_span
+                                - dash_margin
+                                - render_top
+                            ) * render_scale
+                            dash_width = max(
+                                1,
+                                int(round(best_size * 0.07 * render_scale)),
+                            )
+                            draw.line(
+                                [(dash_x, dash_top), (dash_x, dash_bottom)],
                                 fill=self.color,
-                                anchor='mm',
-                                stroke_width=1,
-                                stroke_fill='white'  # 和fill颜色一致就是"加粗"，改成 "white" 就是"白边"
+                                width=dash_width,
                             )
+                            current_y += dash_run * (cell_size + char_spacing)
+                            row_index += dash_run
+                            continue
 
-                        current_y += h + 2  # 移动到下一个字的顶部
+                        cell_center_x = current_col_center_x + GLOBAL_OFFSET_X
+                        cell_center_y = current_y + cell_size / 2 + GLOBAL_OFFSET_Y
+                        self.last_layout_debug.append(
+                            {
+                                "char": char,
+                                "center_x": float(cell_center_x),
+                                "center_y": float(cell_center_y),
+                                "cell_size": int(cell_size),
+                                "column": column_index,
+                                "row": row_index,
+                            }
+                        )
+                        self._draw_vertical_cell(
+                            text_surface,
+                            draw,
+                            char=char,
+                            font_style=font_style,
+                            font_size=scaled_font_size,
+                            center_x=(cell_center_x - render_left) * render_scale,
+                            center_y=(cell_center_y - render_top) * render_scale,
+                            cell_size=cell_size * render_scale,
+                            stroke_width=scaled_stroke_width,
+                        )
+                        current_y += cell_size + char_spacing
+                        row_index += 1
 
-                    # 移到下一列 (向左移动一个标准字宽 + 间距)
-                    current_col_center_x -= (sample_w + best_col_spacing)
+                    current_col_center_x -= cell_size + best_col_spacing
+
+            self._composite_render_surface(
+                image,
+                text_surface,
+                render_left,
+                render_top,
+                render_scale,
+            )
 
             # #调试框 (取消注释可查看排版范围)
             #         debug_box = box[:4]
