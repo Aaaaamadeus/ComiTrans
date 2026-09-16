@@ -15,4 +15,4 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile desktop client
-        run: python -m py_compile run.py comic_translate_desktop/*.py comic_translate_desktop/ui/*.py
+        run: python -m py_compile run.py comic_translate_core/*.py comic_translate_desktop/*.py comic_translate_desktop/ui/*.py comic-translate-ai/main/*.py scripts/*.py

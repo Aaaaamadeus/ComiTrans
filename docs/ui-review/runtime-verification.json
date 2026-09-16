@@ -1,0 +1,33 @@
+[
+  {
+    "captured_state": {
+      "task_id": "a8b5c38181f84f6f8859e14d502a1e1d",
+      "page_id": "1:1",
+      "document_index": 1,
+      "page_label": "本地验证_01.png",
+      "stage": "inpaint",
+      "state": "running",
+      "message": "正在准备背景修复与排版"
+    },
+    "live_log_records": 41,
+    "worker_running": true,
+    "reveal_remaining_chars": 257,
+    "completed_nodes": 4,
+    "node_progress": 0.5714285714285714,
+    "node_states": {
+      "start": 2,
+      "detect": 2,
+      "ocr": 2,
+      "translate": 5,
+      "inpaint": 1,
+      "typeset": 0,
+      "save": 0
+    }
+  },
+  {
+    "success": 8,
+    "failed": 0,
+    "real_models": true,
+    "network_translation": false
+  }
+]

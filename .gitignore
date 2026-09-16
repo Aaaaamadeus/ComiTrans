@@ -99,4 +99,17 @@ legacy/web/docker-compose.override.yml
 
 *.jpg
 *.png
+!docs/images/*.jpg
+!docs/ui-review/*.png
+# Local UI verification outputs (the review screenshots live in docs/ui-review).
+/tmp/ui-qa/
+/tmp/ui-package/
+/tmp/ui-package-build/
+/tmp/ui_*check.py
+/tmp/ui_smoke.py
+/tmp/ui_manga_runtime.py
+/tmp/refactor_ui.py
+/tmp/refactor_editor.py
+/tmp/
+*.lnk
 comic-translate-ai/page/

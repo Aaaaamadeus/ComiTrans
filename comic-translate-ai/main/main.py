@@ -10,7 +10,10 @@ from concurrent.futures import ProcessPoolExecutor
 import sys
 import threading
 import time
+# Allow this legacy command-line entry point to import the shared package.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from comic_translator_pipeline import ComicTranslatorPipeline
+from comic_translate_core.languages import OCR_CONFIG_KEYS
 
 # 优雅关闭标志
 is_running = True
@@ -60,8 +63,18 @@ FONT_MAP = {
     "serious": font_serious
 }
 
-LAMA_PATH = get_path('lama_model', 'models/manga-lama/manga-lama.pt')
-DET_PATH = get_path('detector_model', 'models/text_detector/comictextdetector.pt')
+LAMA_PATH = get_path('lama_model', 'models/manga-lama/lama-manga-dynamic.onnx')
+DET_PATH = get_path('detector_model', 'models/text_detector/comic-text-detector.onnx')
+OCR_CONFIG = {key: CONFIG[key] for key in OCR_CONFIG_KEYS if key in CONFIG}
+for key in ("korean_ocr_model", "english_ocr_model"):
+    if OCR_CONFIG.get(key):
+        OCR_CONFIG[key] = get_path(key, OCR_CONFIG[key])
+OCR_OPTIONS = {
+    "ocr_config": OCR_CONFIG,
+    "ocr_backend": CONFIG.get("ocr_backend", "auto"),
+    "ocr_model_path": get_path("ocr_model", "models/manga-ocr-onnx"),
+    "baberu_ocr_model_path": get_path("baberu_ocr_model", "models/baberu-ocr"),
+}
 
 # API 配置（仅从 config.yaml 读取）
 API_KEY = CONFIG.get('api_key', '')
@@ -95,7 +108,8 @@ def init_worker(det_path, font_map, font_size, lama_path, use_gpu, output_dir, t
             use_gpu=use_gpu,
             translation_model=trans_model,
             api_key=api_key,
-            api_base_url=api_base_url
+            api_base_url=api_base_url,
+            **OCR_OPTIONS,
         )
     except Exception as e:
         print(f"[ERROR] 模型加载失败: {e}")
@@ -170,7 +184,8 @@ if __name__ == "__main__":
             lama_path=LAMA_PATH,
             translation_model=TRANSLATION_MODEL,
             api_key=API_KEY,
-            api_base_url=API_BASE_URL
+            api_base_url=API_BASE_URL,
+            **OCR_OPTIONS,
         )
 
         print("[INFO] 预热检测模型...")

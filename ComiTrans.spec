@@ -1,4 +1,24 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
+import sys
+from pathlib import Path
+
+import PySide6
+import shiboken6
+
+# Resolve DLLs from this Python/Qt installation and Windows, not unrelated
+# tools on PATH (e.g. Poppler's ICU exports do not match Qt's Windows ICU ABI).
+if sys.platform == "win32":
+    windows = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+    os.environ["PATH"] = os.pathsep.join(map(str, (
+        Path(PySide6.__file__).parent,
+        Path(shiboken6.__file__).parent,
+        Path(sys.base_prefix),
+        Path(sys.base_prefix) / "DLLs",
+        Path(sys.executable).parent,
+        windows / "System32",
+        windows,
+    )))
 
 hidden_imports = [
     "comic_translator_pipeline",
@@ -7,6 +27,8 @@ hidden_imports = [
     "onnx_text_detector",
     "onnx_manga_ocr",
     "onnx_baberu_ocr",
+    "comic_translate_core.ocr",
+    "comic_translate_core.onnx_ppocr",
     "text_style",
     "punctuation_layout",
     "pyclipper",
@@ -15,17 +37,19 @@ hidden_imports = [
     "jaconv",
     "tokenizers",
     "PySide6.QtPdf",
+    "PySide6.QtSvg",
 ]
 
 datas = [
     ("comic-translate-ai/font_file", "comic-translate-ai/font_file"),
     ("comic-translate-ai/main/comic_text_detector", "comic-translate-ai/main/comic_text_detector"),
     ("assets/ComiTrans.ico", "assets"),
+    ("assets/ui", "assets/ui"),
 ]
 
 a = Analysis(
     ["run.py"],
-    pathex=["D:\\ComiTrans", "D:\\ComiTrans\\comic-translate-ai\\main"],
+    pathex=[SPECPATH, os.path.join(SPECPATH, "comic-translate-ai", "main")],
     binaries=[],
     datas=datas,
     hiddenimports=hidden_imports,

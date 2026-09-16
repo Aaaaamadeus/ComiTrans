@@ -6,6 +6,8 @@ import os
 import sys
 import tempfile
 import traceback
+import threading
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -13,6 +15,7 @@ from PySide6.QtCore import QThread, Signal
 
 from . import config as app_config
 from .pdf_utils import build_pdf_from_images, render_pdf_pages
+from comic_translate_core.languages import OCR_CONFIG_KEYS
 
 
 @dataclass
@@ -41,21 +44,27 @@ class QtTextStream(io.TextIOBase):
     def __init__(self, callback):
         super().__init__()
         self._callback = callback
-        self._buffer = ""
+        self._buffers = {}
+        self._lock = threading.RLock()
 
     def write(self, text: str) -> int:
-        self._buffer += text
-        while "\n" in self._buffer:
-            line, self._buffer = self._buffer.split("\n", 1)
-            line = line.rstrip()
-            if line:
-                self._callback(line)
+        with self._lock:
+            thread_id = threading.get_ident()
+            buffer = self._buffers.get(thread_id, "") + text
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                line = line.rstrip()
+                if line:
+                    self._callback(line)
+            self._buffers[thread_id] = buffer
         return len(text)
 
     def flush(self) -> None:
-        if self._buffer.strip():
-            self._callback(self._buffer.rstrip())
-            self._buffer = ""
+        with self._lock:
+            for buffer in self._buffers.values():
+                if buffer.strip():
+                    self._callback(buffer.rstrip())
+            self._buffers.clear()
 
 
 class BatchWorker(QThread):
@@ -65,16 +74,20 @@ class BatchWorker(QThread):
     image_done = Signal(str, str)
     image_failed = Signal(str, str)
     stage_changed = Signal(int, str, str)
+    stage_event = Signal(object)
+    page_progress = Signal(int, int)
     finished = Signal(int, int)
 
     def __init__(self, files, output_dir, config, pipeline=None, parent=None):
         super().__init__(parent)
         self._files = [Path(f) for f in files]
         self._output_dir = Path(output_dir)
-        self._config = config
+        self._config = dict(config)
         self._pipeline = pipeline
         self._stop = False
         self._current_index = 0
+        self.task_id = uuid.uuid4().hex
+        self._stage_context = threading.local()
 
     def stop(self) -> None:
         self._stop = True
@@ -83,10 +96,40 @@ class BatchWorker(QThread):
         return self._stop
 
     def _emit_stage(self, stage: str, message: str) -> None:
+        # Compatibility adapter: the existing pipeline reports completions for
+        # these callbacks. Translation also reports requests and continuations.
+        state = "done" if stage in {"detect", "ocr", "inpaint", "typeset", "save"} or (stage == "translate" and message == "翻译完成") else "running"
+        page = getattr(self._stage_context, "page", None)
+        if page is not None:
+            if stage == "translate" and getattr(self._stage_context, "blank", False):
+                state, message = "skipped", "无可翻译文本，跳过 API 请求"
+            self._page_event(stage, state, message)
         if stage == "start" and self._current_index > 0:
             message = f"{self._files[self._current_index - 1].name}: 开始处理"
         self.stage_changed.emit(self._current_index, stage, message)
         self.log.emit(message)
+
+    def _page_event(self, stage, state, message):
+        page = getattr(self._stage_context, "page", None)
+        if page is not None:
+            self.stage_event.emit({
+                "task_id": self.task_id,
+                "page_id": f"{page.document.index}:{page.page_number}",
+                "document_index": page.document.index,
+                "page_label": self._page_label(page),
+                "stage": stage, "state": state, "message": message,
+            })
+
+    def _translate_page(self, page, prepared):
+        self._stage_context.page = page
+        self._stage_context.blank = not any(text.strip() for text in prepared["ocr_texts"])
+        try:
+            result = self._pipeline.translate_page_batch(prepared["ocr_texts"], prepared["img_cv"])
+            self._page_event("translate", "skipped" if self._stage_context.blank else "done", "无可翻译文本，跳过 API 请求" if self._stage_context.blank else "翻译完成")
+            return result
+        except Exception as exc:
+            self._page_event("translate", "failed", str(exc))
+            raise
 
     def _configure_pipeline(self, pipeline) -> None:
         pipeline.cancel_callback = self._is_stopped
@@ -126,6 +169,7 @@ class BatchWorker(QThread):
                 ocr_model_path=self._config.get("ocr_model"),
                 baberu_ocr_model_path=self._config.get("baberu_ocr_model"),
                 ocr_backend=self._config.get("ocr_backend", "auto"),
+                ocr_config={key: self._config[key] for key in OCR_CONFIG_KEYS if key in self._config},
                 translation_model=self._config["translation_model"],
                 api_key=self._config["api_key"],
                 api_base_url=self._config["api_base_url"],
@@ -244,6 +288,8 @@ class BatchWorker(QThread):
             with tempfile.TemporaryDirectory(prefix="comitrans_pdf_") as temporary_dir:
                 documents = self._make_document_jobs(Path(temporary_dir))
                 page_jobs = [page for document in documents for page in document.pages]
+                completed_pages = 0
+                self.page_progress.emit(0, len(page_jobs))
                 max_workers = max(1, int(self._config.get("max_workers") or 4))
 
                 # 每批最多保留 max_workers 页的检测/OCR 图像，避免大型 PDF
@@ -264,6 +310,8 @@ class BatchWorker(QThread):
                         if self._stop or page.document.error:
                             continue
                         self._current_index = page.document.index
+                        self._stage_context.page = page
+                        self._stage_context.blank = False
                         label = self._page_label(page)
                         self.stage_changed.emit(page.document.index, "start", f"{label}: 准备中")
                         try:
@@ -272,10 +320,12 @@ class BatchWorker(QThread):
                             prepared_batch.append((page, prepared))
                         except TaskCancelledError:
                             self._stop = True
+                            self._page_event("cancelled", "cancelled", "已取消")
                             self.stage_changed.emit(page.document.index, "cancelled", f"{label}: 已取消")
                             break
                         except Exception as exc:
                             self._set_document_error(page.document, exc)
+                            self._page_event("failure", "failed", str(exc))
 
                     translations: dict[int, list[str]] = {}
                     translatable = [
@@ -285,12 +335,10 @@ class BatchWorker(QThread):
                     ]
                     if translatable and not self._stop:
                         self.stage_changed.emit(0, "translate", f"并行翻译 {len(translatable)} 页")
-                        with ThreadPoolExecutor(max_workers=min(max_workers, len(translatable))) as executor:
+                        with self._capture_pipeline_output(), ThreadPoolExecutor(max_workers=min(max_workers, len(translatable))) as executor:
                             futures = {
                                 executor.submit(
-                                    self._pipeline.translate_page_batch,
-                                    prepared["ocr_texts"],
-                                    prepared["img_cv"],
+                                    self._translate_page, page, prepared,
                                 ): (page, prepared)
                                 for page, prepared in translatable
                             }
@@ -320,19 +368,26 @@ class BatchWorker(QThread):
                         if self._stop or page.document.error:
                             continue
                         self._current_index = page.document.index
+                        self._stage_context.page = page
+                        self._stage_context.blank = not any(text.strip() for text in prepared["ocr_texts"])
                         label = self._page_label(page)
                         try:
                             page.output_path.parent.mkdir(parents=True, exist_ok=True)
+                            self._page_event("inpaint", "running", "正在准备背景修复与排版")
                             with self._capture_pipeline_output():
                                 self._pipeline.finish_comic_page(
                                     str(page.output_path), prepared, translations[id(page)]
                                 )
+                            completed_pages += 1
+                            self.page_progress.emit(completed_pages, len(page_jobs))
                         except TaskCancelledError:
                             self._stop = True
+                            self._page_event("cancelled", "cancelled", "已取消")
                             self.stage_changed.emit(page.document.index, "cancelled", f"{label}: 已取消")
                             break
                         except Exception as exc:
                             self._set_document_error(page.document, exc)
+                            self._page_event("failure", "failed", str(exc))
 
                 completed = 0
                 for document in documents:

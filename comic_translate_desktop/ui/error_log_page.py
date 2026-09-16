@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
 )
 
 from ..ai_diagnosis import AiDiagnosis
+from .theme import ui_font
+from .manga_components import ChapterBanner, PanelHeading
 
 
 class DiagnosisWorker(QThread):
@@ -45,12 +47,13 @@ class ErrorLogPage(QWidget):
         root.setContentsMargins(20, 18, 20, 20)
         root.setSpacing(10)
 
-        header = QLabel("报错日志与 AI 诊断")
-        header.setObjectName("brandTitle")
+        header = ChapterBanner('04', '诊断', '运行记录 / 错误分析 / 问题反馈')
         root.addWidget(header)
 
         self._file_label = QLabel(f"日志文件: {self._diagnostics.log_path}")
         self._file_label.setProperty("muted", True)
+        self._file_label.setWordWrap(True)
+        self._file_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         root.addWidget(self._file_label)
 
         splitter = QSplitter(Qt.Vertical)
@@ -69,7 +72,7 @@ class ErrorLogPage(QWidget):
         self.prompt_view = QPlainTextEdit()
         self.prompt_view.setReadOnly(True)
         self.prompt_view.setPlaceholderText("暂无报错日志")
-        self.prompt_view.setProperty("code", True)
+        self.prompt_view.setFont(ui_font(mono=True))
         layout.addWidget(self.prompt_view, 1)
 
         buttons = QHBoxLayout()
@@ -132,7 +135,13 @@ class ErrorLogPage(QWidget):
 
     def refresh(self) -> None:
         self._file_label.setText(f"日志文件: {self._diagnostics.log_path}")
-        self.prompt_view.setPlainText(self._diagnostics.build_prompt())
+        if not self.prompt_view.textCursor().hasSelection():
+            text = self._diagnostics.build_prompt()
+            if self.prompt_view.toPlainText() != text:
+                bar = self.prompt_view.verticalScrollBar()
+                value = bar.value()
+                self.prompt_view.setPlainText(text)
+                bar.setValue(value)
 
     def copy_prompt(self) -> None:
         QApplication.clipboard().setText(self.prompt_view.toPlainText())

@@ -11,8 +11,8 @@ from PIL import Image
 from openai import OpenAI
 from manga_lama import MangaLama
 from vertical_typesetter import VerticalTypesetter
-from onnx_manga_ocr import OnnxMangaOcr
-from onnx_baberu_ocr import OnnxBaberuOcr
+from comic_translate_core.languages import source_language, source_language_name
+from comic_translate_core.ocr import create_ocr, recognize_regions
 from onnx_text_detector import OnnxTextDetector
 from text_style import (
     FONT_STYLES,
@@ -65,6 +65,21 @@ def _parse_translation_response(content):
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 
+def _unique_ocr_lines(polygons):
+    """Suppress detector fragments contained within a larger text line."""
+    candidates = [np.asarray(points, dtype=np.float32).reshape(4, 2) for points in polygons]
+    candidates.sort(key=lambda points: abs(cv2.contourArea(points)), reverse=True)
+    kept = []
+    for points in candidates:
+        area = abs(cv2.contourArea(points))
+        if area < 1:
+            continue
+        if any(cv2.intersectConvexConvex(points, other)[0] / area >= 0.85 for other in kept):
+            continue
+        kept.append(points)
+    return sorted(kept, key=lambda points: (float(points[:, 1].min()), float(points[:, 0].min())))
+
+
 class TaskCancelledError(Exception):
     pass
 
@@ -92,7 +107,8 @@ class ComicTranslatorPipeline:
                  baberu_ocr_model_path=None,
                  ocr_backend="auto",
                  progress_callback=None,
-                 cancel_callback=None):
+                 cancel_callback=None,
+                 ocr_config=None):
         self.device = 'cuda' if use_gpu else 'cpu'
         self.translation_model = translation_model
         self.api_key = api_key
@@ -107,6 +123,15 @@ class ComicTranslatorPipeline:
             current_dir, "..", "models", "baberu-ocr"
         )
         self.ocr_backend_requested = str(ocr_backend or "auto").strip().lower()
+        self.ocr_config = {
+            "source_language": "ja", "ocr_backend": self.ocr_backend_requested,
+            "ocr_model": self.ocr_model_path, "baberu_ocr_model": self.baberu_ocr_model_path,
+            "korean_ocr_model": str(Path(current_dir).parent / "models/ppocr/korean_PP-OCRv5_rec_mobile.onnx"),
+            "english_ocr_model": str(Path(current_dir).parent / "models/ppocr/en_PP-OCRv5_rec_mobile.onnx"),
+            **(ocr_config or {}),
+        }
+        self.source_language = source_language(self.ocr_config)
+        self.source_language_name = source_language_name(self.ocr_config)
         if not self.translation_model:
              print("[WARNING] Pipeline 初始化时未指定翻译模型")
         print("初始化管线")
@@ -114,31 +139,11 @@ class ComicTranslatorPipeline:
         print("[INFO] 加载 Comic Text Detector...")
         self.detector = OnnxTextDetector(model_path=det_model_path, input_size=1024, device=self.device)
 
-        # 2. OCR 模型。auto 优先 Baberu，模型不存在或加载失败时回退 manga-ocr。
-        self.ocr = None
-        self.manga_ocr = None
-        self.ocr_backend_active = ""
-        if self.ocr_backend_requested in ("auto", "baberu") and OnnxBaberuOcr.is_complete(
-            self.baberu_ocr_model_path
-        ):
-            try:
-                print("[INFO] 加载 Baberu OCR...")
-                self.ocr = OnnxBaberuOcr(
-                    model_dir=self.baberu_ocr_model_path, device=self.device
-                )
-                self.ocr_backend_active = "baberu"
-            except Exception as exc:
-                print(f"[WARNING] Baberu OCR 加载失败，将回退 manga-ocr: {exc}")
-        if self.ocr is None:
-            if self.ocr_backend_requested == "baberu":
-                print("[WARNING] Baberu OCR 模型不完整，将回退 manga-ocr。")
-            print("[INFO] 加载 Manga-OCR...")
-            self.manga_ocr = OnnxMangaOcr(
-                model_dir=self.ocr_model_path, device=self.device
-            )
-            self.ocr = self.manga_ocr
-            self.ocr_backend_active = "manga-ocr"
-        print(f"[INFO] OCR 后端: {self.ocr_backend_active}")
+        self.ocr_engine = create_ocr(self.ocr_config, self.device)
+        self.ocr_backend_active = self.ocr_engine.name
+        self.ocr = getattr(self.ocr_engine, "recognizer", None)
+        self.manga_ocr = self.ocr if self.ocr_backend_active == "manga-ocr" else None
+        print(f"[INFO] 源语言: {self.source_language_name} → 中文；OCR: {self.ocr_backend_active}")
 
         # 3. 图像修补
         print("[INFO] 加载 Manga-lama...")
@@ -176,6 +181,8 @@ class ComicTranslatorPipeline:
         print("[INFO] 检测气泡中...")
         mask, mask_refined, text_lines = self.detector(img_cv)
         self.last_detector_mask = mask_refined
+        # Detector language labels only distinguish Japanese/English and cannot classify Korean.
+        self._ocr_blocks = {tuple(int(v) for v in line.xyxy): line for line in text_lines}
 
         bubbles = []
         for line in text_lines:
@@ -233,19 +240,44 @@ class ComicTranslatorPipeline:
             max(0, x1 - padding):min(w, x2 + padding),
         ]
         if crop_img.size == 0: return ""
-        if len(box) > 8 and box[8] == 'eng':
+        if self._preserve_english(box):
             return ""
 
-        if method in ('manga-ocr', 'baberu', 'auto'):
-            pil_crop = Image.fromarray(cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB))
-            return self.ocr(pil_crop)
-        # elif method == 'paddle':
-        #     #ocr线程锁
-        #     with self.lock:
-        #         result = self.paddle_ocr.ocr(crop_img)
-        #     if result and result[0]:
-        #         return "".join([line[1][0] for line in result[0]])
-        return ""
+        pil_crop = Image.fromarray(cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB))
+        lines = []
+        block = getattr(self, "_ocr_blocks", {}).get(tuple(box[:4]))
+        if self.ocr_engine.uses_lines and block is not None:
+            # Rectify each detector polygon, sorted top-to-bottom for Korean/English.
+            polygons = _unique_ocr_lines(block.lines)
+            for polygon in polygons:
+                self._check_cancelled()
+                points = np.asarray(polygon, dtype=np.float32).reshape(4, 2)
+                # Line polygons may clip edge punctuation and anti-aliased strokes.
+                horizontal = points[1] - points[0]
+                vertical = points[3] - points[0]
+                margin = max(2.0, min(12.0, float(np.linalg.norm(vertical)) * 0.2))
+                horizontal = horizontal / max(1.0, float(np.linalg.norm(horizontal))) * margin
+                vertical = vertical / max(1.0, float(np.linalg.norm(vertical))) * margin
+                points += np.asarray([-horizontal - vertical, horizontal - vertical,
+                                      horizontal + vertical, -horizontal + vertical])
+                points[:, 0] = np.clip(points[:, 0], 0, w - 1)
+                points[:, 1] = np.clip(points[:, 1], 0, h - 1)
+                line_w = int(max(np.linalg.norm(points[1] - points[0]), np.linalg.norm(points[2] - points[3])))
+                line_h = int(max(np.linalg.norm(points[3] - points[0]), np.linalg.norm(points[2] - points[1])))
+                if line_w < 2 or line_h < 2:
+                    continue
+                dest = np.float32([[0, 0], [line_w - 1, 0], [line_w - 1, line_h - 1], [0, line_h - 1]])
+                matrix = cv2.getPerspectiveTransform(points, dest)
+                rectified = cv2.warpPerspective(img_array, matrix, (line_w, line_h), borderMode=cv2.BORDER_REPLICATE)
+                lines.append(Image.fromarray(cv2.cvtColor(rectified, cv2.COLOR_BGR2RGB)))
+        result = recognize_regions(self.ocr_engine, pil_crop, self.source_language, lines, self._check_cancelled)
+        self._last_ocr_result = result
+        return result.text
+
+    def _preserve_english(self, box):
+        return (getattr(self, "source_language", "ja") == "ja"
+                and getattr(self, "ocr_backend_active", "baberu") != "自定义 OCR"
+                and len(box) > 8 and box[8] == "eng")
 
     def is_simple_bubble(self, roi_img):
         # 判断是否存在气泡
@@ -299,7 +331,7 @@ class ComicTranslatorPipeline:
         needs_ai_inpainting = False
         for data in boxes:
             x1, y1, x2, y2 = data[:4]
-            if len(data) > 8 and data[8] == 'eng':
+            if self._preserve_english(data):
                 continue
             paddle = 15  # 扩大上下文参考边缘，供 LaMa 获取足够纹理
             safe_x1 = max(0, x1 - paddle)
@@ -447,8 +479,8 @@ class ComicTranslatorPipeline:
     def translate_page_batch(self, ocr_texts, image_input):
         # 空白页不需要访问翻译 API。此前空白页会在后续排版阶段被误报成
         # “API 未打通”，对 PDF 中常见的封面/插页尤其不友好。
-        if not ocr_texts:
-            return []
+        if not any(text.strip() for text in ocr_texts):
+            return [""] * len(ocr_texts)
 
         # 使用初始化时传入的配置（来自 config.yaml）
         API_KEY = self.api_key or ""
@@ -480,15 +512,13 @@ class ComicTranslatorPipeline:
         proxy_url = proxies.get('http') or proxies.get('https')
         http_client = httpx.Client(proxy=proxy_url, timeout=90.0) if proxy_url else httpx.Client(timeout=90.0)
 
-        # 2. 构造带序号的文本清单，方便 AI 对照
-        text_list_str = "\n".join([f"[{i}] {text}" for i, text in enumerate(ocr_texts)])
-
         # 3. 构造 Prompt
-        system_prompt = """你是专业的日中漫画翻译助手。输入是按漫画阅读顺序排列的 OCR 文本。
+        language_name = getattr(self, "source_language_name", "日语")
+        system_prompt = """你是专业的漫画翻译助手，将源语言文本翻译成简体中文。输入是按漫画阅读顺序排列的 OCR 文本。
 
 输入示例：
-[0] こんにちは
-[1] また明日
+[0] 原文条目一
+[1] 原文条目二
 [2] ……
 
 输出要求：
@@ -516,13 +546,13 @@ class ComicTranslatorPipeline:
                 )
             else:
                 custom_context.append(
-                    f"【人名对照】\n以下是用户指定使用的中文名，请根据剧情上下文自动匹配到日文角色并直接使用：\n{names_text}\n"
-                    "译文中不得出现这些名字的日文或罗马音。"
+                    f"【人名对照】\n以下是用户指定使用的中文名，请根据剧情上下文自动匹配到原文角色并直接使用：\n{names_text}\n"
+                    "译文中不得出现这些名字的原文或音译拼写。"
                 )
         if custom_context:
             system_prompt += "\n\n" + "\n\n".join(custom_context)
 
-        user_prompt = f'\u8bf7\u4e25\u683c\u6309\u987a\u5e8f\u7ffb\u8bd1\u4ee5\u4e0b {len(ocr_texts)} \u6761\u65e5\u6587\u6587\u672c\uff0c\u8fd4\u56de {{"translations": [...]}}\uff0c\u6570\u91cf\u5fc5\u987b\u4e0e\u8f93\u5165\u4e00\u81f4\uff1a\n{text_list_str}'
+        system_prompt += f"\n本次源语言：{language_name}；目标语言：简体中文。"
 
         try:
             client = OpenAI(
@@ -558,7 +588,7 @@ class ComicTranslatorPipeline:
                     f"[{start_index + i}] {text}" for i, text in enumerate(remaining)
                 )
                 user_prompt = (
-                    f"请严格按顺序翻译以下 {len(remaining)} 条日文文本，返回 "
+                    f"请严格按顺序将以下 {len(remaining)} 条{language_name}文本译成简体中文，返回 "
                     f'{{"translations": [...]}}，数组只能包含本次列出的 {len(remaining)} 条译文：\n'
                     f"{text_list_str}"
                 )
@@ -784,9 +814,13 @@ class ComicTranslatorPipeline:
         for i, box in enumerate(bubbles_data):
             x1, y1, x2, y2, mask_type, font_type, target_font_size, detected_label, language = box
 
+            self._last_ocr_result = None
+            self._check_cancelled()
             raw_text = self.run_ocr(img_cv, box, method='auto')
             self._check_cancelled()
-            if raw_text and self._looks_like_english_garbage(raw_text):
+            if (getattr(self, "source_language", "ja") == "ja"
+                    and getattr(self, "ocr_backend_active", "baberu") != "自定义 OCR"
+                    and raw_text and self._looks_like_english_garbage(raw_text)):
                 bubbles_data[i] = box[:8] + ('eng',)
                 raw_text = ""
             box_width = max(1, x2 - x1)
@@ -819,6 +853,9 @@ class ComicTranslatorPipeline:
                 "target_font_size": target_font_size,
                 "non_bubble": non_bubble,
                 "emphasis": round(emphasis, 3),
+                "source_language": getattr(self, "source_language", "ja"),
+                "ocr_backend": getattr(self, "ocr_backend_active", ""),
+                "ocr_confidence": getattr(self._last_ocr_result, "confidence", None),
             })
             ocr_text_only.append(raw_text)
         self._report_progress("ocr", f"OCR 完成，识别 {len(ocr_text_only)} 条文本")
@@ -861,8 +898,8 @@ class ComicTranslatorPipeline:
         
         processed_data = []
         for i, item in enumerate(bubble_metadata):
-            is_eng = len(bubbles_data[i]) > 8 and bubbles_data[i][8] == 'eng'
-            if is_eng:
+            is_eng = self._preserve_english(bubbles_data[i])
+            if is_eng or not item['raw'].strip():
                 trans_text = ""
             else:
                 trans_text = translated_list[i] if i < len(translated_list) else ""
@@ -887,7 +924,17 @@ class ComicTranslatorPipeline:
 
         # 4. 图像修补 (获得干净的 PIL 画布)
         # 这一步会去除原有文字，生成适合嵌字的底图
-        final_canvas = self.inpaint_bubbles(img_cv, bubbles_data)
+        # Empty/failed OCR or empty translation must leave the source pixels intact.
+        erase_boxes = [box for box, item in zip(bubbles_data, processed_data) if item['trans']]
+        original_canvas = Image.fromarray(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
+        final_canvas = self.inpaint_bubbles(img_cv, erase_boxes)
+        # A neighbouring translated bubble's padding can overlap a preserved region.
+        for item in processed_data:
+            if not item['trans']:
+                x1, y1, x2, y2 = item['box'][:4]
+                region = (max(0, x1), max(0, y1), min(final_canvas.width, x2), min(final_canvas.height, y2))
+                if region[2] > region[0] and region[3] > region[1]:
+                    final_canvas.paste(original_canvas.crop(region), region[:2])
         self._check_cancelled()
         self._report_progress("inpaint", "背景修复完成")
 
@@ -904,6 +951,10 @@ class ComicTranslatorPipeline:
         for idx, item in enumerate(processed_data):
             layout_items.append({
                 "index": idx,
+                "source_text": bubble_metadata[idx]["raw"],
+                "source_language": bubble_metadata[idx].get("source_language", "ja"),
+                "ocr_backend": bubble_metadata[idx].get("ocr_backend", ""),
+                "ocr_confidence": bubble_metadata[idx].get("ocr_confidence"),
                 "box": [int(v) for v in item["box"][:4]],
                 "text": item["trans"],
                 "style": item["style"],

@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from comic_translate_core.languages import (
+    OCR_DEFAULTS, OCR_CONFIG_KEYS, effective_ocr_backend, source_language, validate_ocr_config,
+)
 
 
 if getattr(sys, "frozen", False):
@@ -90,10 +93,11 @@ def load_ai_config() -> dict[str, Any]:
     for style, key in FONT_KEYS.items():
         font_map[style] = str(_resolve_path(raw.get(key), FONT_DEFAULTS[style]))
     ocr_backend = str(raw.get("ocr_backend") or "auto").strip().lower()
-    if ocr_backend not in ("auto", "baberu", "manga", "manga-ocr"):
-        ocr_backend = "auto"
+    ocr_config = {key: raw.get(key, default) for key, default in OCR_DEFAULTS.items()}
+    ocr_config["source_language"] = str(raw.get("source_language") or "ja").strip().lower()
 
     return {
+        **ocr_config,
         "api_key": _clean_text(raw.get("api_key")),
         "api_base_url": _clean_text(raw.get("api_base_url")),
         "translation_model": _clean_text(raw.get("translation_model")) or "gemini-2.5-flash",
@@ -111,6 +115,8 @@ def load_ai_config() -> dict[str, Any]:
         "ocr_backend": ocr_backend,
         "ocr_model": str(_resolve_path(raw.get("ocr_model"), "manga-ocr-onnx", base=MODELS_ROOT)),
         "baberu_ocr_model": str(_resolve_path(raw.get("baberu_ocr_model"), "baberu-ocr", base=MODELS_ROOT)),
+        "korean_ocr_model": str(_resolve_path(raw.get("korean_ocr_model"), "ppocr/korean_PP-OCRv5_rec_mobile.onnx", base=MODELS_ROOT)),
+        "english_ocr_model": str(_resolve_path(raw.get("english_ocr_model"), "ppocr/en_PP-OCRv5_rec_mobile.onnx", base=MODELS_ROOT)),
         "page_input_dir": str(_resolve_path(raw.get("page_input_dir"), "page/test", base=PAGE_BASE)),
         "page_output_dir": str(_resolve_path(raw.get("page_output_dir"), "page/output_page_output", base=PAGE_BASE)),
         "page_test_output_dir": str(_resolve_path(raw.get("page_test_output_dir"), "page/test_output", base=PAGE_BASE)),
@@ -145,6 +151,7 @@ def config_fingerprint(config: dict[str, Any]) -> tuple:
         config["ocr_backend"],
         config["ocr_model"],
         config["baberu_ocr_model"],
+        tuple(config.get(key, OCR_DEFAULTS.get(key, "")) for key in OCR_CONFIG_KEYS),
         tuple(sorted(config["font_map"].items())),
     )
 
@@ -172,12 +179,19 @@ def _baberu_ocr_complete(path: Path) -> bool:
 
 
 def missing_models(config: dict[str, Any]) -> list[str]:
-    missing = []
+    missing = validate_ocr_config(config)
     for key in ("detector_model", "lama_model"):
         path = Path(config[key])
         if not path.exists():
             missing.append(f"{key}: {path}")
-    backend = str(config.get("ocr_backend") or "auto").lower()
+    backend = effective_ocr_backend(config)
+    if backend == "custom":
+        return missing
+    if backend == "ppocr":
+        key = "korean_ocr_model" if source_language(config) == "ko" else "english_ocr_model"
+        if not Path(config.get(key) or "").is_file():
+            missing.append(f"{key}: {config.get(key, '')}（请运行 scripts/download_ocr_models.py）")
+        return missing
     manga_path = Path(config["ocr_model"])
     baberu_path = Path(config["baberu_ocr_model"])
     manga_ok = _manga_ocr_complete(manga_path)

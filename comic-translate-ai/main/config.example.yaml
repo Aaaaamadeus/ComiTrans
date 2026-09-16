@@ -20,6 +20,18 @@ max_workers: null
 pdf_dpi: 200
 multimodal: false
 ocr_backend: auto
+# 被翻译语言：ja（日语）、ko（韩语）、en（英语）、custom（自定义 OCR）
+source_language: ja
+# auto 随源语言选模型，也可设 custom；baberu / manga-ocr 仅用于日语
+korean_ocr_model: models/ppocr/korean_PP-OCRv5_rec_mobile.onnx
+english_ocr_model: models/ppocr/en_PP-OCRv5_rec_mobile.onnx
+custom_source_language: ""
+custom_source_language_name: ""
+custom_ocr_protocol: http
+custom_ocr_url: ""
+custom_ocr_api_key: ""
+custom_ocr_model: ""
+custom_ocr_timeout: 60
 ocr_model: models/manga-ocr-onnx
 baberu_ocr_model: models/baberu-ocr
 page_input_dir: page/test

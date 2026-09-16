@@ -27,7 +27,7 @@ if ($IncludeModels) {
         Write-Host "模型已复制: $modelTarget"
     }
 } else {
-    Write-Host "已跳过模型复制，模型通过独立模型包分发（见 package_release.ps1）。"
+    Write-Host "已跳过模型复制，模型通过独立模型包分发（见 package_release.py）。"
 }
 
 Write-Host ""

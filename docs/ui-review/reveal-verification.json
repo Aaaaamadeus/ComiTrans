@@ -1,0 +1,1511 @@
+{
+  "frame_ms": 16,
+  "characters_per_frame": 4,
+  "partial_states": 8,
+  "font": "Aa今日花晴 春懒猫困",
+  "full_records": 3,
+  "all_complete": true,
+  "source": "Real Windows Qt timer; clearly labelled UI test messages",
+  "samples": [
+    {
+      "ms": 10,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 20,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 29,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 40,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 50,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 59,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 69,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 79,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 89,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 99,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 109,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 120,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 129,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 139,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 150,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 159,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 169,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 179,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 189,
+      "visible_text": "",
+      "full_records": 0,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 199,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示",
+      "full_records": 1,
+      "remaining_chars": 31
+    },
+    {
+      "ms": 209,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示",
+      "full_records": 1,
+      "remaining_chars": 31
+    },
+    {
+      "ms": 219,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已",
+      "full_records": 1,
+      "remaining_chars": 27
+    },
+    {
+      "ms": 229,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整",
+      "full_records": 1,
+      "remaining_chars": 23
+    },
+    {
+      "ms": 240,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整",
+      "full_records": 1,
+      "remaining_chars": 23
+    },
+    {
+      "ms": 249,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正",
+      "full_records": 1,
+      "remaining_chars": 19
+    },
+    {
+      "ms": 259,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正",
+      "full_records": 1,
+      "remaining_chars": 19
+    },
+    {
+      "ms": 270,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快",
+      "full_records": 1,
+      "remaining_chars": 15
+    },
+    {
+      "ms": 279,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；",
+      "full_records": 1,
+      "remaining_chars": 11
+    },
+    {
+      "ms": 289,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；",
+      "full_records": 1,
+      "remaining_chars": 11
+    },
+    {
+      "ms": 299,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日",
+      "full_records": 1,
+      "remaining_chars": 7
+    },
+    {
+      "ms": 309,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持",
+      "full_records": 1,
+      "remaining_chars": 3
+    },
+    {
+      "ms": 321,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持",
+      "full_records": 1,
+      "remaining_chars": 3
+    },
+    {
+      "ms": 330,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 339,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 349,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 359,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 370,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 379,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 390,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 400,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 409,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 419,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 429,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 439,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 449,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 460,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 469,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 479,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 490,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 499,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 509,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 519,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 529,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 539,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 550,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 560,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 570,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 579,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 590,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 600,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 609,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 619,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 630,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 639,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 649,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 659,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 669,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 680,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 690,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 699,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 709,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 720,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 729,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 740,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 750,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 759,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 770,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 779,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 789,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 799,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 809,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 819,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 830,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 839,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。",
+      "full_records": 1,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 849,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试",
+      "full_records": 2,
+      "remaining_chars": 34
+    },
+    {
+      "ms": 860,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试",
+      "full_records": 2,
+      "remaining_chars": 34
+    },
+    {
+      "ms": 869,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫",
+      "full_records": 2,
+      "remaining_chars": 30
+    },
+    {
+      "ms": 880,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、",
+      "full_records": 2,
+      "remaining_chars": 26
+    },
+    {
+      "ms": 889,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、",
+      "full_records": 2,
+      "remaining_chars": 26
+    },
+    {
+      "ms": 899,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别",
+      "full_records": 2,
+      "remaining_chars": 22
+    },
+    {
+      "ms": 909,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修",
+      "full_records": 2,
+      "remaining_chars": 18
+    },
+    {
+      "ms": 919,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修",
+      "full_records": 2,
+      "remaining_chars": 18
+    },
+    {
+      "ms": 929,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体",
+      "full_records": 2,
+      "remaining_chars": 14
+    },
+    {
+      "ms": 939,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体",
+      "full_records": 2,
+      "remaining_chars": 14
+    },
+    {
+      "ms": 949,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa",
+      "full_records": 2,
+      "remaining_chars": 10
+    },
+    {
+      "ms": 959,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴",
+      "full_records": 2,
+      "remaining_chars": 6
+    },
+    {
+      "ms": 969,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴",
+      "full_records": 2,
+      "remaining_chars": 6
+    },
+    {
+      "ms": 980,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫",
+      "full_records": 2,
+      "remaining_chars": 2
+    },
+    {
+      "ms": 990,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1000,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1009,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1019,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1029,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1039,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1049,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1060,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1069,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1080,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1089,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1100,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1110,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1119,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1129,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1139,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1150,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1159,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1169,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1179,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1190,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1199,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1210,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1220,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1231,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1240,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1249,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1259,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1269,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1279,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1290,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1300,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1309,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1320,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1329,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1339,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1351,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1360,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1369,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1380,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1390,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1399,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1409,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1419,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1430,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1439,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1449,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1460,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1470,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1479,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。",
+      "full_records": 2,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1490,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成",
+      "full_records": 3,
+      "remaining_chars": 31
+    },
+    {
+      "ms": 1500,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成",
+      "full_records": 3,
+      "remaining_chars": 31
+    },
+    {
+      "ms": 1509,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与",
+      "full_records": 3,
+      "remaining_chars": 27
+    },
+    {
+      "ms": 1519,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留",
+      "full_records": 3,
+      "remaining_chars": 23
+    },
+    {
+      "ms": 1530,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留",
+      "full_records": 3,
+      "remaining_chars": 23
+    },
+    {
+      "ms": 1543,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回",
+      "full_records": 3,
+      "remaining_chars": 19
+    },
+    {
+      "ms": 1550,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回",
+      "full_records": 3,
+      "remaining_chars": 19
+    },
+    {
+      "ms": 1559,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持",
+      "full_records": 3,
+      "remaining_chars": 15
+    },
+    {
+      "ms": 1569,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大",
+      "full_records": 3,
+      "remaining_chars": 11
+    },
+    {
+      "ms": 1579,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大",
+      "full_records": 3,
+      "remaining_chars": 11
+    },
+    {
+      "ms": 1589,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积",
+      "full_records": 3,
+      "remaining_chars": 7
+    },
+    {
+      "ms": 1599,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动",
+      "full_records": 3,
+      "remaining_chars": 3
+    },
+    {
+      "ms": 1609,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动",
+      "full_records": 3,
+      "remaining_chars": 3
+    },
+    {
+      "ms": 1620,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1630,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1639,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1649,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1659,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1669,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1679,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1689,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1700,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1709,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1720,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1729,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1739,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1749,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1760,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1770,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1779,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1789,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1800,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1810,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1820,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1829,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1840,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1849,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1859,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1870,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1879,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1890,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1900,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1910,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1920,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1929,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1939,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1950,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1959,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1970,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1979,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 1989,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2000,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2010,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2021,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2029,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2039,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2050,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2060,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2069,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2080,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2089,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2099,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2109,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2119,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2130,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2140,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2150,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2160,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2169,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2179,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2190,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2199,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2209,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2220,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2229,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2239,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2249,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2259,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2269,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2279,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2289,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2300,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2309,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2319,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2330,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2340,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2349,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2360,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2369,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2379,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2389,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2399,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2410,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2420,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2430,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2439,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2449,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2460,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2470,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2479,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2489,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    },
+    {
+      "ms": 2499,
+      "visible_text": "22:26:16.683\tINFO\t逐字显示验证：已收到完整日志，正文正在快速展开；中文与日本語保持清晰。\n22:26:17.332\tINFO\t界面测试数据：漫画翻译、文字识别、背景修复。字体为 Aa今日花晴 春懒猫困。\n22:26:17.973\tINFO\t验证完成：复制与导出保留全文，回看时保持选区；大量日志积压会自动加速。",
+      "full_records": 3,
+      "remaining_chars": 0
+    }
+  ]
+}

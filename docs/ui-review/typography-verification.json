@@ -1,0 +1,26 @@
+[
+  {
+    "scale": "1",
+    "dpr": 1.0,
+    "size": [
+      1440,
+      900
+    ],
+    "log_font": "Aa今日花晴 春懒猫困",
+    "brand_font": "Skribble",
+    "log_pixels": 18,
+    "missing": []
+  },
+  {
+    "scale": "2",
+    "dpr": 2.0,
+    "size": [
+      902,
+      485
+    ],
+    "log_font": "Aa今日花晴 春懒猫困",
+    "brand_font": "Skribble",
+    "log_pixels": 18,
+    "missing": []
+  }
+]
