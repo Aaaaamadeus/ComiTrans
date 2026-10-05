@@ -134,6 +134,7 @@ class BatchWorker(QThread):
     def _configure_pipeline(self, pipeline) -> None:
         pipeline.cancel_callback = self._is_stopped
         pipeline.progress_callback = self._emit_stage
+        pipeline.watermark_enabled = bool(self._config.get("watermark_enabled", False))
 
     @contextlib.contextmanager
     def _capture_pipeline_output(self):

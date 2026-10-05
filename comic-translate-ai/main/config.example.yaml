@@ -1,15 +1,18 @@
-﻿api_base_url: ""
+api_base_url: ""
 api_key: ""
 detector_model: models/text_detector/comic-text-detector.onnx
 font_dialogue: font_file/CN/special/LXGWWenKai-Regular.ttf
 font_bold_dialogue: font_file/CN/SourceHanSansSC-Heavy-2.otf
 font_handwriting: font_file/CN/setofont.ttf
+font_seto: font_file/CN/setofont.ttf
+font_tegaki_851: font_file/CN/special/851tegaki_zatsu_normal_0883.ttf
 font_radiating: font_file/CN/special/SmileySans-Oblique.ttf
 font_thought: font_file/CN/SourceHanSerifCN-Regular-1.otf
 font_whisper: font_file/CN/special/KleeOne-Regular.ttf
 font_serious: font_file/CN/SourceHanSerifCN-Regular-1.otf
 font_narration: font_file/CN/special/LXGWWenKai-Regular.ttf
 font_sfx: font_file/CN/special/SmileySans-Oblique.ttf
+font_lxgw_marker: font_file/CN/special/LXGWMarkerGothic-Regular.ttf
 font_cute: font_file/CN/special/KleeOne-Regular.ttf
 font_next_preview: font_file/CN/special/KleeOne-Regular.ttf
 font_title: font_file/CN/SourceHanSansSC-Heavy-2.otf
@@ -19,6 +22,8 @@ lama_model: models/manga-lama/lama-manga-dynamic.onnx
 max_workers: null
 pdf_dpi: 200
 multimodal: false
+# 输出页右下角的小号 @ComiTrans 字标；默认关闭
+watermark_enabled: false
 ocr_backend: auto
 # 被翻译语言：ja（日语）、ko（韩语）、en（英语）、custom（自定义 OCR）
 source_language: ja

@@ -350,6 +350,30 @@ class DesktopUiTests(unittest.TestCase):
         window.worker = None
         window.close()
 
+    def test_optional_font_styles_stay_in_sync_across_ui_config_and_ai(self):
+        """编辑器可选风格、配置键、AI 白名单三处必须完全一致，缺一处就会静默回退。"""
+        import sys
+        from pathlib import Path
+
+        from comic_translate_desktop.config import FONT_DEFAULTS, FONT_KEYS
+        from comic_translate_desktop.ui.editor_page import STYLE_LABELS
+
+        main_dir = Path(__file__).resolve().parents[1] / 'comic-translate-ai' / 'main'
+        if str(main_dir) not in sys.path:
+            sys.path.insert(0, str(main_dir))
+        from text_style import FONT_STYLES
+
+        self.assertEqual(set(STYLE_LABELS), set(FONT_KEYS))
+        self.assertEqual(set(FONT_KEYS), set(FONT_DEFAULTS))
+        self.assertEqual(set(FONT_DEFAULTS), set(FONT_STYLES))
+
+        editor = EditorPage()
+        offered = {editor._style_combo.itemData(index) for index in range(editor._style_combo.count())}
+        self.assertTrue(set(STYLE_LABELS) <= offered)
+        for style in ('seto', 'tegaki_851', 'lxgw_marker'):
+            self.assertIn(style, offered)
+        editor.deleteLater()
+
 
 if __name__ == '__main__':
     unittest.main()

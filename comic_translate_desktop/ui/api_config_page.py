@@ -88,6 +88,8 @@ class ApiConfigPage(QWidget):
         self._ocr_backend.currentIndexChanged.connect(self._refresh_custom_visibility)
 
         self._output_input = QLineEdit()
+        self._watermark_check = QCheckBox("添加 @ComiTrans 水印（默认关闭）")
+        self._watermark_check.setToolTip("在输出图片和 PDF 每页右下角添加小号半透明字标，精修保存时同样生效。")
         browse_btn = QPushButton("浏览...")
         browse_btn.clicked.connect(self._browse_output)
         output_row = QHBoxLayout()
@@ -105,6 +107,7 @@ class ApiConfigPage(QWidget):
         runtime_form.addRow("被翻译语言", self._source_language)
         runtime_form.addRow("OCR 引擎", self._ocr_backend)
         runtime_form.addRow("输出目录", output_row)
+        runtime_form.addRow("输出水印", self._watermark_check)
         runtime_form.addRow("Issue 链接", self._issue_input)
         runtime_form.addRow("模型路径", self._model_info)
         root.addWidget(runtime_group)
@@ -238,6 +241,7 @@ class ApiConfigPage(QWidget):
         self._custom_timeout.setValue(int(config.get("custom_ocr_timeout") or 60))
         self._refresh_custom_visibility()
         self._output_input.setText(config.get("page_output_dir", ""))
+        self._watermark_check.setChecked(bool(config.get("watermark_enabled", False)))
         self._output_input.setToolTip(self._output_input.text())
         self._output_input.setCursorPosition(len(self._output_input.text()))
         self._issue_input.setText(config.get("issue_url", ""))
@@ -253,6 +257,7 @@ class ApiConfigPage(QWidget):
             "api_base_url": self._base_input.text().strip(),
             "translation_model": self._model_input.text().strip(),
             "multimodal": self._multimodal_check.isChecked(),
+            "watermark_enabled": self._watermark_check.isChecked(),
             "use_gpu": self._gpu_check.isChecked(),
             "ocr_backend": self._ocr_backend.currentData(),
             "source_language": self._source_language.currentData(),

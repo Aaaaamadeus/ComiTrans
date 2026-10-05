@@ -137,6 +137,8 @@ You can also double-click `start.bat`. The AI pipeline warms up automatically af
 6. On failure, open the "Diagnostics" page for diagnosis prompts, or click the Issue button.
 7. Use the "Typesetting Refinement" page to fine-tune font style, size, direction, and position per block, then save.
 
+The optional `@ComiTrans` watermark is disabled by default. Toggle it under Settings → Runtime Settings → Output Watermark and save the configuration. Subsequent image translations and every PDF page receive a small, translucent Skribble wordmark in the lower-right corner when enabled. The current editor page also updates its preview; click Save Image to write it. Repeated saves do not accumulate the watermark, and the clean background remains unmarked.
+
 A PDF is shown as one file task and processed internally in page-sized batches. On success, ComiTrans writes `<original_name>_translated.pdf`, preserving page count, order, and page sizes while rasterizing page content. Password-protected PDFs are not supported, and PDF pages cannot yet be adjusted block-by-block in the Typesetting Editor.
 
 ### OCR interfaces
@@ -173,12 +175,18 @@ Python backends implement `OcrEngine.recognize(image, language) -> OcrResult`. E
 | `dialogue` / `bold_dialogue` | Normal / bold dialogue | LXGW WenKai / Source Han Sans Heavy |
 | `radiating` / `sfx` | Emphasis / sound effects | Smiley Sans Oblique |
 | `handwriting` | Handwritten notes | setofont |
+| `seto` | Seto handwriting (optional, manual) | SetoFont |
+| `tegaki_851` | Casual 851 handwriting (optional, manual) | 851tegakizatsu with handwriting/body fallback |
 | `thought` / `serious` | Thoughts / formal text | Source Han Serif |
 | `whisper` / `cute` | Whisper / playful text | Klee One with glyph fallback |
 | `narration` | Wide narration strips | LXGW WenKai |
+| `sfx` | Sound effects | Smiley Sans Oblique |
+| `lxgw_marker` | Marker emphasis (optional, manual) | LXGW Marker Gothic |
 | `next_preview` / `title` | Preview / title | Klee One / Source Han Sans Heavy |
 
 Normal bubbles default to `dialogue`; OCR content, detector class, original stroke weight, and box geometry select the other styles. Detector orientation is preserved unless the aspect ratio strongly contradicts it. The editor offers Auto, explicit Vertical, and explicit Horizontal modes.
+
+`seto`, `tegaki_851`, and `lxgw_marker` are newly added optional styles: pick them per block in the editor, or let the multimodal AI select them. The automatic (non-multimodal) heuristic does not choose them yet; the strategy design is in [docs/FONT_STYLE_STRATEGY.md](docs/FONT_STYLE_STRATEGY.md).
 
 Typesetting renders text on a local 3x supersampled surface and downsamples it with Lanczos, so small dialogue is no longer drawn directly at low resolution. Normal bubbles also avoid a forced white outline for softer edges, while non-bubble text on complex backgrounds keeps an outline for readability.
 
@@ -367,6 +375,6 @@ Report issues at [GitHub Issues](https://github.com/Aaaaamadeus/ComiTrans/issues
 ## License
 
 - Project code is released under the license in the repository.
-- Fonts: Smiley Sans, LXGW WenKai, Klee One, Source Han Sans/Serif, and setofont are open-source fonts with their own licenses.
+- Fonts: Smiley Sans, LXGW WenKai, LXGW Marker Gothic (SIL OFL 1.1), Klee One, Source Han Sans/Serif, setofont (SetoFont), and 851tegakizatsu are free for commercial use, each under its own license.
 - UI fonts Skribble and Aa retain their embedded copyright information; see [font provenance](assets/ui/fonts/README.md).
 - Models: comic-text-detector, manga-ocr, and manga-lama are open-source; see [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md).

@@ -13,6 +13,7 @@ from manga_lama import MangaLama
 from vertical_typesetter import VerticalTypesetter
 from comic_translate_core.languages import source_language, source_language_name
 from comic_translate_core.ocr import create_ocr, recognize_regions
+from comic_translate_core.watermark import apply_watermark
 from onnx_text_detector import OnnxTextDetector
 from text_style import (
     FONT_STYLES,
@@ -108,7 +109,8 @@ class ComicTranslatorPipeline:
                  ocr_backend="auto",
                  progress_callback=None,
                  cancel_callback=None,
-                 ocr_config=None):
+                 ocr_config=None,
+                 watermark_enabled=False):
         self.device = 'cuda' if use_gpu else 'cpu'
         self.translation_model = translation_model
         self.api_key = api_key
@@ -116,6 +118,7 @@ class ComicTranslatorPipeline:
         self.translation_prompt = translation_prompt or ""
         self.chinese_names = chinese_names or ""
         self.multimodal = bool(multimodal)
+        self.watermark_enabled = bool(watermark_enabled)
         self.progress_callback = progress_callback
         self.cancel_callback = cancel_callback
         self.ocr_model_path = ocr_model_path or os.path.join(current_dir, "..", "models", "manga-ocr-onnx")
@@ -740,9 +743,10 @@ class ComicTranslatorPipeline:
             )
             system_prompt = (
                 "你是漫画排版字体配置助手。请根据整页漫画画面、原文和译文，为每个文本块返回 JSON，"
-                '格式为 {"items": [{"index": 0, "font_style": "dialogue", "font_size": 18, "direction": "vertical"}]}。'
+                '格式为 {"items": [{"index": 0, "font_style": "dialogue", "direction": "vertical"}]}。'
                 f"font_style 只能取 {', '.join(FONT_STYLES)} 之一；"
-                "direction 只能取 vertical 或 horizontal；font_size 为整数像素。"
+                "direction 只能取 vertical 或 horizontal。"
+                "不要返回字号：字号由本地排版算法按文本框与掩膜面积自动计算。"
             )
             user_prompt = f"请为以下文本块配置字体：\n{text_pairs}"
             response = client.chat.completions.create(
@@ -774,11 +778,9 @@ class ComicTranslatorPipeline:
                 style = item.get("font_style", "dialogue")
                 if style not in FONT_STYLES:
                     style = "dialogue"
-                size = int(item.get("font_size") or 0)
                 direction = 1 if str(item.get("direction", "")).lower().startswith("v") else 0
                 result[idx] = {
                     "font_style": style,
-                    "font_size": size if size > 0 else None,
                     "direction": direction,
                 }
             return result
@@ -913,7 +915,8 @@ class ComicTranslatorPipeline:
                 "style": font_cfg.get("font_style", item['style']),
                 "trans": trans_text,
                 "direction": font_cfg.get("direction", item['direction']),
-                "target_font_size": font_cfg.get("font_size") or item['target_font_size'],
+                # 字号一律使用检测器建议值，多模态不再参与字号决策。
+                "target_font_size": item['target_font_size'],
                 "non_bubble": item['non_bubble'],
                 "emphasis": item.get('emphasis', 0.0),
             })
@@ -1000,6 +1003,7 @@ class ComicTranslatorPipeline:
         # 6. 保存
         self._check_cancelled()
         self._report_progress("typeset", "排版完成")
+        final_canvas = apply_watermark(final_canvas, enabled=getattr(self, "watermark_enabled", False))
         final_canvas.save(output_path)
         self._report_progress("save", f"已保存: {os.path.basename(output_path)}")
         print(f"处理完成！已保存至: {output_path}")

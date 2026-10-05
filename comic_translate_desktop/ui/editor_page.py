@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt, QSize, QSettings, QTimer
 from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QGroupBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy)
 from ..config import load_ai_config, MAIN_DIR
+from comic_translate_core.watermark import apply_watermark
 from .preview import ImagePreview
 from .theme import ui_font
 from .manga_components import ChapterBanner, PanelHeading
@@ -15,11 +16,14 @@ STYLE_LABELS = {
     "bold_dialogue": "粗体对话",
     "radiating": "强调/放射",
     "handwriting": "手写注记",
+    "seto": "濑户字体",
+    "tegaki_851": "851手写杂书体",
     "thought": "内心独白",
     "whisper": "轻声/低语",
     "serious": "严肃/正式",
     "narration": "旁白",
     "sfx": "拟声/音效",
+    "lxgw_marker": "霞鹜漫黑",
     "cute": "可爱/活泼",
     "next_preview": "下回预告",
     "title": "标题",
@@ -336,6 +340,14 @@ class EditorPage(QWidget):
             return False
         return True
 
+    def set_watermark_enabled(self, enabled: bool) -> None:
+        if bool(self.config.get('watermark_enabled', False)) == enabled:
+            return
+        self.config['watermark_enabled'] = enabled
+        if self.items and self.cleaned_path is not None and self.cleaned_path.is_file():
+            self._mark_dirty()
+            self.apply_changes()
+
     def render(self) -> None:
         if self.cleaned_path is None or not self.cleaned_path.exists():
             return
@@ -361,6 +373,7 @@ class EditorPage(QWidget):
                 target_font_size=size if size > 0 else None,
                 non_bubble=bool(item.get("non_bubble", False)),
             )
+        image = apply_watermark(image, enabled=bool(self.config.get('watermark_enabled', False)))
         self._rendered = image
         from PIL.ImageQt import ImageQt
         self.preview.set_pixmap(QPixmap.fromImage(ImageQt(image)))

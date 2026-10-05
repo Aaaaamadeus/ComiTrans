@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import sys
@@ -33,11 +33,14 @@ FONT_KEYS = {
     "bold_dialogue": "font_bold_dialogue",
     "radiating": "font_radiating",
     "handwriting": "font_handwriting",
+    "seto": "font_seto",
+    "tegaki_851": "font_tegaki_851",
     "thought": "font_thought",
     "whisper": "font_whisper",
     "serious": "font_serious",
     "narration": "font_narration",
     "sfx": "font_sfx",
+    "lxgw_marker": "font_lxgw_marker",
     "cute": "font_cute",
     "next_preview": "font_next_preview",
     "title": "font_title",
@@ -47,11 +50,14 @@ FONT_DEFAULTS = {
     "bold_dialogue": "font_file/CN/SourceHanSansSC-Heavy-2.otf",
     "radiating": "font_file/CN/special/SmileySans-Oblique.ttf",
     "handwriting": "font_file/CN/setofont.ttf",
+    "seto": "font_file/CN/setofont.ttf",
+    "tegaki_851": "font_file/CN/special/851tegaki_zatsu_normal_0883.ttf",
     "thought": "font_file/CN/SourceHanSerifCN-Regular-1.otf",
     "whisper": "font_file/CN/special/KleeOne-Regular.ttf",
     "serious": "font_file/CN/SourceHanSerifCN-Regular-1.otf",
     "narration": "font_file/CN/special/LXGWWenKai-Regular.ttf",
     "sfx": "font_file/CN/special/SmileySans-Oblique.ttf",
+    "lxgw_marker": "font_file/CN/special/LXGWMarkerGothic-Regular.ttf",
     "cute": "font_file/CN/special/KleeOne-Regular.ttf",
     "next_preview": "font_file/CN/special/KleeOne-Regular.ttf",
     "title": "font_file/CN/SourceHanSansSC-Heavy-2.otf",
@@ -105,6 +111,7 @@ def load_ai_config() -> dict[str, Any]:
         "chinese_names": str(raw.get("chinese_names") or ""),
         "font_size": int(raw.get("font_size") or 16),
         "multimodal": bool(raw.get("multimodal", False)),
+        "watermark_enabled": bool(raw.get("watermark_enabled", False)),
         "max_workers": int(raw.get("max_workers") or 4),
         "pdf_dpi": int(raw.get("pdf_dpi") or 200),
         "issue_url": str(raw.get("issue_url") or ""),

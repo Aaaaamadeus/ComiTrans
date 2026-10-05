@@ -1003,6 +1003,7 @@ class MainWindow(QMainWindow):
             return
         self.config = save_ai_config(updates)
         self.api_config_page.load_config(self.config)
+        self.editor_page.set_watermark_enabled(bool(self.config.get("watermark_enabled", False)))
         self._source_language.blockSignals(True)
         self._source_language.setCurrentIndex(max(0, self._source_language.findData(self.config.get("source_language", "ja"))))
         self._source_language.blockSignals(False)

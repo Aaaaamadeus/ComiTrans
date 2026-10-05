@@ -135,6 +135,8 @@ Copy-Item comic-translate-ai/main/config.example.yaml comic-translate-ai/main/co
 6. 翻译失败时可在“诊断”页查看诊断提示词，或点击顶部“反馈”按钮提交反馈。
 7. 需要微调时，切换到“嵌字精修”页，选择已翻译图片，调整字体风格、字号、横竖方向和位置后保存。
 
+可在“设置 → 运行设置 → 输出水印”开关 `@ComiTrans` 水印，默认关闭。保存配置后，后续翻译图片和 PDF 每页右下角会按开关添加小号半透明 Skribble 字标。精修中的页面也会更新预览，点击“保存图片”写入；重复保存不会叠加水印，清理底图保持无水印。
+
 PDF 会以一个文件任务显示，内部按页分批处理，成功后输出 `<原文件名>_translated.pdf`。输出 PDF 保留页数、顺序和页面尺寸；页面内容会栅格化。加密或需要密码的 PDF 暂不支持，PDF 页面也暂不支持在“嵌字精修”页逐块调整。
 
 ### OCR 接口
@@ -171,13 +173,19 @@ Python 扩展通过 `OcrEngine.recognize(image, language) -> OcrResult` 接入�
 | `dialogue` / `bold_dialogue` | 普通 / 粗体对话 | 霞鹜文楷 / 思源黑体 Heavy |
 | `radiating` / `sfx` | 强调放射 / 拟声词 | 得意黑 Smiley Sans 斜体 |
 | `handwriting` | 手写注记 | setofont |
+| `seto` | 濑户手写（可选手动指定） | SetoFont 濑户字体 |
+| `tegaki_851` | 851 随性手写（可选手动指定） | 851tegakizatsu 851手写杂书体（缺字回退手写/正文） |
 | `thought` / `serious` | 内心 / 严肃正式 | 思源宋体 |
 | `whisper` / `cute` | 低语 / 可爱活泼 | Klee One（缺字自动回退思源字体） |
 | `narration` | 横向长条旁白 | 霞鹜文楷 LXGW WenKai |
+| `sfx` | 拟声词 | 得意黑 Smiley Sans 斜体 |
+| `lxgw_marker` | 漫黑/马克笔强调（可选手动指定） | 霞鹜漫黑 LXGW Marker Gothic |
 | `next_preview` | 下回预告 | Klee One |
 | `title` | 章节标题 | 思源黑体 Heavy |
 
 普通气泡默认 `dialogue`，再根据 OCR 内容、检测类别、原字笔画强度和文本框比例选择其它风格。方向以检测器结果为主，仅在长宽比明显矛盾时纠偏；编辑器提供自动、明确竖排和明确横排三种选择。
+
+`seto`、`tegaki_851`、`lxgw_marker` 为本次新增的可选字体风格：可在嵌字精修页的「字体风格」中手动指定，也可由多模态 AI 选中；自动（非多模态）判断暂不主动选用它们，判断策略设计见 [docs/FONT_STYLE_STRATEGY.md](docs/FONT_STYLE_STRATEGY.md)。
 
 嵌字使用局部 3 倍超采样后以 Lanczos 缩回原尺寸，小字号对白不再直接落在低分辨率画布上；普通气泡同时取消强制白描边，使笔画边缘更自然，复杂背景上的非气泡文字仍会保留描边以保证可读性。
 
@@ -367,6 +375,6 @@ v2.2.1 已全面 ONNX 化并移除 PyTorch。检测、OCR、修复均为 ONNX �
 ## 开源协议
 
 - 项目代码遵循相应开源协议发布（详见仓库 LICENSE 文件）。
-- 字体：得意黑 Smiley Sans、霞鹜文楷 LXGW WenKai、Klee One、思源黑体/宋体、setofont 均为开源字体，各自的授权见字体项目说明。
+- 字体：得意黑 Smiley Sans、霞鹜文楷 LXGW WenKai、霞鹜漫黑 LXGW Marker Gothic（SIL OFL 1.1）、Klee One、思源黑体/宋体、setofont（濑户字体）、851手写杂书体 均为可免费商用的开源/免费字体，各自的授权见字体项目说明。
 - UI 字体 Skribble 与 Aa今日花晴 春懒猫困使用各自的内嵌版权信息，来源与用途见 [字体说明](assets/ui/fonts/README.md)。
 - 模型：comic-text-detector、Baberu OCR、manga-ocr、manga-lama 均为开源模型，来源见 [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md)。

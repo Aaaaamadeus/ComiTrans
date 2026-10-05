@@ -117,11 +117,14 @@ class VerticalTypesetter:
     def _style_for_text(self, style, text):
         fallback_styles = {
             "handwriting": ("narration", "dialogue"),
+            "seto": ("handwriting", "narration", "dialogue"),
+            "tegaki_851": ("handwriting", "narration", "dialogue"),
             "whisper": ("narration", "thought", "dialogue"),
             "cute": ("narration", "dialogue"),
             "next_preview": ("narration", "dialogue"),
             "radiating": ("bold_dialogue", "dialogue"),
             "sfx": ("bold_dialogue", "dialogue"),
+            "lxgw_marker": ("bold_dialogue", "dialogue"),
         }
         visible_chars = [char for char in text if not char.isspace()]
         for candidate in (style, *fallback_styles.get(style, ("dialogue",))):
@@ -138,7 +141,7 @@ class VerticalTypesetter:
 
     @staticmethod
     def _stroke_width(style, size, non_bubble=False):
-        if style in ("radiating", "bold_dialogue", "sfx", "title"):
+        if style in ("radiating", "bold_dialogue", "sfx", "lxgw_marker", "title"):
             return max(1, min(3, int(round(size * 0.045))))
         if non_bubble:
             return max(1, min(2, int(round(size * 0.035))))
@@ -605,7 +608,7 @@ class VerticalTypesetter:
                         size_cap = min(size_cap, int(min(box_width, box_height) * 0.7))
                     estimate_multiplier = 1.4
                     lower_bound = 14
-                elif style in ("radiating", "handwriting", "bold_dialogue", "sfx", "cute"):
+                elif style in ("radiating", "handwriting", "seto", "tegaki_851", "bold_dialogue", "sfx", "lxgw_marker", "cute"):
                     if is_horizontal:
                         size_cap = int(min(box_width, box_height) * 0.6)
                     else:
