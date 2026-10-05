@@ -319,6 +319,20 @@ class LanguageUiTests(unittest.TestCase):
         self.assertEqual(page._ocr_backend.findData("baberu"), -1)
         page.deleteLater()
 
+    def test_multimodal_font_probe_checkbox_round_trips_and_defaults_off(self):
+        """实验开关：默认关闭，勾选后要能写回配置。"""
+        from comic_translate_desktop.ui.api_config_page import ApiConfigPage
+        default_page = ApiConfigPage({"multimodal": True})
+        self.assertFalse(default_page.values()["multimodal_font_probe"])
+        default_page.deleteLater()
+
+        page = ApiConfigPage({"multimodal": True, "multimodal_font_probe": True})
+        self.assertTrue(page._font_probe_check.isChecked())
+        self.assertTrue(page.values()["multimodal_font_probe"])
+        page._font_probe_check.setChecked(False)
+        self.assertFalse(page.values()["multimodal_font_probe"])
+        page.deleteLater()
+
     def test_main_language_switch_persists_and_invalidates_pipeline(self):
         from comic_translate_desktop.ui.main_window import MainWindow
         with tempfile.TemporaryDirectory() as temporary, patch.object(app_config, "CONFIG_PATH", Path(temporary) / "config.yaml"), \

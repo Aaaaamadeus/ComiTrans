@@ -48,6 +48,7 @@ def _pipeline(**overrides):
     pipeline.api_base_url = "https://example.invalid/v1"
     pipeline.translation_model = "test-model"
     pipeline.multimodal = True
+    pipeline.multimodal_font_probe = True
     pipeline.typesetter = SimpleNamespace(font_map=dict(FONT_MAP))
     pipeline.font_probe_workers = 1
     for name, value in overrides.items():
@@ -221,6 +222,16 @@ class ConfigureFontsTests(unittest.TestCase):
 
         with patch.object(pipeline_module, "OpenAI", _Exploding):
             result = _pipeline(multimodal=False).configure_fonts([_block("dialogue")], IMAGE)
+        self.assertEqual(result, {})
+
+    def test_font_probe_is_off_by_default_even_in_multimodal_mode(self):
+        """实测真实页面上判定不稳定且昂贵，因此默认关闭，只做翻译。"""
+        class _Exploding(_ScriptedOpenAI):
+            def _create(self, **kwargs):  # pragma: no cover - 不应被调用
+                raise AssertionError("字体判别默认关闭时不得调用接口")
+
+        with patch.object(pipeline_module, "OpenAI", _Exploding):
+            result = _pipeline(multimodal_font_probe=False).configure_fonts([_block("dialogue")], IMAGE)
         self.assertEqual(result, {})
 
 

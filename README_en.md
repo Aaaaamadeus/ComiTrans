@@ -81,7 +81,7 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 - **GPU inference**: NVIDIA CUDA supported when the machine already has an NVIDIA driver.
 - **Multimodal translation toggle**: sends the full page image to the AI. Beyond translation the AI does exactly one thing: for body-text blocks it compares the original against three locally rendered candidates (gothic / mincho / handwriting) and picks the closest one. Font size and orientation stay local. Pure-text mode uses automatic typesetting.
 - **Whole-PDF translation**: import PDFs alongside images, translate them page by page, and create one `*_translated.pdf` with the original page order and page sizes.
-- **12 font categories**: dialogue, bold dialogue, emphasis, handwriting, thought, whisper, serious, narration, SFX, cute, preview, and title styles with per-glyph fallback.
+- **15 font categories**: dialogue, bold dialogue, emphasis, handwriting, Seto, 851 handwriting, thought, whisper, serious, narration, SFX, LXGW Marker, cute, preview, and title styles with per-glyph fallback.
 - **Mask-based erasing and typesetting**: erasing only removes the detector text mask; layout area and center follow the mask.
 - **Manual typesetting editor**: adjust font style, size, direction, and position per text block, then save over the output.
 - **Error logs with AI diagnosis**: logs go to `Log/app.log`, diagnosis prompts are auto-generated, and multi-turn AI diagnosis is supported.

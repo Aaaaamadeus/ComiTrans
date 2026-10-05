@@ -111,6 +111,8 @@ def load_ai_config() -> dict[str, Any]:
         "chinese_names": str(raw.get("chinese_names") or ""),
         "font_size": int(raw.get("font_size") or 16),
         "multimodal": bool(raw.get("multimodal", False)),
+        # 实验开关：多模态下是否让 AI 参与字体族判别（默认关闭，见 docs/FONT_STYLE_STRATEGY.md §4.14）
+        "multimodal_font_probe": bool(raw.get("multimodal_font_probe", False)),
         "watermark_enabled": bool(raw.get("watermark_enabled", False)),
         "max_workers": int(raw.get("max_workers") or 4),
         "pdf_dpi": int(raw.get("pdf_dpi") or 200),

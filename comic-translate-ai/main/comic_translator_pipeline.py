@@ -5,6 +5,7 @@ import sys
 import json
 import re
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import cv2
@@ -107,6 +108,7 @@ class ComicTranslatorPipeline:
                  translation_prompt=None,
                  chinese_names=None,
                  multimodal=False,
+                 multimodal_font_probe=False,
                  ocr_model_path=None,
                  baberu_ocr_model_path=None,
                  ocr_backend="auto",
@@ -121,6 +123,9 @@ class ComicTranslatorPipeline:
         self.translation_prompt = translation_prompt or ""
         self.chinese_names = chinese_names or ""
         self.multimodal = bool(multimodal)
+        # 实验功能：AI 参与字体族判别。默认关闭——实测在真实漫画页上判定不稳定且每块
+        # 需要数千 reasoning token，见 docs/FONT_STYLE_STRATEGY.md §4.14。
+        self.multimodal_font_probe = bool(multimodal_font_probe)
         self.watermark_enabled = bool(watermark_enabled)
         self.progress_callback = progress_callback
         self.cancel_callback = cancel_callback
@@ -722,7 +727,7 @@ class ComicTranslatorPipeline:
         三候选比对 5/5；候选一多就崩。因此这里把模型的决策面压到「选 A/B/C/none」，
         并且结果还要过精确率门控与本地许可表（font_probe.resolve_style）。
         """
-        if not self.multimodal or not bubble_metadata:
+        if not self.multimodal or not getattr(self, "multimodal_font_probe", False) or not bubble_metadata:
             return {}
 
         API_KEY = self.api_key or ""
@@ -784,6 +789,7 @@ class ComicTranslatorPipeline:
             buffer = io.BytesIO()
             sheet.save(buffer, format="JPEG", quality=88)
             encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            started = time.time()
             response = client.chat.completions.create(
                 model=self.translation_model,
                 messages=[
@@ -801,7 +807,15 @@ class ComicTranslatorPipeline:
                 ],
                 response_format={"type": "json_object"},
             )
+            elapsed = time.time() - started
+            usage = getattr(response, "usage", None)
+            reasoning = None
+            if usage is not None:
+                details = getattr(usage, "completion_tokens_details", None)
+                reasoning = getattr(details, "reasoning_tokens", None) if details else None
             _letter, family = font_probe.parse_pick(response.choices[0].message.content)
+            print(f"[INFO] 字体候选判别 块{index}: family={family or '-'} "
+                  f"({elapsed:.1f}s, reasoning={reasoning})")
             if not font_probe.accept_family(family):
                 return
             role = str(item.get("style") or "dialogue")

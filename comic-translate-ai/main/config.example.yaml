@@ -1,4 +1,4 @@
-api_base_url: ""
+﻿api_base_url: ""
 api_key: ""
 detector_model: models/text_detector/comic-text-detector.onnx
 font_dialogue: font_file/CN/special/LXGWWenKai-Regular.ttf
@@ -22,6 +22,7 @@ lama_model: models/manga-lama/lama-manga-dynamic.onnx
 max_workers: null
 pdf_dpi: 200
 multimodal: false
+multimodal_font_probe: false   # 实验：让 AI 参与字体族判别（默认关闭，见 docs/FONT_STYLE_STRATEGY.md §4.14）
 # 输出页右下角的小号 @ComiTrans 字标；默认关闭
 watermark_enabled: false
 ocr_backend: auto

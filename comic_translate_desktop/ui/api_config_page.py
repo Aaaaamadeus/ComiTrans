@@ -66,12 +66,23 @@ class ApiConfigPage(QWidget):
         self._base_input.setPlaceholderText("https://api.openai.com/v1")
         self._model_input = QLineEdit()
         self._model_input.setPlaceholderText("gemini-2.5-flash")
-        self._multimodal_check = QCheckBox("多模态翻译（发送整页图片，并用 AI 配置字体）")
+        self._multimodal_check = QCheckBox("多模态翻译（发送整页图片，AI 参与字体判别）")
+        self._multimodal_check.setToolTip(
+            "勾选后会把整页图片发给翻译服务：除翻译外，AI 只对正文类文本块做本地三候选（黑体/宋体/手写）比对；"
+            "字号与排版方向始终由本地算法决定。"
+        )
+
+        self._font_probe_check = QCheckBox("AI 字体判别（实验，默认关闭）")
+        self._font_probe_check.setToolTip(
+            "真实漫画页实测：同一页多次运行可能给出不同判定，且每块需数千 reasoning token。\n"
+            "不勾选时多模态只做翻译，字体完全交给本地算法（更稳定）。详见 docs/FONT_STYLE_STRATEGY.md §4.14。"
+        )
 
         api_form.addRow("API Key", key_row)
         api_form.addRow("API Base URL", self._base_input)
         api_form.addRow("翻译模型", self._model_input)
         api_form.addRow("多模态", self._multimodal_check)
+        api_form.addRow("字体判别", self._font_probe_check)
         root.addWidget(api_group)
 
         runtime_group = QGroupBox("运行设置")
@@ -223,6 +234,7 @@ class ApiConfigPage(QWidget):
         self._base_input.setText(config.get("api_base_url", ""))
         self._model_input.setText(config.get("translation_model", ""))
         self._multimodal_check.setChecked(bool(config.get("multimodal", False)))
+        self._font_probe_check.setChecked(bool(config.get("multimodal_font_probe", False)))
         self._gpu_check.setChecked(bool(config.get("use_gpu", False)))
         self._source_language.setCurrentIndex(max(0, self._source_language.findData(config.get("source_language", "ja"))))
         self._refresh_ocr_choices()
@@ -257,6 +269,7 @@ class ApiConfigPage(QWidget):
             "api_base_url": self._base_input.text().strip(),
             "translation_model": self._model_input.text().strip(),
             "multimodal": self._multimodal_check.isChecked(),
+            "multimodal_font_probe": self._font_probe_check.isChecked(),
             "watermark_enabled": self._watermark_check.isChecked(),
             "use_gpu": self._gpu_check.isChecked(),
             "ocr_backend": self._ocr_backend.currentData(),
