@@ -1,9 +1,11 @@
 import os
 import base64
+import io
 import sys
 import json
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import cv2
 import numpy as np
@@ -15,6 +17,7 @@ from comic_translate_core.languages import source_language, source_language_name
 from comic_translate_core.ocr import create_ocr, recognize_regions
 from comic_translate_core.watermark import apply_watermark
 from onnx_text_detector import OnnxTextDetector
+import font_probe
 from text_style import (
     FONT_STYLES,
     choose_font_style,
@@ -712,13 +715,41 @@ class ComicTranslatorPipeline:
         finally:
             http_client.close()
 
-    def configure_fonts(self, ocr_texts, translated_list, image_input):
-        if not self.multimodal or not ocr_texts:
+    def configure_fonts(self, bubble_metadata, image_input):
+        """A′：本地生成三个候选，模型只做 1-of-3 判别；字号与方向都归本地。
+
+        依据 docs/FONT_STYLE_STRATEGY.md §4.12 的实测：开放式分类只有 39%~57%，
+        三候选比对 5/5；候选一多就崩。因此这里把模型的决策面压到「选 A/B/C/none」，
+        并且结果还要过精确率门控与本地许可表（font_probe.resolve_style）。
+        """
+        if not self.multimodal or not bubble_metadata:
             return {}
 
         API_KEY = self.api_key or ""
         API_BASE_URL = self.api_base_url or ""
         if not API_KEY or not API_BASE_URL or not self.translation_model:
+            return {}
+
+        font_map = getattr(getattr(self, "typesetter", None), "font_map", None) or {}
+        specs = font_probe.candidate_specs(font_map)
+        if not specs:
+            print("[WARNING] 字体候选不完整（需要黑体/宋体/手写各一），跳过多模态字体判别")
+            return {}
+
+        if isinstance(image_input, str):
+            img_data = np.fromfile(str(image_input), dtype=np.uint8)
+            image = cv2.imdecode(img_data, cv2.IMREAD_COLOR)
+        else:
+            image = image_input
+        if image is None:
+            return {}
+
+        targets = [
+            (index, item)
+            for index, item in enumerate(bubble_metadata)
+            if font_probe.should_probe(item.get("style"), item.get("raw"))
+        ]
+        if not targets:
             return {}
 
         import urllib.request
@@ -729,64 +760,72 @@ class ComicTranslatorPipeline:
         http_client = httpx.Client(proxy=proxy_url, timeout=90.0) if proxy_url else httpx.Client(timeout=90.0)
         client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL, http_client=http_client, max_retries=1)
 
-        try:
-            if isinstance(image_input, str):
-                with open(image_input, "rb") as image_file:
-                    base64_image = base64.b64encode(image_file.read()).decode("utf-8")
-            else:
-                _, buffer = cv2.imencode(".jpg", image_input)
-                base64_image = base64.b64encode(buffer).decode("utf-8")
+        reference_font = specs[0][2]
+        workers = max(1, min(int(getattr(self, "font_probe_workers", 4) or 1), len(targets)))
+        result: dict[int, dict] = {}
 
-            text_pairs = "\n".join(
-                f"[{i}] 原文: {ocr_texts[i]} | 译文: {translated_list[i] if i < len(translated_list) else ''}"
-                for i in range(len(ocr_texts))
+        def probe(index, item):
+            box = [int(value) for value in (item.get("box") or [])[:4]]
+            if len(box) < 4:
+                return
+            x1, y1, x2, y2 = box
+            crop = image[max(0, y1):max(1, y2), max(0, x1):max(1, x2)]
+            if crop.size == 0:
+                return
+            crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+            sheet = font_probe.build_probe_sheet(
+                Image.fromarray(crop_rgb),
+                str(item.get("raw") or ""),
+                specs,
+                direction=int(item.get("direction", 1)),
+                reference_font=reference_font,
+                glyph_px=int(item.get("target_font_size") or 0) or None,
             )
-            system_prompt = (
-                "你是漫画排版字体配置助手。请根据整页漫画画面、原文和译文，为每个文本块返回 JSON，"
-                '格式为 {"items": [{"index": 0, "font_style": "dialogue", "direction": "vertical"}]}。'
-                f"font_style 只能取 {', '.join(FONT_STYLES)} 之一；"
-                "direction 只能取 vertical 或 horizontal。"
-                "不要返回字号：字号由本地排版算法按文本框与掩膜面积自动计算。"
-            )
-            user_prompt = f"请为以下文本块配置字体：\n{text_pairs}"
+            buffer = io.BytesIO()
+            sheet.save(buffer, format="JPEG", quality=88)
+            encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
             response = client.chat.completions.create(
                 model=self.translation_model,
                 messages=[
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": font_probe.probe_prompt()},
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": user_prompt},
+                            {"type": "text", "text": "请判断这一块原图的字体最接近哪个候选。"},
                             {
                                 "type": "image_url",
-                                "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                                "image_url": {"url": f"data:image/jpeg;base64,{encoded}"},
                             },
                         ],
                     },
                 ],
                 response_format={"type": "json_object"},
             )
+            _letter, family = font_probe.parse_pick(response.choices[0].message.content)
+            if not font_probe.accept_family(family):
+                return
+            role = str(item.get("style") or "dialogue")
+            style = font_probe.resolve_style(role, family)
+            if style not in FONT_STYLES:
+                return
+            result[index] = {"font_style": style, "family": family}
 
-            content = response.choices[0].message.content.strip()
-            data = json.loads(content)
-            items = data.get("items") or data.get("fonts") or []
-            result = {}
-            for item in items:
-                idx = int(item.get("index", -1))
-                if idx < 0 or idx >= len(ocr_texts):
-                    continue
-                style = item.get("font_style", "dialogue")
-                if style not in FONT_STYLES:
-                    style = "dialogue"
-                direction = 1 if str(item.get("direction", "")).lower().startswith("v") else 0
-                result[idx] = {
-                    "font_style": style,
-                    "direction": direction,
-                }
-            return result
+        try:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = [pool.submit(probe, index, item) for index, item in targets]
+                for future in futures:
+                    try:
+                        future.result()
+                    except Exception as exc:  # 单个块失败只影响该块
+                        print(f"[WARNING] 字体候选判别失败，保留本地判定: {exc}")
         except Exception as exc:
-            print(f"[WARNING] 字体配置 AI 调用失败，使用默认字体: {exc}")
+            print(f"[WARNING] 字体候选判别整体失败，全部保留本地判定: {exc}")
             return {}
+        finally:
+            http_client.close()
+
+        print(f"[INFO] 字体候选判别：{len(result)}/{len(targets)} 块采纳了模型选择")
+        return result
 
     def prepare_comic_page(self, input_path):
         print("[INFO] 开始处理漫画页面")
@@ -896,7 +935,8 @@ class ComicTranslatorPipeline:
 
         font_config = {}
         if self.multimodal:
-            font_config = self.configure_fonts(ocr_text_only, translated_list, img_cv)
+            # A′：本地候选 + 模型 1-of-3 判别；字号与方向不再由模型决定。
+            font_config = self.configure_fonts(bubble_metadata, img_cv)
         
         processed_data = []
         for i, item in enumerate(bubble_metadata):

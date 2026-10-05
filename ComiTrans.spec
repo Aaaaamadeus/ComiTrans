@@ -22,6 +22,7 @@ if sys.platform == "win32":
 
 hidden_imports = [
     "comic_translator_pipeline",
+    "font_probe",
     "manga_lama",
     "vertical_typesetter",
     "onnx_text_detector",

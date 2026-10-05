@@ -79,7 +79,7 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 - **Split release packages**: models ship separately, so app updates do not require re-downloading models.
 - **Startup warmup**: the AI pipeline loads automatically when the app opens.
 - **GPU inference**: NVIDIA CUDA supported when the machine already has an NVIDIA driver.
-- **Multimodal translation toggle**: sends the full page image to the AI and lets it configure font, size, and direction after translation; pure-text mode uses automatic typesetting.
+- **Multimodal translation toggle**: sends the full page image to the AI. Beyond translation the AI does exactly one thing: for body-text blocks it compares the original against three locally rendered candidates (gothic / mincho / handwriting) and picks the closest one. Font size and orientation stay local. Pure-text mode uses automatic typesetting.
 - **Whole-PDF translation**: import PDFs alongside images, translate them page by page, and create one `*_translated.pdf` with the original page order and page sizes.
 - **12 font categories**: dialogue, bold dialogue, emphasis, handwriting, thought, whisper, serious, narration, SFX, cute, preview, and title styles with per-glyph fallback.
 - **Mask-based erasing and typesetting**: erasing only removes the detector text mask; layout area and center follow the mask.
@@ -131,7 +131,7 @@ You can also double-click `start.bat`. The AI pipeline warms up automatically af
 
 1. Click "Add Files" or "Add Folder", or drag images, PDFs, or folders into the window.
 2. Configure the translation API in Settings, then choose Source Language on the workbench. Japanese Auto uses Baberu with manga-ocr fallback; Korean/English use PP-OCRv5. Choose Custom OCR for another language or provider.
-3. Enable "Multimodal Translation" to send the full page image to the AI and let it configure fonts; disable it to use pure-text translation and automatic typesetting.
+3. Enable "Multimodal Translation" to send the full page image to the AI; after translation it compares body-text blocks against three locally rendered candidates and only picks a font family (size and orientation remain local). Disable it to use pure-text translation and automatic typesetting.
 4. Expand "Preferences" on the translation page to fill in background prompts and Chinese character names (one per line; the AI maps them automatically).
 5. Click "Start Translation" and watch the live step/status logs.
 6. On failure, open the "Diagnostics" page for diagnosis prompts, or click the Issue button.
@@ -186,7 +186,7 @@ Python backends implement `OcrEngine.recognize(image, language) -> OcrResult`. E
 
 Normal bubbles default to `dialogue`; OCR content, detector class, original stroke weight, and box geometry select the other styles. Detector orientation is preserved unless the aspect ratio strongly contradicts it. The editor offers Auto, explicit Vertical, and explicit Horizontal modes.
 
-`seto`, `tegaki_851`, and `lxgw_marker` are newly added optional styles: pick them per block in the editor, or let the multimodal AI select them. The automatic (non-multimodal) heuristic does not choose them yet; the strategy design is in [docs/FONT_STYLE_STRATEGY.md](docs/FONT_STYLE_STRATEGY.md).
+`seto`, `tegaki_851`, and `lxgw_marker` are optional styles: pick them per block in the editor. In multimodal mode, when the AI judges the original glyphs to be the "gothic" family on a body-text block, the local permission table routes it to `lxgw_marker`. The automatic (non-multimodal) heuristic does not choose them yet; see [docs/FONT_STYLE_STRATEGY.md](docs/FONT_STYLE_STRATEGY.md) for the strategy and the measurements behind it.
 
 Typesetting renders text on a local 3x supersampled surface and downsamples it with Lanczos, so small dialogue is no longer drawn directly at low resolution. Normal bubbles also avoid a forced white outline for softer edges, while non-bubble text on complex backgrounds keeps an outline for readability.
 
@@ -201,7 +201,7 @@ Typesetting renders text on a local 3x supersampled surface and downsamples it w
 
 1. **Bubble & text detection**: an ONNX detector outputs bubbles, text masks, and text lines.
 2. **Source-language OCR**: Japanese uses Baberu/manga-ocr, Korean and English use PP-OCRv5 text-line recognition, or a custom OCR service can be selected. The English-skip rule applies only to Japanese local mode. Empty source/translation regions retain the original artwork.
-3. **LLM translation**: pure-text mode translates OCR results; multimodal mode sends the page image and asks the AI to configure font, size, and direction.
+3. **LLM translation**: pure-text mode translates OCR results; multimodal mode sends the page image. For fonts, multimodal only runs a local three-candidate comparison: the local side owns the candidate set and the default font per role, the AI answers which of gothic / mincho / handwriting the original glyphs look like, and the answer is only accepted when it passes the precision gate. Size and orientation are always decided locally.
 4. **Background inpainting**: erases only the detector text mask; simple white bubbles are filled directly, complex backgrounds use LaMa ONNX.
 5. **Chinese typesetting**: font size is estimated from the mask area, text is centered on the mask centroid, orientation adapts automatically, and long text gets tighter sizing.
 6. **Save & edit**: output images are saved, cleaned canvases go to `<output_dir>_cleaned/`, layout JSON goes to `<output_dir>_layout/`, and the editor lets you refine everything manually.
