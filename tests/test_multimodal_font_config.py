@@ -49,6 +49,8 @@ def _pipeline(**overrides):
     pipeline.translation_model = "test-model"
     pipeline.multimodal = True
     pipeline.multimodal_font_probe = True
+    pipeline.disable_thinking = True
+    pipeline.font_probe_samples = 1
     pipeline.typesetter = SimpleNamespace(font_map=dict(FONT_MAP))
     pipeline.font_probe_workers = 1
     for name, value in overrides.items():
@@ -223,6 +225,41 @@ class ConfigureFontsTests(unittest.TestCase):
         with patch.object(pipeline_module, "OpenAI", _Exploding):
             result = _pipeline(multimodal=False).configure_fonts([_block("dialogue")], IMAGE)
         self.assertEqual(result, {})
+
+    def test_probe_call_disables_thinking_and_bounds_output(self):
+        """判别调用必须关思考并限制输出：实测思考会吃满预算并返回空。"""
+        _ScriptedOpenAI.reset(["A"])
+        with patch.object(pipeline_module, "OpenAI", _ScriptedOpenAI):
+            _pipeline().configure_fonts([_block("dialogue")], IMAGE)
+        sent = _ScriptedOpenAI.calls[0]
+        # OpenAI SDK 会拒绝未知关键字参数，必须走 extra_body 透传
+        self.assertEqual(sent.get("extra_body"), {"thinking": {"type": "disabled"}})
+        self.assertEqual(sent.get("max_tokens"), pipeline_module.PROBE_MAX_TOKENS)
+
+    def test_multi_sample_voting_needs_a_majority(self):
+        """三次采样两票一致才采纳；三票分散则弃权保留本地判定。"""
+        with patch.object(pipeline_module, "OpenAI", _ScriptedOpenAI):
+            _ScriptedOpenAI.reset(["A", "A", "C"])
+            agreed = _pipeline(font_probe_samples=3).configure_fonts([_block("dialogue")], IMAGE)
+            self.assertEqual(agreed[0]["font_style"], "lxgw_marker")
+            self.assertEqual(len(_ScriptedOpenAI.calls), 3)
+
+            _ScriptedOpenAI.reset(["A", "B", "C"])
+            scattered = _pipeline(font_probe_samples=3).configure_fonts([_block("dialogue")], IMAGE)
+            self.assertEqual(scattered, {})
+            self.assertEqual(len(_ScriptedOpenAI.calls), 3)
+
+
+class PickMajorityTests(unittest.TestCase):
+    def test_majority_rules(self):
+        self.assertEqual(font_probe.pick_majority(["gothic", "gothic", "handwriting"]), "gothic")
+        self.assertEqual(font_probe.pick_majority(["gothic", "gothic"]), "gothic")
+        self.assertEqual(font_probe.pick_majority(["gothic"]), "gothic")
+        self.assertIsNone(font_probe.pick_majority(["gothic", "mincho", "handwriting"]))
+        # 有效票不足样本数一半（模型多次没给出可解析结果）时弃权
+        self.assertIsNone(font_probe.pick_majority(["gothic", None, None]))
+        self.assertIsNone(font_probe.pick_majority(["mincho", "mincho", None, None, None]))
+        self.assertIsNone(font_probe.pick_majority([]))
 
     def test_font_probe_is_off_by_default_even_in_multimodal_mode(self):
         """实测真实页面上判定不稳定且昂贵，因此默认关闭，只做翻译。"""

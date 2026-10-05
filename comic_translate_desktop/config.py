@@ -113,6 +113,9 @@ def load_ai_config() -> dict[str, Any]:
         "multimodal": bool(raw.get("multimodal", False)),
         # 实验开关：多模态下是否让 AI 参与字体族判别（默认关闭，见 docs/FONT_STYLE_STRATEGY.md §4.14）
         "multimodal_font_probe": bool(raw.get("multimodal_font_probe", False)),
+        # 关闭思考模式可显著省 token（翻译 completion 214→51，见 §4.15），默认开启
+        "disable_thinking": bool(raw.get("disable_thinking", True)),
+        "font_probe_samples": int(raw.get("font_probe_samples") or 3),
         "watermark_enabled": bool(raw.get("watermark_enabled", False)),
         "max_workers": int(raw.get("max_workers") or 4),
         "pdf_dpi": int(raw.get("pdf_dpi") or 200),

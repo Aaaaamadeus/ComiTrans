@@ -178,6 +178,8 @@ class BatchWorker(QThread):
                 chinese_names=self._config.get("chinese_names", ""),
                 multimodal=self._config.get("multimodal", False),
                 multimodal_font_probe=self._config.get("multimodal_font_probe", False),
+                disable_thinking=self._config.get("disable_thinking", True),
+                font_probe_samples=self._config.get("font_probe_samples", 3),
                 progress_callback=self._emit_stage,
                 cancel_callback=self._is_stopped,
             )
@@ -258,6 +260,8 @@ class BatchWorker(QThread):
         pipeline.chinese_names = config.get("chinese_names", "")
         pipeline.multimodal = bool(config.get("multimodal", False))
         pipeline.multimodal_font_probe = bool(config.get("multimodal_font_probe", False))
+        pipeline.disable_thinking = bool(config.get("disable_thinking", True))
+        pipeline.font_probe_samples = int(config.get("font_probe_samples") or 3)
 
     def run(self) -> None:
         main_dir = str(app_config.MAIN_DIR)

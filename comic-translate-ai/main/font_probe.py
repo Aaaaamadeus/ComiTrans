@@ -129,6 +129,29 @@ def parse_pick(content: str | None) -> tuple[str | None, str | None]:
     return None, None
 
 
+def pick_majority(families: Iterable[str | None], *, strict: bool = True) -> str | None:
+    """多数表决：把单次判定的抖动收敛成稳定结论，票不够就弃权。
+
+    规则：① 有效票（模型给出了可解析的族）必须达到样本数的一半，否则弃权；
+    ② 在有效票中拿到过半（默认严格过半）才通过。
+
+    实测动机（文档 §4.15）：关掉思考后单块只要 ~5 个 completion token，
+    但同一块三次仍可能给出 handwriting/mincho/mincho 这样的组合，
+    因此用「多采样 + 过半才采纳」代替「单次说了算」。
+    """
+    from collections import Counter
+
+    samples = list(families or [])
+    if not samples:
+        return None
+    valid = [family for family in samples if family]
+    if not valid or len(valid) * 2 < len(samples):
+        return None
+    family, count = Counter(valid).most_common(1)[0]
+    threshold = len(valid) / 2 if strict else 0
+    return family if count > threshold else None
+
+
 def estimate_glyph_px(crop: Image.Image, text: str, direction: int) -> int:
     """估算原图单字像素：优先用检测器给出的字号，这里只做兜底估算。"""
     chars = max(1, len([char for char in (text or "") if not char.isspace()]))

@@ -27,6 +27,14 @@ from text_style import (
 )
 
 
+# 关闭"思考/推理"的请求参数。实测（docs/FONT_STYLE_STRATEGY.md §4.15）：
+# 同一道小题 completion 从 62 降到 2；字体判别从 1.5k~2k 降到 5，且不再出现空响应。
+# 注意：OpenAI SDK 会拒绝未知的关键字参数，必须经 extra_body 透传；
+# 接口若不认识该参数（400），调用处会去掉它重试，保证兼容性。
+THINKING_DISABLED = {"thinking": {"type": "disabled"}}
+PROBE_MAX_TOKENS = 512
+
+
 def _parse_translation_response(content):
     """返回（完整译文条目, JSON 是否完整），并恢复截断前的完整字符串。"""
     cleaned = (content or "").replace("```json", "").replace("```", "").strip()
@@ -109,6 +117,8 @@ class ComicTranslatorPipeline:
                  chinese_names=None,
                  multimodal=False,
                  multimodal_font_probe=False,
+                 disable_thinking=True,
+                 font_probe_samples=3,
                  ocr_model_path=None,
                  baberu_ocr_model_path=None,
                  ocr_backend="auto",
@@ -126,6 +136,10 @@ class ComicTranslatorPipeline:
         # 实验功能：AI 参与字体族判别。默认关闭——实测在真实漫画页上判定不稳定且每块
         # 需要数千 reasoning token，见 docs/FONT_STYLE_STRATEGY.md §4.14。
         self.multimodal_font_probe = bool(multimodal_font_probe)
+        # 关闭思考模式：实测翻译 completion 从 214 降到 51、耗时减半，译文质量相当（§4.15）
+        self.disable_thinking = bool(disable_thinking)
+        # 字体判别的多采样投票次数（≥2 时过半才采纳，用于收敛单次判定的抖动）
+        self.font_probe_samples = int(font_probe_samples or 1)
         self.watermark_enabled = bool(watermark_enabled)
         self.progress_callback = progress_callback
         self.cancel_callback = cancel_callback
@@ -590,6 +604,7 @@ class ComicTranslatorPipeline:
             last_content = ""
             last_finish_reason = ""
             send_max_tokens = True
+            send_thinking_disabled = bool(getattr(self, "disable_thinking", True))
 
             # 服务端可能在输出 token 达到上限时截断 JSON。保留已经完整输出的
             # 数组元素，并只续译尚未返回的后缀，避免重复翻译或静默补空。
@@ -633,6 +648,8 @@ class ComicTranslatorPipeline:
                         )
                         if send_max_tokens:
                             request_options["max_tokens"] = 8192
+                        if send_thinking_disabled:
+                            request_options["extra_body"] = dict(THINKING_DISABLED)
                         response = client.chat.completions.create(**request_options)
                         break
                     except Exception as exc:
@@ -644,6 +661,11 @@ class ComicTranslatorPipeline:
                         if send_max_tokens and "max_tokens" in str(exc).lower():
                             print("[WARNING] 当前接口不支持 max_tokens 参数，移除该参数后重试...")
                             send_max_tokens = False
+                            continue
+                        if send_thinking_disabled and ("thinking" in str(exc).lower()
+                                                       or "extra_body" in str(exc).lower()):
+                            print("[WARNING] 当前接口不支持关闭思考的参数，移除后重试...")
+                            send_thinking_disabled = False
                             continue
                         raise
                 if response is None:
@@ -767,6 +789,7 @@ class ComicTranslatorPipeline:
 
         reference_font = specs[0][2]
         workers = max(1, min(int(getattr(self, "font_probe_workers", 4) or 1), len(targets)))
+        samples = max(1, min(int(getattr(self, "font_probe_samples", 3) or 1), 5))
         result: dict[int, dict] = {}
 
         def probe(index, item):
@@ -789,33 +812,37 @@ class ComicTranslatorPipeline:
             buffer = io.BytesIO()
             sheet.save(buffer, format="JPEG", quality=88)
             encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
-            started = time.time()
-            response = client.chat.completions.create(
-                model=self.translation_model,
-                messages=[
-                    {"role": "system", "content": font_probe.probe_prompt()},
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": "请判断这一块原图的字体最接近哪个候选。"},
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": f"data:image/jpeg;base64,{encoded}"},
-                            },
-                        ],
-                    },
-                ],
-                response_format={"type": "json_object"},
-            )
-            elapsed = time.time() - started
-            usage = getattr(response, "usage", None)
-            reasoning = None
-            if usage is not None:
-                details = getattr(usage, "completion_tokens_details", None)
-                reasoning = getattr(details, "reasoning_tokens", None) if details else None
-            _letter, family = font_probe.parse_pick(response.choices[0].message.content)
-            print(f"[INFO] 字体候选判别 块{index}: family={family or '-'} "
-                  f"({elapsed:.1f}s, reasoning={reasoning})")
+            # 判别调用一律关闭思考：实测（docs §4.15）单块 completion 从 1.5k~2k 降到 5，
+            # 且不再出现"思考吃满预算、返回空"的失败；同时限制输出，避免跑飞。
+            votes: list[str | None] = []
+            elapsed_total = 0.0
+            for _sample in range(samples):
+                started = time.time()
+                response = client.chat.completions.create(
+                    model=self.translation_model,
+                    messages=[
+                        {"role": "system", "content": font_probe.probe_prompt()},
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": "请判断这一块原图的字体最接近哪个候选。"},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/jpeg;base64,{encoded}"},
+                                },
+                            ],
+                        },
+                    ],
+                    response_format={"type": "json_object"},
+                    max_tokens=PROBE_MAX_TOKENS,
+                    extra_body=dict(THINKING_DISABLED),
+                )
+                elapsed_total += time.time() - started
+                _letter, family = font_probe.parse_pick(response.choices[0].message.content)
+                votes.append(family)
+            family = font_probe.pick_majority(votes)
+            print(f"[INFO] 字体候选判别 块{index}: {votes} -> family={family or '-'} "
+                  f"({elapsed_total:.1f}s, {samples} 次采样)")
             if not font_probe.accept_family(family):
                 return
             role = str(item.get("style") or "dialogue")

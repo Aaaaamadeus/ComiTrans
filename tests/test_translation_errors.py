@@ -152,6 +152,37 @@ class TranslationErrorTests(unittest.TestCase):
                 )
         self.assertTrue(caught.exception.fatal)
 
+    def test_thinking_disabled_is_sent_and_dropped_when_unsupported(self):
+        """默认请求关闭思考；接口不认这个参数时自动去掉重试。"""
+        import comic_translator_pipeline as module
+
+        calls = []
+
+        class _ThinkingRejectingOpenAI:
+            def __init__(self, **_kwargs):
+                self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+            def _create(self, **kwargs):
+                calls.append(kwargs)
+                if "extra_body" in kwargs:
+                    raise RuntimeError("invalid_request_error: unknown parameter thinking")
+                message = SimpleNamespace(content='{"translations": ["你好"]}')
+                return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+
+        pipeline = _pipeline(api_key="k", base_url="https://example.invalid/v1", model="m")
+        pipeline.disable_thinking = True
+        with patch.object(module, "OpenAI", _ThinkingRejectingOpenAI):
+            result = pipeline.translate_page_batch(["こんにちは"], np.zeros((10, 10, 3), dtype=np.uint8))
+
+        self.assertEqual(result, ["你好"])
+        self.assertIn("thinking", str(calls[0].get("extra_body")))
+        self.assertNotIn("extra_body", calls[1])
+        with patch.object(module, "OpenAI", _ThinkingRejectingOpenAI):
+            pipeline.disable_thinking = False
+            calls.clear()
+            pipeline.translate_page_batch(["こんにちは"], np.zeros((10, 10, 3), dtype=np.uint8))
+        self.assertNotIn("thinking", calls[0])
+
     def test_worker_does_not_call_finish_after_translation_failure(self):
         class FailingPipeline:
             finish_calls = 0

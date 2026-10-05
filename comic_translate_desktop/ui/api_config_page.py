@@ -77,12 +77,18 @@ class ApiConfigPage(QWidget):
             "真实漫画页实测：同一页多次运行可能给出不同判定，且每块需数千 reasoning token。\n"
             "不勾选时多模态只做翻译，字体完全交给本地算法（更稳定）。详见 docs/FONT_STYLE_STRATEGY.md §4.14。"
         )
+        self._no_thinking_check = QCheckBox("关闭思考模式（省 token，默认开启）")
+        self._no_thinking_check.setToolTip(
+            "实测同一页翻译：输出 token 214 → 51，耗时 1.8s → 0.7s，译文质量相当。\n"
+            "若你的服务不支持该参数，会自动去掉并重试。详见 docs/FONT_STYLE_STRATEGY.md §4.15。"
+        )
 
         api_form.addRow("API Key", key_row)
         api_form.addRow("API Base URL", self._base_input)
         api_form.addRow("翻译模型", self._model_input)
         api_form.addRow("多模态", self._multimodal_check)
         api_form.addRow("字体判别", self._font_probe_check)
+        api_form.addRow("思考模式", self._no_thinking_check)
         root.addWidget(api_group)
 
         runtime_group = QGroupBox("运行设置")
@@ -235,6 +241,7 @@ class ApiConfigPage(QWidget):
         self._model_input.setText(config.get("translation_model", ""))
         self._multimodal_check.setChecked(bool(config.get("multimodal", False)))
         self._font_probe_check.setChecked(bool(config.get("multimodal_font_probe", False)))
+        self._no_thinking_check.setChecked(bool(config.get("disable_thinking", True)))
         self._gpu_check.setChecked(bool(config.get("use_gpu", False)))
         self._source_language.setCurrentIndex(max(0, self._source_language.findData(config.get("source_language", "ja"))))
         self._refresh_ocr_choices()
@@ -270,6 +277,7 @@ class ApiConfigPage(QWidget):
             "translation_model": self._model_input.text().strip(),
             "multimodal": self._multimodal_check.isChecked(),
             "multimodal_font_probe": self._font_probe_check.isChecked(),
+            "disable_thinking": self._no_thinking_check.isChecked(),
             "watermark_enabled": self._watermark_check.isChecked(),
             "use_gpu": self._gpu_check.isChecked(),
             "ocr_backend": self._ocr_backend.currentData(),
