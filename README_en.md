@@ -20,22 +20,27 @@ ComiTrans is a manga translation desktop client. Detection, built-in Japanese/Ko
 
 Since v2.2.1, detection, OCR, and inpainting are powered entirely by **ONNX Runtime**, removing PyTorch / torchvision / transformers dependencies. The app and models are released as separate packages: model updates no longer require re-downloading the program.
 
-## v2.3.0 UI
+> [!NOTE]
+> v2.4.0 adds a searchable font catalog with on-demand downloads and live mask editing. Download the [new app and model packages](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.4.0), or run the source with `start.bat`. See the [changelog](#changelog).
 
-A black-and-white manga magazine layout with large chapter titles, edge halftones, the Skribble wordmark, and compact language/output controls. Seven nodes share one horizontal track and advance on real completion or skip events. The editor canvas preserves the artwork's colors.
+## Manga workbench
+
+A black-and-white manga workbench with open section headings, local halftones, the Skribble wordmark, and soft controls. Workspaces open directly into their tools. Import fonts and choose a default translation font on the translation page, with a real glyph preview. Seven nodes share one horizontal track and advance on real completion or skip events. The editor canvas preserves the artwork's colors.
 
 **Automatic processing**
 
-![ComiTrans v2.3.0 automatic processing](docs/ui-review/automatic-idle.png)
+![ComiTrans automatic processing](docs/ui-review/automatic-style-review.png)
 
 <details>
-<summary>Processing and typesetting editor screenshots</summary>
+<summary>Processing, mask editing, and font library screenshots</summary>
 
 The processing capture uses real local models on text-free test pages, without an external translation request.
 
 ![Processing and stage track](docs/ui-review/automatic-processing.png)
 
-![Typesetting editor](docs/ui-review/editor.png)
+![Mask resizing and live editor preview](docs/ui-review/editor-mask-drag-style-review.png)
+
+![Font library and name search](docs/ui-review/font-library-search-style-review.png)
 
 </details>
 
@@ -57,7 +62,7 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 
 ## Table of Contents
 
-[New UI and log animation](#v230-ui) · [OCR interfaces](#ocr-interfaces)
+[Manga workbench and log animation](#manga-workbench) · [OCR interfaces](#ocr-interfaces) · [Detailed changelog](CHANGELOG.md)
 
 1. [Key Features](#key-features)
 2. [Quick Start](#quick-start)
@@ -79,11 +84,12 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 - **Split release packages**: models ship separately, so app updates do not require re-downloading models.
 - **Startup warmup**: the AI pipeline loads automatically when the app opens.
 - **GPU inference**: NVIDIA CUDA supported when the machine already has an NVIDIA driver.
-- **Multimodal translation toggle**: sends the full page image to the AI. Beyond translation the AI does exactly one thing: for body-text blocks it compares the original against three locally rendered candidates (gothic / mincho / handwriting) and picks the closest one. Font size and orientation stay local. Pure-text mode uses automatic typesetting.
+- **Multimodal translation toggle**: sends the full page image to the AI for visual context; pure-text mode sends OCR results. Font selection, size, and orientation are local by default. Experimental font comparison requires a separate opt-in.
 - **Whole-PDF translation**: import PDFs alongside images, translate them page by page, and create one `*_translated.pdf` with the original page order and page sizes.
 - **15 font categories**: dialogue, bold dialogue, emphasis, handwriting, Seto, 851 handwriting, thought, whisper, serious, narration, SFX, LXGW Marker, cute, preview, and title styles with per-glyph fallback.
+- **Searchable open-source font library**: search fonts on the translation and editor pages. The Google Fonts snapshot includes 2,056 families in an approximately 1 MB catalog; font files download on demand for offline use. TTF / OTF / TTC / OTC imports remain available. Manual editor choices affect only the selected block and override the translation default, with per-glyph fallback. [Font library guide](docs/FONT_LIBRARY.md).
 - **Mask-based erasing and typesetting**: erasing only removes the detector text mask; layout area and center follow the mask.
-- **Manual typesetting editor**: adjust font style, size, direction, and position per text block, then save over the output.
+- **Manual typesetting with live preview**: adjust font style, actual font size, direction, X/Y offsets, and layout mask dimensions per block. Drag mask corners or edges to resize, or drag inside to move. The canvas updates automatically; saving exports the current result.
 - **Error logs with AI diagnosis**: logs go to `Log/app.log`, diagnosis prompts are auto-generated, and multi-turn AI diagnosis is supported.
 - **Batch folder selection**: pick a whole folder and images/PDFs are added recursively.
 - **Safe cancellation**: stop requests remain visible while the current inference/request finishes; remaining pages are not scheduled.
@@ -94,12 +100,12 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 
 ### Release users (recommended)
 
-1. Download `ComiTrans-v2.3.0-app.zip` (program) and `ComiTrans-v2.3.0-models.zip` (models).
+1. Download `ComiTrans-v2.4.0-app.zip` (program) and `ComiTrans-v2.4.0-models.zip` (models) from the [v2.4.0 release](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.4.0).
 2. Extract the app archive into a `ComiTrans` folder.
 3. Extract both archives into the same parent directory, merging their top-level `ComiTrans` folders. The final model path is `ComiTrans\comic-translate-ai\models\`.
 4. Double-click `ComiTrans.exe` and enter your translation API key and model on the "Settings" page.
 
-Upgrading from v2.2.2: existing Japanese models can be reused. Merge the v2.3.0 model archive to add Korean/English recognition. Keep your existing `config.yaml` and output files.
+Upgrading from v2.3.0: reuse your existing models. From v2.2.2, existing Japanese models can be reused; merge the new model archive to add Korean/English recognition. Keep your existing `config.yaml`, entire `user_fonts` folder, and output files.
 
 Release users do not need to install Python, PyTorch, pip, or the CUDA Toolkit. GPU acceleration only requires an existing NVIDIA driver.
 
@@ -131,11 +137,19 @@ You can also double-click `start.bat`. The AI pipeline warms up automatically af
 
 1. Click "Add Files" or "Add Folder", or drag images, PDFs, or folders into the window.
 2. Configure the translation API in Settings, then choose Source Language on the workbench. Japanese Auto uses Baberu with manga-ocr fallback; Korean/English use PP-OCRv5. Choose Custom OCR for another language or provider.
-3. Enable "Multimodal Translation" to send the full page image to the AI; after translation it compares body-text blocks against three locally rendered candidates and only picks a font family (size and orientation remain local). Disable it to use pure-text translation and automatic typesetting.
+3. Enable "Multimodal Translation" to send the full page image to the AI; disable it for pure-text translation. Both modes use local font selection and typesetting by default.
 4. Expand "Preferences" on the translation page to fill in background prompts and Chinese character names (one per line; the AI maps them automatically).
 5. Click "Start Translation" and watch the live step/status logs.
 6. On failure, open the "Diagnostics" page for diagnosis prompts, or click the Issue button.
-7. Use the "Typesetting Refinement" page to fine-tune font style, size, direction, and position per block, then save.
+7. Select a text block in "Typesetting Refinement". Drag its mask corners or edges to resize, or drag inside to move; press Esc during a drag to restore its starting geometry. Font size, X/Y offsets, and exact dimensions are also available under “排版与位置”. The canvas updates automatically. Click Save Image or press Ctrl+S to export the current result. See the [live preview guide](docs/EDITOR_LIVE_PREVIEW.md).
+
+### Translation fonts
+
+Choose a default in the translation page's “译文字体” dropdown. A specific font applies to all translated text; “自动匹配漫画风格” restores the existing style fonts. “＋ 导入字体” imports multiple TTF, OTF, TTC, or OTC files and selects the last successful import. Font collections use their first face.
+
+Both pages support name search in their font selectors. Open “字体库” to filter Google Fonts by name, language, or style, choose a face, and click “下载并使用”. The full catalog is searchable offline, and downloaded fonts remain available without a connection. Ten families in the snapshot lack a license attachment and are currently view-only. See the [font library guide](docs/FONT_LIBRARY.md).
+
+Choices save automatically and apply to the next translation. The editor refreshes its preview while retaining drafts and explicit per-block font choices; Save Image writes the updated output. Select “跟随翻译默认字体” to restore the default for a block. Imported and downloaded fonts are stored in the app's `user_fonts` folder without system installation. Duplicate files are reused and missing glyphs fall back per character. Keep the entire `user_fonts` folder when moving or updating the app. See the [font guide](docs/CUSTOM_FONTS.md).
 
 The optional `@ComiTrans` watermark is disabled by default. Toggle it under Settings → Runtime Settings → Output Watermark and save the configuration. Subsequent image translations and every PDF page receive a small, translucent Skribble wordmark in the lower-right corner when enabled. The current editor page also updates its preview; click Save Image to write it. Repeated saves do not accumulate the watermark, and the clean background remains unmarked.
 
@@ -186,7 +200,7 @@ Python backends implement `OcrEngine.recognize(image, language) -> OcrResult`. E
 
 Normal bubbles default to `dialogue`; OCR content, detector class, original stroke weight, and box geometry select the other styles. Detector orientation is preserved unless the aspect ratio strongly contradicts it. The editor offers Auto, explicit Vertical, and explicit Horizontal modes.
 
-`seto`, `tegaki_851`, and `lxgw_marker` are optional styles: pick them per block in the editor. In multimodal mode, when the AI judges the original glyphs to be the "gothic" family on a body-text block, the local permission table routes it to `lxgw_marker`. The automatic (non-multimodal) heuristic does not choose them yet; see [docs/FONT_STYLE_STRATEGY.md](docs/FONT_STYLE_STRATEGY.md) for the strategy and the measurements behind it.
+`seto`, `tegaki_851`, and `lxgw_marker` can be selected per block in the editor; the local automatic heuristic does not select these three styles yet. Experimental font comparison runs only when both `multimodal` and `multimodal_font_probe` are enabled; the latter is disabled by default. The AI compares locally rendered gothic, mincho, and handwriting candidates, then local gates and permissions decide whether to apply the result. A gothic result on body text can map to `lxgw_marker`. See [docs/FONT_STYLE_STRATEGY.md](docs/FONT_STYLE_STRATEGY.md) for the strategy and measurements.
 
 Typesetting renders text on a local 3x supersampled surface and downsamples it with Lanczos, so small dialogue is no longer drawn directly at low resolution. Normal bubbles also avoid a forced white outline for softer edges, while non-bubble text on complex backgrounds keeps an outline for readability.
 
@@ -201,7 +215,7 @@ Typesetting renders text on a local 3x supersampled surface and downsamples it w
 
 1. **Bubble & text detection**: an ONNX detector outputs bubbles, text masks, and text lines.
 2. **Source-language OCR**: Japanese uses Baberu/manga-ocr, Korean and English use PP-OCRv5 text-line recognition, or a custom OCR service can be selected. The English-skip rule applies only to Japanese local mode. Empty source/translation regions retain the original artwork.
-3. **LLM translation**: pure-text mode translates OCR results; multimodal mode sends the page image. For fonts, multimodal only runs a local three-candidate comparison: the local side owns the candidate set and the default font per role, the AI answers which of gothic / mincho / handwriting the original glyphs look like, and the answer is only accepted when it passes the precision gate. Size and orientation are always decided locally.
+3. **LLM translation**: pure-text mode sends OCR results; multimodal mode sends the page image. Local role, glyph, and box heuristics select fonts by default. With experimental font comparison explicitly enabled, the AI identifies a font family among three local candidates, subject to local gates. Size and orientation always stay local.
 4. **Background inpainting**: erases only the detector text mask; simple white bubbles are filled directly, complex backgrounds use LaMa ONNX.
 5. **Chinese typesetting**: font size is estimated from the mask area, text is centered on the mask centroid, orientation adapts automatically, and long text gets tighter sizing.
 6. **Save & edit**: output images are saved, cleaned canvases go to `<output_dir>_cleaned/`, layout JSON goes to `<output_dir>_layout/`, and the editor lets you refine everything manually.
@@ -225,7 +239,10 @@ More model sources, alternative ONNX versions, and better detection candidates: 
 
 ### Build the app
 
+Install the pinned build dependencies first; the build script does not upgrade tools automatically:
+
 ```powershell
+.\.venv\Scripts\python -m pip install -r requirements-build.txt
 .\build_app.ps1
 ```
 
@@ -243,9 +260,9 @@ python package_release.py
 
 This creates two archives and their checksums, preserving older releases:
 
-- `ComiTrans-v2.3.0-app.zip`: program only, no models
-- `ComiTrans-v2.3.0-models.zip`: ONNX models including Japanese, Korean, and English OCR
-- `ComiTrans-v2.3.0-SHA256SUMS.txt`: SHA256 checksums
+- `ComiTrans-v2.4.0-app.zip`: program only, no models
+- `ComiTrans-v2.4.0-models.zip`: ONNX models including Japanese, Korean, and English OCR
+- `ComiTrans-v2.4.0-SHA256SUMS.txt`: SHA256 checksums
 
 Extract the models archive into `ComiTrans\comic-translate-ai\models\`.
 
@@ -266,16 +283,31 @@ ComiTrans
 │   └── font_file/                 # Chinese fonts
 ├── comic_translate_core/          # source languages, OCR protocol, PP-OCR
 ├── comic_translate_desktop/       # PySide6 desktop client
-├── assets/ui/                     # UI fonts and SVG icons
+├── assets/ui/                     # UI fonts, SVG icons, and empty-state artwork
+├── assets/font_catalog.json       # Google Fonts snapshot; files download on demand
+├── user_fonts/                    # local imports/downloads and licenses (not committed)
+├── scripts/update_font_catalog.py # catalog maintenance
 ├── scripts/download_ocr_models.py # Korean/English model downloads
 ├── docs/ui-review/                # UI screenshots and log animation
 ├── docs/ONNX_MODELS.md            # model sources & alternatives
-├── legacy/web/                    # archived web architecture
+├── requirements-build.txt         # pinned build dependencies
 ├── build_app.ps1                  # build script
 └── package_release.py             # release split script
 ```
 
 ## Changelog
+
+### v2.4.0 (2026-10-13)
+
+- Open manga workspaces with softer buttons and borders, local halftones, and empty-state illustrations; removed large chapter banners and supplied missing Japanese header glyphs.
+- Font imports and default translation font selection on the translation page; an approximately 1 MB Google Fonts catalog with name search, language/style filters, background downloads, license preservation, and offline reuse.
+- Eight mask resize handles, free resizing, position dragging, and Esc to cancel a drag. Text, font, size, and X/Y changes preview automatically; saving exports the current result and persists its layout.
+- Fixed global defaults overriding editor font choices and whole-text replacement on missing glyphs. Manual fonts affect only the selected block, retain per-glyph fallback, and survive save/reload.
+- Removed the approved 82 legacy web, obsolete CLI, and training files. Simplified ONNX imports, warmup, and build dependencies; closed diagnosis HTTP clients correctly.
+- Separate multimodal translation and experimental font-comparison switches, with comparison disabled by default. Improved local candidates, voting, and API thinking controls; documented the proposed translation constraints.
+- Validation: 163 automated tests passed, 33 real Qt captures at each of normal and 200% scaling passed, and real font downloads plus offline selection were verified.
+
+App and models remain separate packages; v2.3.0 users can reuse their models. See the [v2.4.0 release notes](docs/RELEASE-v2.4.0.md), [detailed changelog](CHANGELOG.md), [cleanup record](docs/PROJECT_CLEANUP.md), and [editor guide](docs/EDITOR_LIVE_PREVIEW.md).
 
 ### v2.3.0 (2026-09-16)
 
@@ -348,7 +380,7 @@ ComiTrans
 
 - Web-based manga translation platform: Spring Boot backend, Vue frontend, PostgreSQL / Redis / Nginx, Python worker for image processing.
 - Batch translation, text erasing, font classification, horizontal typesetting, hosted models.
-- Archived under `legacy/web/`; old docs in `docs/README-v1.md`.
+- Old web sources and their documentation have been removed from the working tree; historical implementations remain in Git history. See the [cleanup record](docs/PROJECT_CLEANUP.md).
 
 ## FAQ
 

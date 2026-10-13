@@ -1,0 +1,37 @@
+[
+  {
+    "path": ".pip-cache",
+    "bytes": 4011096713.0,
+    "files": 671
+  },
+  {
+    "path": ".cache",
+    "bytes": 0.0,
+    "files": 13
+  },
+  {
+    "path": "build",
+    "bytes": 46060768.0,
+    "files": 16
+  },
+  {
+    "path": "__pycache__",
+    "bytes": 8699.0,
+    "files": 3
+  },
+  {
+    "path": "tmp\\ui-package",
+    "bytes": 886910473.0,
+    "files": 973
+  },
+  {
+    "path": "tmp\\ui-package-build",
+    "bytes": 46246166.0,
+    "files": 16
+  },
+  {
+    "path": "tmp\\v2.3.0-build",
+    "bytes": 46273809.0,
+    "files": 16
+  }
+]

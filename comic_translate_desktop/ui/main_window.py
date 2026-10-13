@@ -58,7 +58,8 @@ from .step_panel import StepPanel
 from .theme import APP_STYLESHEET, brand_font, refresh_style
 from .preview import ImagePreview
 from .log_panel import LogPanel
-from .manga_components import ChapterBanner, PanelHeading, StageFocus
+from .font_picker import TranslationFontPicker
+from .manga_components import PanelHeading, StageFocus
 from .step_panel import STAGE_LABELS, STAGE_ORDER
 
 
@@ -117,17 +118,18 @@ class MainWindow(QMainWindow):
         top_bar = QFrame()
         top_bar.setObjectName("topBar")
         header = QHBoxLayout(top_bar)
-        header.setContentsMargins(24, 8, 24, 8)
+        self._header_layout = header
+        header.setContentsMargins(20, 10, 20, 10)
         header.setSpacing(8)
         title = QLabel("ComiTrans")
         title.setObjectName("brandTitle")
         self._brand_title = title
-        title.setFont(brand_font(48))
+        title.setFont(brand_font(40))
         title.setContentsMargins(0, 0, 12, 0)
         header.addWidget(title)
-        header.addSpacing(20)
-        self._nav_auto = QPushButton("自动处理")
-        self._nav_editor = QPushButton("嵌字精修")
+        header.addSpacing(8)
+        self._nav_auto = QPushButton("01  自动处理")
+        self._nav_editor = QPushButton("02  嵌字精修")
         for button in (self._nav_auto, self._nav_editor):
             button.setCheckable(True)
             button.setProperty("role", "nav")
@@ -136,6 +138,9 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("○ 就绪")
         self.status_label.setObjectName("statusPill")
         self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.status_label.setMinimumWidth(100)
+        self.status_label.setMaximumWidth(180)
         header.addWidget(self.status_label)
         self._stop_btn = QPushButton("□ 停止任务")
         self._stop_btn.setToolTip("请求停止，等待后台安全收尾")
@@ -145,11 +150,13 @@ class MainWindow(QMainWindow):
         self._output_btn = QPushButton("输出目录")
         self._issue_btn = QPushButton("反馈")
         for button, tooltip in ((self._settings_btn, "翻译服务、OCR、模型与默认输出"), (self._logs_btn, "日志文件与 AI 诊断"), (self._output_btn, "打开输出目录"), (self._issue_btn, "打开反馈页面")):
-            button.setProperty("role", "quiet")
+            button.setProperty("role", "utility" if button in (self._settings_btn, self._logs_btn) else "quiet")
             button.setProperty("compact", True)
             button.setToolTip(tooltip)
             button.setAccessibleName(tooltip)
             header.addWidget(button)
+        self._settings_btn.setCheckable(True)
+        self._logs_btn.setCheckable(True)
         self._more_btn = QToolButton()
         self._more_btn.setText("更多")
         self._more_btn.setProperty("role", "quiet")
@@ -167,9 +174,6 @@ class MainWindow(QMainWindow):
         auto_layout = QVBoxLayout(self.translate_tab)
         auto_layout.setContentsMargins(0, 0, 0, 0)
         auto_layout.setSpacing(0)
-        self._chapter_banner = ChapterBanner("01", "自动翻译工作台", "批量处理 · 逐页检查 · 精准嵌字")
-        self._work_title = self._chapter_banner
-        auto_layout.addWidget(self._chapter_banner)
         self.queue_splitter = QSplitter(Qt.Horizontal)
         self.queue_splitter.setHandleWidth(8)
         self.queue_splitter.setChildrenCollapsible(False)
@@ -177,7 +181,7 @@ class MainWindow(QMainWindow):
         self.queue_splitter.addWidget(self._build_work_panel())
         self.queue_splitter.setStretchFactor(0, 0)
         self.queue_splitter.setStretchFactor(1, 1)
-        self.queue_splitter.setSizes([264, 1128])
+        self.queue_splitter.setSizes([256, 1136])
         auto_layout.addWidget(self.queue_splitter, 1)
         self.tabs.addWidget(self.translate_tab)
         self.api_config_page = ApiConfigPage(self.config)
@@ -235,6 +239,7 @@ class MainWindow(QMainWindow):
         label.setAlignment(Qt.AlignCenter)
         drop.addWidget(label)
         self._add_btn = QPushButton("＋ 添加文件")
+        self._add_btn.setProperty('role', 'quiet')
         self._folder_btn = QPushButton("添加文件夹")
         self._folder_btn.setProperty("role", "quiet")
         drop.addWidget(self._add_btn)
@@ -325,6 +330,9 @@ class MainWindow(QMainWindow):
         output_row.addWidget(self._output_dir_input, 1)
         output_row.addWidget(self._browse_output_btn)
         control_layout.addLayout(self._control_grid)
+        self._font_picker = TranslationFontPicker(self.config)
+        self._font_picker.selection_changed.connect(self._change_translation_font)
+        control_layout.addWidget(self._font_picker)
         self._pref_container = QWidget()
         self._pref_container.setVisible(False)
         pref_layout = QHBoxLayout(self._pref_container)
@@ -407,7 +415,7 @@ class MainWindow(QMainWindow):
         self.preview_tabs.setDocumentMode(True)
         self.original_view = ImagePreview(import_action=True)
         self.original_view.import_requested.connect(self._choose_files)
-        self.result_view = ImagePreview()
+        self.result_view = ImagePreview(illustration='studio-editor-v1.png')
         self.preview_tabs.addTab(self.original_view, "原图")
         self.preview_tabs.addTab(self.result_view, "译图")
         self._log_panel = LogPanel(self.diagnostics.log_path)
@@ -453,7 +461,19 @@ class MainWindow(QMainWindow):
         self.api_config_page.load_config(self.config)
         self._append_log(f"被翻译语言已切换为 {self._source_language.currentText()}，将在下次翻译时加载对应 OCR。")
         if language == "custom":
+            self.api_config_page._sections.setCurrentIndex(1)
             self.tabs.setCurrentWidget(self.api_config_page)
+
+    def _change_translation_font(self, reference: str) -> None:
+        try:
+            updated = save_ai_config({'translation_font': reference})
+        except OSError as exc:
+            self._font_picker.load_config(self.config)
+            self._font_picker.show_error(f'字体选择未保存：{exc}')
+            return
+        self.config = updated
+        self.editor_page.set_translation_fonts(updated)
+        self._append_log(f'译文字体已保存：{self._font_picker.combo.currentText()}，下次翻译生效。')
 
     def _expand_document_paths(self, paths) -> tuple[list[Path], int]:
         documents: list[Path] = []
@@ -606,6 +626,7 @@ class MainWindow(QMainWindow):
         self.status_label.setProperty("state", state)
         refresh_style(self.status_label)
         self.status_label.setAccessibleName(text)
+        self.status_label.setToolTip(text)
         if state not in ('running', 'stopping'):
             self.stage_focus.set_stage('—', text, self.stage_label.text())
 
@@ -756,6 +777,7 @@ class MainWindow(QMainWindow):
         self.original_view.import_button.setEnabled(not running)
         self._output_dir_input.setEnabled(not running)
         self._browse_output_btn.setEnabled(not running)
+        self._font_picker.setEnabled(not running and not warming)
         self._pref_container.setEnabled(not running)
         self._settings_btn.setEnabled(not running)
         self._remove_btn.setEnabled(not running and selected_count > 0)
@@ -763,6 +785,10 @@ class MainWindow(QMainWindow):
         self.api_config_page.setEnabled(not running and not warming)
         self._source_language.setEnabled(not running and not warming)
         self._file_count_label.setText(f"{count} 个文件")
+        self.step_panel.setVisible(count > 0 or running)
+        self.stage_focus.setVisible(count > 0 or running or warming)
+        self._page_progress_label.setVisible(count > 0 or running)
+        self._progress_label.setVisible(count > 0 or running)
         self._file_selection_label.setText(
             f"已选 {selected_count} 个" if selected_count else "支持图片与 PDF"
         )
@@ -900,13 +926,14 @@ class MainWindow(QMainWindow):
             self._open_issue()
 
     def _show_api_config(self) -> None:
-        self.api_config_page.load_config(self.config)
         self.tabs.setCurrentWidget(self.api_config_page)
 
     def _on_tab_changed(self, index: int) -> None:
         page = self.tabs.widget(index)
         self._nav_auto.setChecked(page is self.translate_tab)
         self._nav_editor.setChecked(page is self.editor_page)
+        self._settings_btn.setChecked(page is self.api_config_page)
+        self._logs_btn.setChecked(page is self.error_log_page)
         if page is self.error_log_page:
             self.error_log_page.refresh()
         if page is self.editor_page:
@@ -937,7 +964,10 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'preview_tabs'):
             return
         compact = self.height() < 680
-        self._brand_title.setFont(brand_font(32 if self.width() < 1120 else 48))
+        self._brand_title.setFont(brand_font(28 if self.width() < 960 else 36 if self.width() < 1180 else 40))
+        self._header_layout.setContentsMargins(12 if self.width() < 1120 else 20, 8, 12 if self.width() < 1120 else 20, 8)
+        self._nav_auto.setText('自动处理' if self.width() < 1120 else '01  自动处理')
+        self._nav_editor.setText('嵌字精修' if self.width() < 1120 else '02  嵌字精修')
         narrow = self.width() < 1120
         self._more_btn.setVisible(narrow)
         self._output_btn.setVisible(not narrow)
@@ -954,13 +984,13 @@ class MainWindow(QMainWindow):
             self._control_grid.addWidget(self._start_btn, 0, 2)
             self._control_grid.setColumnStretch(1, 1)
         self._output_controls.setVisible(self.height() >= 580)
-        self._chapter_banner.set_compact(self.height() < 780, tight=self.height() < 580)
         self._elapsed_label.setVisible(not compact)
         self.step_panel.set_compact(compact)
         self.preview_tabs.setVisible(not compact or not self._log_toggle.isChecked())
         self._log_toggle.setToolTip('小窗口下，收起日志可查看图像' if compact else '独立展开或收起详细日志')
-        self._work_layout.setContentsMargins(12, 8 if compact else 12, 12, 12)
-        self._work_layout.setSpacing(4 if compact else 6)
+        margin = 12 if self.width() < 1180 else 20
+        self._work_layout.setContentsMargins(margin, 8 if compact else 14, margin, 12)
+        self._work_layout.setSpacing(4 if compact else 8)
         self._queue_layout.setContentsMargins(16, 8, 16, 16)
         self._queue_layout.setSpacing(8 if compact else 12)
         self._file_selection_label.setVisible(not compact)
@@ -1003,6 +1033,7 @@ class MainWindow(QMainWindow):
             return
         self.config = save_ai_config(updates)
         self.api_config_page.load_config(self.config)
+        self._font_picker.load_config(self.config)
         self.editor_page.set_watermark_enabled(bool(self.config.get("watermark_enabled", False)))
         self._source_language.blockSignals(True)
         self._source_language.setCurrentIndex(max(0, self._source_language.findData(self.config.get("source_language", "ja"))))

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import io
-import os
 import sys
 import tempfile
 import traceback
@@ -135,6 +134,16 @@ class BatchWorker(QThread):
         pipeline.cancel_callback = self._is_stopped
         pipeline.progress_callback = self._emit_stage
         pipeline.watermark_enabled = bool(self._config.get("watermark_enabled", False))
+        fonts = self._config.get('font_map')
+        typesetter = getattr(pipeline, 'typesetter', None)
+        fallbacks = tuple(self._config.get('font_fallbacks') or ())
+        size = int(self._config.get('font_size') or 16)
+        if fonts and typesetter is not None and (
+            typesetter.font_map != fonts or typesetter.base_font_size != size
+            or getattr(typesetter, 'fallback_fonts', ()) != fallbacks
+        ):
+            from vertical_typesetter import VerticalTypesetter
+            pipeline.typesetter = VerticalTypesetter(fonts, size, fallback_fonts=fallbacks)
 
     @contextlib.contextmanager
     def _capture_pipeline_output(self):
@@ -153,7 +162,6 @@ class BatchWorker(QThread):
         main_dir = str(app_config.MAIN_DIR)
         if main_dir not in sys.path:
             sys.path.insert(0, main_dir)
-        os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
         self.log.emit("[预热] 开始导入 comic_translator_pipeline")
         from comic_translator_pipeline import ComicTranslatorPipeline
@@ -165,6 +173,7 @@ class BatchWorker(QThread):
                 det_model_path=self._config["detector_model"],
                 font_map=self._config["font_map"],
                 font_size=self._config["font_size"],
+                fallback_fonts=self._config.get('font_fallbacks'),
                 use_gpu=self._config["use_gpu"],
                 lama_path=self._config["lama_model"],
                 ocr_model_path=self._config.get("ocr_model"),
@@ -177,7 +186,8 @@ class BatchWorker(QThread):
                 translation_prompt=self._config.get("translation_prompt", ""),
                 chinese_names=self._config.get("chinese_names", ""),
                 multimodal=self._config.get("multimodal", False),
-                multimodal_font_probe=self._config.get("multimodal_font_probe", False),
+                multimodal_font_probe=(self._config.get("multimodal_font_probe", False)
+                                       and not self._config.get('translation_font_active', False)),
                 disable_thinking=self._config.get("disable_thinking", True),
                 font_probe_samples=self._config.get("font_probe_samples", 3),
                 progress_callback=self._emit_stage,
@@ -259,7 +269,8 @@ class BatchWorker(QThread):
         pipeline.translation_prompt = config.get("translation_prompt", "")
         pipeline.chinese_names = config.get("chinese_names", "")
         pipeline.multimodal = bool(config.get("multimodal", False))
-        pipeline.multimodal_font_probe = bool(config.get("multimodal_font_probe", False))
+        pipeline.multimodal_font_probe = bool(config.get("multimodal_font_probe", False)
+                                              and not config.get('translation_font_active', False))
         pipeline.disable_thinking = bool(config.get("disable_thinking", True))
         pipeline.font_probe_samples = int(config.get("font_probe_samples") or 3)
 
@@ -286,8 +297,10 @@ class BatchWorker(QThread):
             else:
                 self._apply_api_config(self._pipeline, self._config)
             self._configure_pipeline(self._pipeline)
-            _ak = str(self._config.get("api_key") or "")
-            _mask = (_ak[:4] + "****" + _ak[-4:]) if len(_ak) > 8 else ("***" if _ak else "空")
+            if not self._files:
+                self.finished.emit(0, 0)
+                return
+            _mask = app_config.mask_api_key(str(self._config.get("api_key") or "")) or "空"
             self.log.emit(
                 f"[INFO] 翻译模型: {self._config.get('translation_model', '')}，API Key: {_mask}"
             )

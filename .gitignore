@@ -18,25 +18,19 @@ Desktop.ini
 logs/
 Log/
 *.log
-npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
 
 # ===== Environment / Secrets =====
 .env
 .env.*
 !.env.example
 .pip-cache/
+.cache/
 comic-translate-ai/main/config.yaml
-legacy/web/nginx/certs/*.key
-legacy/web/nginx/certs/*.pem
-legacy/web/nginx/certs/*.crt
 
 # ===== Python (comic-translate-ai) =====
 __pycache__/
 *.py[cod]
 *$py.class
-*.pyo
 venv/
 .venv/
 env/
@@ -50,12 +44,8 @@ build/
 release/
 
 # Python AI 模型文件（体积大，不上传）
-comic-translate-ai/models/**/*.pt
-comic-translate-ai/models/**/*.pth
-comic-translate-ai/models/**/*.onnx
-comic-translate-ai/models/**/*.bin
 comic-translate-ai/models/
-models/manga-ocr-base
+/user_fonts/
 
 # Python 测试页面输出
 comic-translate-ai/page/test_page_output/
@@ -63,54 +53,13 @@ comic-translate-ai/page/*_layout/
 comic-translate-ai/page/temp_api/
 app/
 
-# ===== Node.js / Vue 前端 (comic-tanslate-ui) =====
-node_modules/
-dist/
-dist-ssr/
-coverage/
-*.local
-*.tsbuildinfo
-.eslintcache
-package-lock.json
-
-# ===== Java / Maven 后端 (comic-tanslate-web) =====
-comic-tanslate-web/target/
-*.class
-*.jar
-*.war
-*.ear
-
-# ===== Docker =====
-docker-compose.override.yml
-
-# ===== Legacy web (archived, no longer the active architecture) =====
-legacy/web/**/node_modules/
-legacy/web/**/dist/
-legacy/web/**/dist-ssr/
-legacy/web/**/coverage/
-legacy/web/**/package-lock.json
-legacy/web/**/target/
-legacy/web/**/*.class
-legacy/web/**/*.jar
-legacy/web/**/*.war
-legacy/web/**/*.ear
-legacy/web/docker-compose.override.yml
-
-
 *.jpg
 *.png
 !docs/images/*.jpg
 !docs/ui-review/*.png
+!assets/ui/illustrations/*.png
 !docs/watermark-review/runtime-manga.png
 # Local UI verification outputs (the review screenshots live in docs/ui-review).
-/tmp/ui-qa/
-/tmp/ui-package/
-/tmp/ui-package-build/
-/tmp/ui_*check.py
-/tmp/ui_smoke.py
-/tmp/ui_manga_runtime.py
-/tmp/refactor_ui.py
-/tmp/refactor_editor.py
 /tmp/
 *.lnk
 comic-translate-ai/page/

@@ -31,9 +31,11 @@ class VerticalTypesetter:
         font_size,
         color=(0, 0, 0),
         render_scale=DEFAULT_RENDER_SCALE,
+        fallback_fonts=None,
     ):
         self.fonts = {}
         self.font_map = font_map
+        self.fallback_fonts = tuple(fallback_fonts or ())
         self.font_cache = {}
         self.base_font_size = font_size
         self.color = color
@@ -41,6 +43,8 @@ class VerticalTypesetter:
         self.last_direction = None
         self.last_render_scale = 1
         self.last_layout_debug = []
+        self.last_layout_box = None
+        self.last_render_layer = None
         self.render_scale = max(1, int(render_scale))
         self._font_coverage_cache = {}
         self._glyph_visibility_cache = {}
@@ -105,6 +109,7 @@ class VerticalTypesetter:
             self.font_map.get("bold_dialogue"),
             self.font_map.get("serious"),
             self.font_map.get("title"),
+            *self.fallback_fonts,
         ]
         seen = set()
         for path in candidates:
@@ -181,6 +186,7 @@ class VerticalTypesetter:
                 Image.Resampling.LANCZOS,
             )
         image.paste(surface, (left, top), surface)
+        return surface, left, top
 
     def _calculate_layout_fast(self, text, font, limit, is_horizontal=False, spacing=None):
         if spacing is None:
@@ -475,13 +481,17 @@ class VerticalTypesetter:
         direction=0,
         target_font_size=None,
         non_bubble=False,
+        manual_layout=False,
     ):
         """执行竖排绘制 (使用绝对居中算法 anchor='mm')"""
         try:
             self.last_layout_debug = []
+            self.last_font_size = None
+            self.last_layout_box = None
+            self.last_render_layer = None
             x1, y1, x2, y2 = map(int, box[:4])
 
-            scale_ratio = 0.9
+            scale_ratio = 1.0 if manual_layout else 0.9
 
             GLOBAL_OFFSET_X = 0
             GLOBAL_OFFSET_Y = 0   # 移除之前的 +5 硬补偿，因为接下来使用绝对几何中心
@@ -495,7 +505,9 @@ class VerticalTypesetter:
 
             # --- 智能气泡外扩算法 ---
             # 解决日语瘦长包围盒限制中文排版空间的问题
-            if raw_height > raw_width * 1.5:
+            if manual_layout:
+                pass  # The editor supplies the actual region; preserve its dimensions.
+            elif raw_height > raw_width * 1.5:
                 # 瘦长型气泡：推测存在横白边，放宽宽度
                 expanded_width = int(raw_height * 0.8)
                 raw_width = max(raw_width, expanded_width)
@@ -572,6 +584,10 @@ class VerticalTypesetter:
             # ??????????????????????????
             if mask_center is not None:
                 center_x, center_y = mask_center
+            self.last_layout_box = [
+                center_x - box_width / 2, center_y - box_height / 2,
+                center_x + box_width / 2, center_y + box_height / 2,
+            ]
             columns = self.wrap_text_vertical(clean_text, box_height, current_font)
             if not columns: return image
             # 智能寻找最佳字号
@@ -655,6 +671,14 @@ class VerticalTypesetter:
 
             constraint_limit = box_width if is_horizontal else box_height  # 传给函数的限制
             check_limit = box_height if is_horizontal else box_width  # 用于检查结果的限制
+
+            if manual_layout and target_font_size and target_font_size > 0:
+                best_size = int(target_font_size)
+                current_font = self._get_font_object(font_style, best_size)
+                _, _, best_lines_struct, best_col_spacing = self._calculate_layout_fast(
+                    clean_text, current_font, constraint_limit, is_horizontal=is_horizontal
+                )
+                low = high + 1  # Explicit editor size takes precedence over automatic fitting.
 
             while low <= high:
                 mid = (low + high) // 2
@@ -833,7 +857,7 @@ class VerticalTypesetter:
 
                     current_col_center_x -= cell_size + best_col_spacing
 
-            self._composite_render_surface(
+            self.last_render_layer = self._composite_render_surface(
                 image,
                 text_surface,
                 render_left,
@@ -867,6 +891,8 @@ class VerticalTypesetter:
             return image
 
         except Exception as e:
+            if manual_layout:
+                raise
             import traceback
             print(f"【严重错误】draw_text 崩溃: {e}")
             traceback.print_exc()

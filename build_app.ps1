@@ -5,13 +5,14 @@ $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
-    Write-Host "未找到.venv，请先运行setup 创建虚拟环境。"
+    Write-Host "未找到 .venv，请按 README 创建虚拟环境。"
     exit 1
 }
 
-& ".\.venv\Scripts\python.exe" -m pip install --upgrade pyinstaller
+& ".\.venv\Scripts\python.exe" -c "import PyInstaller"
 if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+    Write-Host "缺少构建依赖，请执行：.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt"
+    exit 1
 }
 
 & ".\.venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean ComiTrans.spec

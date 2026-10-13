@@ -3,7 +3,7 @@ import numpy as np
 from shapely.geometry import Polygon
 import math
 import copy
-from utils.imgproc_utils import union_area, xywh2xyxypoly, rotate_polygons
+from .imgproc_utils import union_area, xywh2xyxypoly, rotate_polygons
 import cv2
 
 LANG_LIST = ['eng', 'ja', 'unknown']

@@ -1,36 +1,13 @@
 from __future__ import annotations
 
-import os
-import sys
-from pathlib import Path
-
 import cv2
 import numpy as np
 import onnxruntime as ort
 
-
-def _find_detector_utils_dir() -> str:
-    candidates = []
-    if getattr(sys, "frozen", False):
-        meipass = getattr(sys, "_MEIPASS", "")
-        candidates.append(os.path.join(meipass, "comic-translate-ai", "main", "comic_text_detector"))
-        candidates.append(os.path.join(os.path.dirname(sys.executable), "comic-translate-ai", "main", "comic_text_detector"))
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates.append(os.path.join(current_dir, "comic_text_detector"))
-    for cand in candidates:
-        if os.path.isdir(cand):
-            return cand
-    return candidates[-1]
-
-
-DETECTOR_UTILS_DIR = _find_detector_utils_dir()
-if DETECTOR_UTILS_DIR not in sys.path:
-    sys.path.append(DETECTOR_UTILS_DIR)
-
-from utils.db_utils import SegDetectorRepresenter  # noqa: E402
-from utils.imgproc_utils import letterbox  # noqa: E402
-from utils.textblock import group_output  # noqa: E402
-from utils.textmask import REFINEMASK_INPAINT, refine_mask  # noqa: E402
+from comic_text_detector.utils.db_utils import SegDetectorRepresenter
+from comic_text_detector.utils.imgproc_utils import letterbox
+from comic_text_detector.utils.textblock import group_output
+from comic_text_detector.utils.textmask import REFINEMASK_INPAINT, refine_mask
 
 
 def _xywh2xyxy(x: np.ndarray) -> np.ndarray:

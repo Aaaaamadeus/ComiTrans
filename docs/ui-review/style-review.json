@@ -1,0 +1,345 @@
+{
+  "source": "running Qt Widgets",
+  "model_requests": false,
+  "api_requests": false,
+  "captures": [
+    {
+      "file": "automatic-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "font-library-style-review.png",
+      "width": 820,
+      "height": 660,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "font-library-search-style-review.png",
+      "width": 820,
+      "height": 660,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "automatic-custom-font-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-empty-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "settings-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "settings-ocr-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "settings-output-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "diagnosis-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "diagnosis-chat-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-focus-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-layout-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-live-preview-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-mask-preview-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-mask-drag-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-font-switch-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "automatic-preview-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "automatic-1024-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "settings-1024-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "diagnosis-1024-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-1024-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-focus-1024-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "automatic-960-style-review.png",
+      "width": 960,
+      "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "settings-960-style-review.png",
+      "width": 960,
+      "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "diagnosis-960-style-review.png",
+      "width": 960,
+      "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-960-style-review.png",
+      "width": 960,
+      "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-focus-960-style-review.png",
+      "width": 960,
+      "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "automatic-820-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "settings-820-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "diagnosis-820-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-820-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-focus-820-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    }
+  ],
+  "illustrations": [
+    {
+      "file": "studio-import-v1.png",
+      "width": 1536,
+      "height": 1024,
+      "transparent": true
+    },
+    {
+      "file": "studio-editor-v1.png",
+      "width": 1522,
+      "height": 1033,
+      "transparent": true
+    }
+  ],
+  "topbar_geometry": {
+    "brandTitle": [
+      20,
+      8,
+      274,
+      68
+    ],
+    "01  自动处理": [
+      310,
+      20,
+      111,
+      44
+    ],
+    "02  嵌字精修": [
+      429,
+      20,
+      111,
+      44
+    ],
+    "statusPill": [
+      1076,
+      28,
+      100,
+      28
+    ],
+    "设置": [
+      1184,
+      27,
+      46,
+      30
+    ],
+    "诊断": [
+      1238,
+      27,
+      46,
+      30
+    ],
+    "输出目录": [
+      1292,
+      27,
+      74,
+      30
+    ],
+    "反馈": [
+      1374,
+      27,
+      46,
+      30
+    ]
+  },
+  "font_catalog": {
+    "families": 2056,
+    "chinese_handwriting_results": 7,
+    "offline_search": true
+  },
+  "editor_live_preview": {
+    "font_size": 31,
+    "offset_x": 12,
+    "offset_y": 8,
+    "mask_width": 210,
+    "mask_height": 180,
+    "edits_preserve_file_until_save": true,
+    "saved_pixels_match_preview": true,
+    "guide_excluded_from_export": true,
+    "cached_edit_ms": 11.2
+  },
+  "editor_mask_drag": {
+    "handles": 8,
+    "geometry": [
+      93,
+      133,
+      335,
+      337
+    ],
+    "live_during_drag": true,
+    "fields_synchronized": true,
+    "saved_pixels_match_preview": true
+  },
+  "editor_font_switch": {
+    "manual_overrides_default": true,
+    "only_selected_block": true,
+    "save_reload_pixels_match": true,
+    "subsequent_default_keeps_manual_font": true
+  },
+  "brand_font": "Skribble",
+  "log_font": "Aa今日花晴 春懒猫困",
+  "workspace_banners": {
+    "automatic": 0,
+    "editor": 0,
+    "settings": 0,
+    "diagnosis": 0
+  },
+  "success": true
+}

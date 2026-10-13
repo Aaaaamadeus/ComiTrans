@@ -1,0 +1,28 @@
+{
+  "revision": "66928797f271fed5ee428544e7229685e2d90127",
+  "catalog_families": 2056,
+  "catalog_bytes": 1051291,
+  "fonts": [
+    {
+      "family": "Bangers",
+      "actual_name": "Bangers · Regular",
+      "bytes": 93148,
+      "verified_sha1": "9b0f8c1f1b45e7bb4971b7d6a8604f9aacacdd32",
+      "license": "OFL-1.1",
+      "license_preserved": true,
+      "offline_reference": "user_fonts/4160a7311de9342674cce9160cde9fcbb30f48190397d86ff1b70b455af65824.ttf"
+    },
+    {
+      "family": "Zhi Mang Xing",
+      "actual_name": "Zhi Mang Xing · Regular",
+      "bytes": 4063532,
+      "verified_sha1": "d037d1f00395175de01de33e62957c30a008a1b1",
+      "license": "OFL-1.1",
+      "license_preserved": true,
+      "offline_reference": "user_fonts/644e0cae9b40f0b10ab729a01bd32032e3973bac22be3dccae01bf6ae7fde969.ttf"
+    }
+  ],
+  "success": true,
+  "offline_ui_preview": true,
+  "offline_ui_selection": true
+}

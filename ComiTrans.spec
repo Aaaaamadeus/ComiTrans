@@ -34,7 +34,6 @@ hidden_imports = [
     "punctuation_layout",
     "pyclipper",
     "shapely",
-    "tqdm",
     "jaconv",
     "tokenizers",
     "PySide6.QtPdf",
@@ -43,8 +42,10 @@ hidden_imports = [
 
 datas = [
     ("comic-translate-ai/font_file", "comic-translate-ai/font_file"),
-    ("comic-translate-ai/main/comic_text_detector", "comic-translate-ai/main/comic_text_detector"),
+    ("comic-translate-ai/main/comic_text_detector/LICENSE", "licenses/comic-text-detector"),
+    ("comic-translate-ai/main/comic_text_detector/README.md", "licenses/comic-text-detector"),
     ("assets/ComiTrans.ico", "assets"),
+    ("assets/font_catalog.json", "assets"),
     ("assets/ui", "assets/ui"),
 ]
 

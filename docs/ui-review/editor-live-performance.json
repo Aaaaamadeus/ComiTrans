@@ -1,0 +1,18 @@
+{
+  "blocks": 20,
+  "page_pixels": [
+    1600,
+    2400
+  ],
+  "initial_render_ms": 424.3,
+  "cached_edit_ms": [
+    43.3,
+    42.8,
+    42.6,
+    44.9,
+    44.5
+  ],
+  "average_cached_edit_ms": 43.6,
+  "preview_coalesce_ms": 40,
+  "api_requests": false
+}

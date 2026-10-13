@@ -17,6 +17,8 @@ font_cute: font_file/CN/special/KleeOne-Regular.ttf
 font_next_preview: font_file/CN/special/KleeOne-Regular.ttf
 font_title: font_file/CN/SourceHanSansSC-Heavy-2.otf
 font_size: 16
+# 留空沿用漫画风格；在翻译页选择字体后自动保存，导入字体放在应用 user_fonts 目录。
+translation_font: ""
 issue_url: ""
 lama_model: models/manga-lama/lama-manga-dynamic.onnx
 max_workers: null

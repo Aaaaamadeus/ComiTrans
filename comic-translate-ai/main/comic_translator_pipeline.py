@@ -1,10 +1,8 @@
 import os
 import base64
 import io
-import sys
 import json
 import re
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -125,7 +123,8 @@ class ComicTranslatorPipeline:
                  progress_callback=None,
                  cancel_callback=None,
                  ocr_config=None,
-                 watermark_enabled=False):
+                 watermark_enabled=False,
+                 fallback_fonts=None):
         self.device = 'cuda' if use_gpu else 'cpu'
         self.translation_model = translation_model
         self.api_key = api_key
@@ -176,10 +175,7 @@ class ComicTranslatorPipeline:
 
         # 4. 嵌字器
         print("初始化嵌字器")
-        self.typesetter = VerticalTypesetter(font_map, font_size)
-
-        # 线程锁
-        self.lock = threading.Lock()
+        self.typesetter = VerticalTypesetter(font_map, font_size, fallback_fonts=fallback_fonts)
 
     def _report_progress(self, stage, message):
         if self.progress_callback:
@@ -303,21 +299,6 @@ class ComicTranslatorPipeline:
         return (getattr(self, "source_language", "ja") == "ja"
                 and getattr(self, "ocr_backend_active", "baberu") != "自定义 OCR"
                 and len(box) > 8 and box[8] == "eng")
-
-    def is_simple_bubble(self, roi_img):
-        # 判断是否存在气泡
-        if roi_img is None or roi_img.size == 0:
-            return False
-        # 转换成灰度
-        gray = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
-        # 计算均值和标准差
-        mean, std = cv2.meanStdDev(gray)
-        mean_val = mean[0][0]
-        std_val = std[0][0]
-        # 阈值参数设置（收紧：仅处理真正的纯白气泡，防止将网点纸直接涂白）
-        white = mean_val > 230 and std_val < 20
-        print(f"亮度:{mean_val:.2f},标准差:{std_val:.2f}->{'白气泡' if white else '复杂背景'}")
-        return white
 
     def _is_simple_bubble_v2(self, roi_img, erase_mask=None):
         if roi_img is None or roi_img.size == 0:
@@ -526,8 +507,7 @@ class ComicTranslatorPipeline:
         safe_key = f"{API_KEY[:4]}...{API_KEY[-4:]}" if len(API_KEY) > 8 else "***"
         print(f"[INFO] 使用翻译 API: {API_BASE_URL.split('?')[0]}")
         print(f"[INFO] API Key: {safe_key}")
-        import time as _time
-        _t0 = _time.time()
+        _t0 = time.time()
         self._report_progress("translate", f"正在请求翻译 API: {self.translation_model}，{len(ocr_texts)} 条文本")
         
         import urllib.request
@@ -683,7 +663,7 @@ class ComicTranslatorPipeline:
                 if not remaining:
                     self._report_progress(
                         "translate",
-                        f"翻译 API 返回 {len(translations)} 条结果，耗时 {_time.time() - _t0:.1f}s",
+                        f"翻译 API 返回 {len(translations)} 条结果，耗时 {time.time() - _t0:.1f}s",
                     )
                     return translations
 
@@ -787,7 +767,6 @@ class ComicTranslatorPipeline:
         http_client = httpx.Client(proxy=proxy_url, timeout=90.0) if proxy_url else httpx.Client(timeout=90.0)
         client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL, http_client=http_client, max_retries=1)
 
-        reference_font = specs[0][2]
         workers = max(1, min(int(getattr(self, "font_probe_workers", 4) or 1), len(targets)))
         samples = max(1, min(int(getattr(self, "font_probe_samples", 3) or 1), 5))
         result: dict[int, dict] = {}
@@ -806,7 +785,6 @@ class ComicTranslatorPipeline:
                 str(item.get("raw") or ""),
                 specs,
                 direction=int(item.get("direction", 1)),
-                reference_font=reference_font,
                 glyph_px=int(item.get("target_font_size") or 0) or None,
             )
             buffer = io.BytesIO()
@@ -891,8 +869,7 @@ class ComicTranslatorPipeline:
         bubble_metadata = []
         ocr_text_only = []
 
-        # 3.OCR 与 翻译 (并行处理数据)
-        processed_data = []
+        # 3. OCR 与本地排版元数据
         for i, box in enumerate(bubbles_data):
             x1, y1, x2, y2, mask_type, font_type, target_font_size, detected_label, language = box
 
@@ -1072,6 +1049,9 @@ class ComicTranslatorPipeline:
                         non_bubble=item['non_bubble'],
                     )
                     rendered_sizes[idx] = getattr(self.typesetter, "last_font_size", None)
+                    region = getattr(self.typesetter, "last_layout_box", None)
+                    if region is not None:
+                        layout_items[idx]["mask_box"] = list(region)
 
                 except Exception as e:
                     import traceback

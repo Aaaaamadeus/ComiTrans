@@ -49,7 +49,7 @@ class LogPanel(QFrame):
         layout.setSpacing(6)
         bar = QHBoxLayout()
         self.heading = PanelHeading('03', '详细日志')
-        self.heading.setFixedWidth(320)
+        self.heading.setFixedWidth(240)
         bar.addWidget(self.heading)
         self.level = QComboBox()
         self.level.addItems(['全部级别', 'INFO', 'WARN', 'ERROR'])
@@ -86,6 +86,7 @@ class LogPanel(QFrame):
             bar.addWidget(widget, 1 if widget is self.search else 0)
         layout.addLayout(bar)
         self.view = QPlainTextEdit()
+        self.view.setObjectName('logContent')
         self.view.setReadOnly(True)
         # Each event is one Qt block; embedded newlines use Unicode line separators.
         self.view.setMaximumBlockCount(self.LIMIT)
@@ -111,7 +112,7 @@ class LogPanel(QFrame):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.heading.setFixedWidth(180 if self.width() < 920 else 320)
+        self.heading.setFixedWidth(160 if self.width() < 920 else 240)
         self.font_size.setVisible(self.width() >= 920)
         self.level.setVisible(self.width() >= 750)
         self.search.setPlaceholderText('搜索日志' if self.width() >= 750 else '搜索')

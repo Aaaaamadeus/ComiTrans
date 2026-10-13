@@ -98,6 +98,22 @@ def load_ai_config() -> dict[str, Any]:
     font_map = {}
     for style, key in FONT_KEYS.items():
         font_map[style] = str(_resolve_path(raw.get(key), FONT_DEFAULTS[style]))
+    style_font_map = dict(font_map)
+    font_fallbacks = list(dict.fromkeys([
+        *style_font_map.values(),
+        *(str(AI_ROOT / path) for path in FONT_DEFAULTS.values()),
+    ]))
+    translation_font = ''
+    translation_font_active = False
+    if _clean_text(raw.get('translation_font')):
+        from .font_library import inspect_font, resolve_font_reference
+        translation_font = str(resolve_font_reference(_clean_text(raw['translation_font'])))
+        try:
+            inspect_font(translation_font)
+            translation_font_active = True
+            font_map = {style: translation_font for style in FONT_KEYS}
+        except Exception:
+            pass  # Keep usable built-in fonts when an imported file is missing/corrupt.
     ocr_backend = str(raw.get("ocr_backend") or "auto").strip().lower()
     ocr_config = {key: raw.get(key, default) for key, default in OCR_DEFAULTS.items()}
     ocr_config["source_language"] = str(raw.get("source_language") or "ja").strip().lower()
@@ -122,6 +138,10 @@ def load_ai_config() -> dict[str, Any]:
         "issue_url": str(raw.get("issue_url") or ""),
         "use_gpu": bool(raw.get("use_gpu", False)),
         "font_map": font_map,
+        "style_font_map": style_font_map,
+        "font_fallbacks": font_fallbacks,
+        "translation_font": translation_font,
+        "translation_font_active": translation_font_active,
         "detector_model": str(_resolve_path(raw.get("detector_model"), "text_detector/comic-text-detector.onnx", base=MODELS_ROOT)),
         "lama_model": str(_resolve_path(raw.get("lama_model"), "manga-lama/lama-manga-dynamic.onnx", base=MODELS_ROOT)),
         "ocr_backend": ocr_backend,
@@ -164,7 +184,6 @@ def config_fingerprint(config: dict[str, Any]) -> tuple:
         config["ocr_model"],
         config["baberu_ocr_model"],
         tuple(config.get(key, OCR_DEFAULTS.get(key, "")) for key in OCR_CONFIG_KEYS),
-        tuple(sorted(config["font_map"].items())),
     )
 
 

@@ -207,7 +207,6 @@ def build_probe_sheet(
     specs: Sequence[tuple[str, str, str]],
     *,
     direction: int = 1,
-    reference_font: str | None = None,
     glyph_px: int | None = None,
 ) -> Image.Image:
     """拼出「原图 + A/B/C 候选」的竖排对比图。

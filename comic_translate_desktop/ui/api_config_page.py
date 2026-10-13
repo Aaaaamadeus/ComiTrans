@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -13,13 +14,14 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSpinBox,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from ..config import mask_api_key
 from comic_translate_core.languages import SOURCE_LANGUAGES
-from .manga_components import ChapterBanner
+from .manga_components import PanelHeading
 
 
 class ApiConfigPage(QWidget):
@@ -28,29 +30,27 @@ class ApiConfigPage(QWidget):
     def __init__(self, config: dict, parent=None):
         super().__init__(parent)
         self._config = config
+        self._loading_config = False
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        content = QWidget()
-        content.setObjectName("editorPanel")
-        scroll.setWidget(content)
-        outer.addWidget(scroll)
-        root = QVBoxLayout(content)
-        root.setContentsMargins(20, 18, 20, 20)
-        root.setSpacing(14)
-
-        header = ChapterBanner('03', '设置', '翻译服务 / OCR 模型 / 默认输出')
-        root.addWidget(header)
-        subtitle = QLabel("配置翻译服务与本地推理选项，保存后将在下一次任务生效。")
-        subtitle.setProperty("muted", True)
-        root.addWidget(subtitle)
+        outer.setSpacing(0)
+        body = QFrame()
+        body.setObjectName('pageBody')
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(24, 16, 24, 12)
+        self._sections = QTabWidget()
+        self._sections.setDocumentMode(True)
+        self._sections.setAccessibleName('设置分类')
+        body_layout.addWidget(self._sections)
+        outer.addWidget(body, 1)
+        root = self._add_section('01  翻译服务', '连接你的翻译服务', '配置接口与翻译方式，保存后将在下一次任务生效。')
+        ocr_root = self._add_section('02  文字识别', '选择语言与识别方式', '本地识别和自定义 OCR 均在这里配置。')
+        runtime_root = self._add_section('03  运行与输出', '安排输出与运行选项', '设置默认保存位置、硬件加速和输出水印。')
 
         api_group = QGroupBox("翻译服务")
         api_form = QFormLayout(api_group)
-        api_form.setLabelAlignment(Qt.AlignRight)
-        api_form.setSpacing(12)
+        self._style_form(api_form)
 
         self._key_input = QLineEdit()
         self._key_input.setEchoMode(QLineEdit.Password)
@@ -66,16 +66,17 @@ class ApiConfigPage(QWidget):
         self._base_input.setPlaceholderText("https://api.openai.com/v1")
         self._model_input = QLineEdit()
         self._model_input.setPlaceholderText("gemini-2.5-flash")
-        self._multimodal_check = QCheckBox("多模态翻译（发送整页图片，AI 参与字体判别）")
+        self._multimodal_check = QCheckBox("发送整页图片辅助翻译")
         self._multimodal_check.setToolTip(
-            "勾选后会把整页图片发给翻译服务：除翻译外，AI 只对正文类文本块做本地三候选（黑体/宋体/手写）比对；"
-            "字号与排版方向始终由本地算法决定。"
+            "勾选后会把整页图片发给翻译服务，结合画面翻译；默认字体在翻译页选择。"
+            "字号与排版方向由本地算法决定，AI 字体判别需另行启用。"
         )
 
         self._font_probe_check = QCheckBox("AI 字体判别（实验，默认关闭）")
         self._font_probe_check.setToolTip(
             "真实漫画页实测：同一页多次运行可能给出不同判定，且每块需数千 reasoning token。\n"
             "不勾选时多模态只做翻译，字体完全交给本地算法（更稳定）。详见 docs/FONT_STYLE_STRATEGY.md §4.14。"
+            "\n仅在‘自动匹配漫画风格’时运行；翻译页指定的字体优先。"
         )
         self._no_thinking_check = QCheckBox("关闭思考模式（省 token，默认开启）")
         self._no_thinking_check.setToolTip(
@@ -90,11 +91,11 @@ class ApiConfigPage(QWidget):
         api_form.addRow("字体判别", self._font_probe_check)
         api_form.addRow("思考模式", self._no_thinking_check)
         root.addWidget(api_group)
+        root.addStretch(1)
 
         runtime_group = QGroupBox("运行设置")
         runtime_form = QFormLayout(runtime_group)
-        runtime_form.setLabelAlignment(Qt.AlignRight)
-        runtime_form.setSpacing(12)
+        self._style_form(runtime_form)
 
         self._gpu_check = QCheckBox("使用 GPU（需要本机 CUDA 可用）")
         self._ocr_backend = QComboBox()
@@ -121,16 +122,23 @@ class ApiConfigPage(QWidget):
         self._model_info.setProperty("muted", True)
 
         runtime_form.addRow("硬件", self._gpu_check)
-        runtime_form.addRow("被翻译语言", self._source_language)
-        runtime_form.addRow("OCR 引擎", self._ocr_backend)
         runtime_form.addRow("输出目录", output_row)
         runtime_form.addRow("输出水印", self._watermark_check)
         runtime_form.addRow("Issue 链接", self._issue_input)
-        runtime_form.addRow("模型路径", self._model_info)
-        root.addWidget(runtime_group)
+        runtime_root.addWidget(runtime_group)
+        runtime_root.addStretch(1)
+        ocr_group = QGroupBox('语言与引擎')
+        ocr_form = QFormLayout(ocr_group)
+        self._style_form(ocr_form)
+        ocr_form.addRow('原文语言', self._source_language)
+        ocr_form.addRow('OCR 引擎', self._ocr_backend)
+        ocr_form.addRow('本地模型', self._model_info)
+        self._model_info.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        ocr_root.addWidget(ocr_group)
 
         self._ppocr_group = QGroupBox("韩语 / 英语本地 OCR")
         ppocr_form = QFormLayout(self._ppocr_group)
+        self._style_form(ppocr_form)
         self._korean_model = QLineEdit()
         self._english_model = QLineEdit()
         for label, field in (("韩语模型", self._korean_model), ("英语模型", self._english_model)):
@@ -144,10 +152,11 @@ class ApiConfigPage(QWidget):
         note.setWordWrap(True)
         note.setProperty("muted", True)
         ppocr_form.addRow(note)
-        root.addWidget(self._ppocr_group)
+        ocr_root.addWidget(self._ppocr_group)
 
         self._custom_group = QGroupBox("自定义 OCR")
         custom_form = QFormLayout(self._custom_group)
+        self._style_form(custom_form)
         self._custom_language = QLineEdit()
         self._custom_language.setPlaceholderText("例如 fr、de、th；选择自定义 OCR 语言时必填")
         self._custom_language_name = QLineEdit()
@@ -176,21 +185,71 @@ class ApiConfigPage(QWidget):
         note.setWordWrap(True)
         note.setProperty("muted", True)
         custom_form.addRow(note)
-        root.addWidget(self._custom_group)
+        ocr_root.addWidget(self._custom_group)
+        ocr_root.addStretch(1)
 
-        actions = QHBoxLayout()
+        footer = QFrame()
+        footer.setObjectName('pageActions')
+        actions = QHBoxLayout(footer)
+        actions.setContentsMargins(24, 12, 24, 12)
         self._save_btn = QPushButton("保存配置")
         self._save_btn.setProperty("role", "primary")
-        self._save_status = QLabel("")
+        self._save_status = QLabel("修改后点击保存，下次任务生效")
         self._save_status.setProperty("muted", True)
-        actions.addWidget(self._save_btn)
         actions.addWidget(self._save_status)
         actions.addStretch(1)
-        root.addLayout(actions)
-        root.addStretch(1)
+        actions.addWidget(self._save_btn)
+        outer.addWidget(footer)
 
         self._save_btn.clicked.connect(self.save_requested)
         self.load_config(config)
+        for field in self.findChildren(QLineEdit):
+            field.textChanged.connect(self._mark_unsaved)
+        for combo in self.findChildren(QComboBox):
+            combo.currentIndexChanged.connect(self._mark_unsaved)
+        for check in self.findChildren(QCheckBox):
+            if check is not self._show_key_check:
+                check.toggled.connect(self._mark_unsaved)
+        self._custom_timeout.valueChanged.connect(self._mark_unsaved)
+
+    def _add_section(self, tab_title, title, description):
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        canvas = QFrame()
+        canvas.setObjectName('editorPanel')
+        centered = QHBoxLayout(canvas)
+        centered.setContentsMargins(0, 0, 0, 0)
+        content = QFrame()
+        content.setObjectName('editorPanel')
+        content.setMaximumWidth(1040)
+        root = QVBoxLayout(content)
+        root.setContentsMargins(20, 24, 20, 24)
+        root.setSpacing(16)
+        heading = PanelHeading('', title)
+        root.addWidget(heading)
+        hint = QLabel(description)
+        hint.setProperty('muted', True)
+        hint.setWordWrap(True)
+        root.addWidget(hint)
+        centered.addStretch(1)
+        centered.addWidget(content, 8)
+        centered.addStretch(1)
+        scroll.setWidget(canvas)
+        self._sections.addTab(scroll, tab_title)
+        return root
+
+    @staticmethod
+    def _style_form(form):
+        form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        form.setHorizontalSpacing(24)
+        form.setVerticalSpacing(14)
+
+    def _mark_unsaved(self, *args):
+        if not self._loading_config:
+            self._save_status.setText('有未保存的修改')
 
     def _toggle_key_visibility(self, checked: bool) -> None:
         self._key_input.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password)
@@ -233,6 +292,7 @@ class ApiConfigPage(QWidget):
         self._ppocr_group.setVisible(self._source_language.currentData() in ("ko", "en") and self._ocr_backend.currentData() != "custom")
 
     def load_config(self, config: dict) -> None:
+        self._loading_config = True
         self._config = config
         self._key_input.clear()
         if config.get("api_key"):
@@ -270,6 +330,8 @@ class ApiConfigPage(QWidget):
             f"manga-ocr: {config.get('ocr_model', '')}\n"
             f"修复: {config.get('lama_model', '')}"
         )
+        self._loading_config = False
+        self._save_status.setText('修改后点击保存，下次任务生效')
 
     def values(self) -> dict:
         data = {

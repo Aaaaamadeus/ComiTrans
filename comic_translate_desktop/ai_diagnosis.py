@@ -33,12 +33,12 @@ class AiDiagnosis:
 
         from openai import OpenAI
 
-        client = OpenAI(api_key=api_key, base_url=api_base_url, timeout=90)
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-        )
-        answer = response.choices[0].message.content.strip()
+        with OpenAI(api_key=api_key, base_url=api_base_url, timeout=90) as client:
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+            )
+            answer = response.choices[0].message.content.strip()
 
         self._history.append({"role": "user", "content": user_text})
         self._history.append({"role": "assistant", "content": answer})

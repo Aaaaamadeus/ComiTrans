@@ -241,6 +241,56 @@ class DesktopUiTests(unittest.TestCase):
         layout.write_text(json.dumps([dict(text='译文', source_text='日本語', box=[20, 20, 80, 180], style='dialogue', font_size=18, direction=1, offset_x=0, offset_y=0, source_language='ja', custom_metadata='keep')], ensure_ascii=False), encoding='utf-8')
         return output, layout
 
+    def test_settings_draft_survives_navigation_and_preserves_ocr_values(self):
+        from comic_translate_desktop import config
+        with patch.object(config, 'CONFIG_PATH', self.root / 'defaults.yaml'), \
+             patch.object(config, 'PROJECT_ROOT', self.root), \
+             patch.object(MainWindow, '_start_warmup'):
+            window = MainWindow()
+            self.addCleanup(window.close)
+            page = window.api_config_page
+            window._show_api_config()
+            page._model_input.setText('draft-translation-model')
+            page._key_input.setText('draft-key')
+            page._source_language.setCurrentIndex(page._source_language.findData('custom'))
+            page._custom_language.setText('fr')
+            page._custom_url.setText('https://example.invalid/ocr')
+            page._custom_timeout.setValue(90)
+            page._watermark_check.setChecked(True)
+            page._sections.setCurrentIndex(2)
+            window.tabs.setCurrentWidget(window.translate_tab)
+            window._show_api_config()
+            values = page.values()
+            self.assertEqual(values['translation_model'], 'draft-translation-model')
+            self.assertEqual(values['api_key'], 'draft-key')
+            self.assertEqual(values['custom_source_language'], 'fr')
+            self.assertEqual(values['custom_ocr_url'], 'https://example.invalid/ocr')
+            self.assertEqual(values['custom_ocr_timeout'], 90)
+            self.assertEqual(values['ocr_backend'], 'custom')
+            self.assertTrue(values['watermark_enabled'])
+            self.assertIn('未保存', page._save_status.text())
+            self.assertTrue(window._settings_btn.isChecked())
+            self.assertFalse(window._nav_auto.isChecked())
+
+    def test_compact_settings_and_diagnosis_keep_primary_actions_visible(self):
+        from comic_translate_desktop import config
+        with patch.object(config, 'CONFIG_PATH', self.root / 'defaults.yaml'), \
+             patch.object(config, 'PROJECT_ROOT', self.root), \
+             patch.object(MainWindow, '_start_warmup'):
+            window = MainWindow()
+            self.addCleanup(window.close)
+            window.resize(820, 480)
+            window.show()
+            for page, button in ((window.api_config_page, window.api_config_page._save_btn),
+                                 (window.error_log_page, window.error_log_page._send_btn)):
+                window.tabs.setCurrentWidget(page)
+                if page is window.error_log_page:
+                    page._sections.setCurrentIndex(1)
+                self.app.processEvents()
+                self.assertTrue(button.isVisible())
+                self.assertTrue(window.rect().contains(button.mapTo(window, button.rect().topLeft())))
+                self.assertTrue(window.rect().contains(button.mapTo(window, button.rect().bottomRight())))
+
     def test_editor_loading_and_noop_save_preserve_image_and_layout(self):
         output, layout = self.fixture_page()
         original_image, original_layout = output.read_bytes(), layout.read_bytes()
@@ -251,6 +301,32 @@ class DesktopUiTests(unittest.TestCase):
         self.assertEqual(output.read_bytes(), original_image)
         self.assertEqual(layout.read_bytes(), original_layout)
         self.assertEqual(editor.preview._original.toImage().pixelColor(0, 0).name(), '#ffeedd')
+
+    def test_canvas_focus_preserves_draft_and_restores_sidebar_preferences(self):
+        output, layout = self.fixture_page()
+        editor = EditorPage()
+        self.addCleanup(editor.close)
+        editor.load_page(output)
+        editor._pages_toggle.setChecked(True)
+        editor._properties_toggle.setChecked(True)
+        editor._text_input.setPlainText('仍在编辑的译文')
+        original_image, original_layout = output.read_bytes(), layout.read_bytes()
+        editor._focus_btn.setChecked(True)
+        self.assertTrue(editor._dirty)
+        self.assertFalse(editor._pages_toggle.isChecked())
+        self.assertFalse(editor._properties_toggle.isChecked())
+        editor.save_ui_state()
+        self.assertTrue(QSettings().value('ui/editorPages', False, type=bool))
+        self.assertTrue(QSettings().value('ui/editorProperties', False, type=bool))
+        editor._focus_btn.setChecked(False)
+        self.assertTrue(editor._pages_toggle.isChecked())
+        self.assertTrue(editor._properties_toggle.isChecked())
+        self.assertEqual(editor._text_input.toPlainText(), '仍在编辑的译文')
+        self.assertEqual(output.read_bytes(), original_image)
+        self.assertEqual(layout.read_bytes(), original_layout)
+        # This test leaves no persisted panel state for the following tests.
+        QSettings().remove('ui/editorPages')
+        QSettings().remove('ui/editorProperties')
 
     def test_editor_keeps_draft_on_navigation_and_reports_real_save_failure(self):
         output, layout = self.fixture_page()

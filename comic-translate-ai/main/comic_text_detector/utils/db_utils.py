@@ -3,8 +3,6 @@ import numpy as np
 import pyclipper
 from shapely.geometry import Polygon
 from collections import namedtuple
-import warnings
-warnings.filterwarnings('ignore')
 
 
 def iou_rotate(box_a, box_b, method='union'):

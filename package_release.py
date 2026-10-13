@@ -17,13 +17,17 @@ MODEL_FILES = [
     "ppocr/en_PP-OCRv5_rec_mobile.onnx",
 ]
 MODEL_DIRS = ["baberu-ocr", "manga-ocr-onnx"]
-SKIP_DIRS = {"models", "Log", "logs", "__pycache__", ".cache"}
+SKIP_DIRS = {"models", "user_fonts", "Log", "logs", "__pycache__", ".cache"}
 
 
 def collect_app(dist: Path):
     required = ["ComiTrans.exe", "_internal/assets/ui/fonts/Skribble.ttf",
                 "_internal/assets/ui/fonts/AaJinRiHuaQing-ChunLanMaoKun.ttf",
-                "_internal/assets/ui/icons/chevron-down.svg"]
+                "_internal/assets/ui/icons/chevron-down.svg",
+                "_internal/assets/font_catalog.json",
+                "_internal/assets/ui/illustrations/studio-import-v1.png",
+                "_internal/assets/ui/illustrations/studio-editor-v1.png",
+                "_internal/licenses/comic-text-detector/LICENSE"]
     for name in required:
         if not (dist / name).is_file():
             raise FileNotFoundError(f"Build is incomplete: {dist / name}")
@@ -35,6 +39,11 @@ def collect_app(dist: Path):
         if path.name in {"config.yaml", ".env"} or path.suffix == ".log":
             continue
         files.append((path, "ComiTrans/" + rel.as_posix()))
+    for path, name in ((ROOT / f"docs/RELEASE-v{__version__}.md", "README-release.md"),
+                       (ROOT / "CHANGELOG.md", "CHANGELOG.md")):
+        if not path.is_file():
+            raise FileNotFoundError(f"Missing release documentation: {path}")
+        files.append((path, "ComiTrans/" + name))
     return files
 
 

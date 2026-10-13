@@ -4,8 +4,8 @@ from __future__ import annotations
 from functools import lru_cache
 from math import ceil, hypot, sqrt
 
-from PySide6.QtCore import QByteArray
-from PySide6.QtGui import QPainter
+from PySide6.QtCore import QByteArray, QRectF, Qt
+from PySide6.QtGui import QPainter, QPainterPath
 from PySide6.QtSvg import QSvgRenderer
 
 DOT_COLOR = '#111111'
@@ -84,4 +84,30 @@ def draw_tone(painter, bounds, *, compact=False, mask='linear', profile='section
     # QWidget 中用 Qt 的对应混合模式实现 SVG 的 mix-blend-mode: multiply。
     painter.setCompositionMode(QPainter.CompositionMode_Multiply)
     renderer.render(painter, bounds)
+    painter.restore()
+
+
+def draw_corner_tones(painter, bounds, *, compact=False):
+    """Small page-edge accents; keep the central reading area open."""
+    if bounds.width() < 320 or bounds.height() < 150:
+        return
+    width = min(192, bounds.width() * .24)
+    height = min(112, bounds.height() * .28)
+    painter.save()
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setOpacity(.3)
+    corners = (
+        (QRectF(bounds.left() + 8, bounds.top() + 8, width, height), 'left'),
+        (QRectF(bounds.right() - width - 8, bounds.bottom() - height - 8, width, height), 'right'),
+    )
+    for corner, direction in corners:
+        wedge = QPainterPath()
+        wedge.moveTo(corner.topLeft() if direction == 'left' else corner.bottomRight())
+        wedge.lineTo(corner.topRight())
+        wedge.lineTo(corner.bottomLeft())
+        wedge.closeSubpath()
+        painter.save()
+        painter.setClipPath(wedge, Qt.IntersectClip)
+        draw_tone(painter, corner, compact=compact, profile='section', direction=direction)
+        painter.restore()
     painter.restore()
