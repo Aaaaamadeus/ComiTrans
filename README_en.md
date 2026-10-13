@@ -53,12 +53,12 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 ## Before / After
 
 > [!NOTE]
-> User-provided A/B examples: a1/a2 and b1/b2, with the Japanese original on the left and Chinese result on the right. Output is currently Simplified Chinese.
+> User-provided examples from pages 6 and 7: Japanese originals on the left, with their corresponding Simplified Chinese translations on the right.
 
 | Before | After |
 | --- | --- |
-| ![A original](docs/images/before1.jpg) | ![A result](docs/images/after1.jpg) |
-| ![B original](docs/images/before2.jpg) | ![B result](docs/images/after2.jpg) |
+| ![Page 6 Japanese original](docs/images/before1.png) | ![Page 6 Chinese translation](docs/images/after1.png) |
+| ![Page 7 Japanese original](docs/images/before2.png) | ![Page 7 Chinese translation](docs/images/after2.png) |
 
 ## Table of Contents
 

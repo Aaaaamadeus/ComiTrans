@@ -51,12 +51,12 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 ## 翻译前后对比
 
 > [!NOTE]
-> 以下为用户提供的 A、B 两组日文原图与中文结果，分别对应 a1/a2、b1/b2。当前输出语言为简体中文。
+> 以下为用户提供的第 6、7 页对比：左列为日文原图，右列为对应的简体中文译图。
 
 | 翻译前 | 翻译后 |
 | --- | --- |
-| ![A 组原文](docs/images/before1.jpg) | ![A 组译文](docs/images/after1.jpg) |
-| ![B 组原文](docs/images/before2.jpg) | ![B 组译文](docs/images/after2.jpg) |
+| ![第 6 页日文原图](docs/images/before1.png) | ![第 6 页中文译图](docs/images/after1.png) |
+| ![第 7 页日文原图](docs/images/before2.png) | ![第 7 页中文译图](docs/images/after2.png) |
 
 ## 目录
 
