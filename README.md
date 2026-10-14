@@ -107,6 +107,8 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 Release 用户不需要安装 Python、PyTorch、pip 或 CUDA Toolkit。GPU 加速只需本机已有 NVIDIA 驱动。
 
+2026-10-14 的 v2.4.0 重新封包加入补丁基线。早期 2.4.0 用户可下载 `ComiTrans-v2.4.0-baseline-patch.zip`，解压后双击 `Update-ComiTrans.bat`，选择原安装目录。基线版后续可在程序目录运行同名入口，选择对应的小补丁 ZIP。详见[补丁更新说明](docs/PATCH_UPDATES.md)。
+
 ### 源码运行（开发者）
 
 推荐 Python 3.12+，支持 CUDA 的 NVIDIA GPU 可选。
@@ -263,7 +265,9 @@ python package_release.py
 
 - `ComiTrans-v2.4.0-app.zip`：主程序，不含模型
 - `ComiTrans-v2.4.0-models.zip`：含日语、韩语、英语 OCR 的 ONNX 模型包
-- `ComiTrans-v2.4.0-SHA256SUMS.txt`：两个压缩包的 SHA256
+- `ComiTrans-v2.4.0-SHA256SUMS.txt`：程序、模型、基线和迁移补丁的 SHA256
+- `ComiTrans-v2.4.0-baseline.json`：程序文件 SHA256 清单与构建指纹，供后续生成补丁
+- `ComiTrans-v2.4.0-baseline-patch.zip`：早期 2.4.0 升级到基线版的迁移补丁
 
 模型包解压到 `ComiTrans\comic-translate-ai\models\`。
 
@@ -296,6 +300,13 @@ ComiTrans
 └── package_release.py             # Release 拆包脚本
 ```
 ## 更新日志
+
+### v2.4.0 重新封包（2026-10-14）
+
+- 新增逐文件 SHA256 基线、构建指纹和 Windows 补丁更新入口。
+- 后续小版本可按文件生成补丁，校验原构建、备份修改文件并在失败时恢复。
+- 提供早期 2.4.0 到基线版的迁移补丁；配置、字体、模型和漫画保留。覆盖原 2.4.0 程序包并更新校验文件。[补丁说明](docs/PATCH_UPDATES.md)。
+- 完整 176 项回归通过，真实旧包迁移与迁移后的程序启动验证通过。
 
 ### v2.4.0（2026-10-13）
 

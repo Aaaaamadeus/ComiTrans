@@ -1,0 +1,32 @@
+{
+  "baseline_build_id": "4db1c999bbcd2e3f503090b6b41edd9449f13e9122d5774ee823409c9fddec31",
+  "managed_files": 894,
+  "migration_bytes": 91467,
+  "actual_legacy_migration": true,
+  "migrated_files_match_full_package": true,
+  "user_data_preserved": true,
+  "frozen_startup": {
+    "version": "2.4.0",
+    "frozen": true,
+    "pipeline_ready": true,
+    "brand_font": "Skribble",
+    "log_font": "Aa今日花晴 春懒猫困",
+    "missing_glyphs": [],
+    "svg_valid": true,
+    "window_visible": true,
+    "font_imported": true,
+    "font_choice_persisted": true,
+    "font_pipeline_updated": true,
+    "font_models_reused": true,
+    "font_editor_updated": true,
+    "screenshot_saved": true,
+    "catalog_families": 2056,
+    "font_search_enabled": true,
+    "catalog_search_results": 1,
+    "font_library_screenshot_saved": true,
+    "success": true
+  },
+  "regression_tests": 176,
+  "patch_tests": 13,
+  "regression_process_exit": 0
+}

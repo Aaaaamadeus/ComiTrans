@@ -109,6 +109,8 @@ Upgrading from v2.3.0: reuse your existing models. From v2.2.2, existing Japanes
 
 Release users do not need to install Python, PyTorch, pip, or the CUDA Toolkit. GPU acceleration only requires an existing NVIDIA driver.
 
+The 2026-10-14 refresh of v2.4.0 establishes a patch baseline. Original v2.4.0 users can extract `ComiTrans-v2.4.0-baseline-patch.zip`, run `Update-ComiTrans.bat`, and select their installation. Future updates can use the launcher in the app folder to select a small patch ZIP. See the [patch guide](docs/PATCH_UPDATES.md).
+
 ### Run from source (developers)
 
 Python 3.12+ is recommended; an NVIDIA GPU with CUDA support is optional.
@@ -262,7 +264,9 @@ This creates two archives and their checksums, preserving older releases:
 
 - `ComiTrans-v2.4.0-app.zip`: program only, no models
 - `ComiTrans-v2.4.0-models.zip`: ONNX models including Japanese, Korean, and English OCR
-- `ComiTrans-v2.4.0-SHA256SUMS.txt`: SHA256 checksums
+- `ComiTrans-v2.4.0-SHA256SUMS.txt`: checksums for the app, models, baseline and migration patch
+- `ComiTrans-v2.4.0-baseline.json`: file hashes and build fingerprint for generating future patches
+- `ComiTrans-v2.4.0-baseline-patch.zip`: migration patch for the original v2.4.0 package
 
 Extract the models archive into `ComiTrans\comic-translate-ai\models\`.
 
@@ -296,6 +300,13 @@ ComiTrans
 ```
 
 ## Changelog
+
+### v2.4.0 package refresh (2026-10-14)
+
+- Added a file-level SHA256 baseline, build fingerprint and Windows patch launcher.
+- Future minor releases can use file-level patches with source-build checks, backups and automatic restoration on failed writes.
+- Added a migration patch for original v2.4.0 users, preserving configuration, fonts, models and manga. Replaced the original app archive and refreshed its checksums. [Patch guide](docs/PATCH_UPDATES.md).
+- All 176 regression tests passed; migration of the actual original package and startup of the migrated app were verified.
 
 ### v2.4.0 (2026-10-13)
 

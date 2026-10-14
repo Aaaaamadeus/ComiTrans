@@ -2,6 +2,16 @@
 
 漫画工作台、可检索的开源字体库与蒙版热预览。程序和模型继续拆包发布，v2.3.0 用户可复用原有模型。
 
+## 2026-10-14 重新封包：补丁基线
+
+本次替换原 v2.4.0 程序包，加入逐文件 SHA256 基线、构建指纹和 Windows 更新入口，支持后续小版本的增量补丁。
+
+已经下载早期 2.4.0 的用户可使用 `ComiTrans-v2.4.0-baseline-patch.zip`：关闭应用，解压补丁，运行其中的 `Update-ComiTrans.bat`，选择原安装目录。新基线版后续可在程序目录运行该入口，选择小补丁 ZIP。
+
+更新器校验原构建和补丁内容，备份修改文件，失败时恢复；配置、字体、模型和漫画保留。独立 `ComiTrans-v2.4.0-baseline.json` 用于维护者生成补丁。完整程序包仍可用于新安装。
+
+Version 2.4.0 was refreshed on 2026-10-14 with a patch baseline and Windows launcher. Original users can install the small baseline migration patch; future updates can use file-level patches with build verification, backups and restoration on failed writes. User data is preserved.
+
 ## 更新内容
 
 - 沿用黑白漫画风，移除冗余章节横幅，柔化按钮和边框；加入局部网点和空状态漫画插画。
@@ -20,7 +30,7 @@
 
 从 v2.3.0 升级时可直接复用已有模型，只更新主程序。从 v2.2.2 升级可复用日语模型，韩语/英语识别需要新版模型包。保留 `config.yaml`、整个 `user_fonts` 文件夹和漫画输出及布局；不要覆盖旧的用户配置。
 
-`ComiTrans-v2.4.0-SHA256SUMS.txt` 提供两个 ZIP 的 SHA256。无需安装 Python、PyTorch 或 CUDA Toolkit；GPU 加速只需要已有 NVIDIA 驱动。
+`ComiTrans-v2.4.0-SHA256SUMS.txt` 提供程序、模型、基线清单和迁移补丁的 SHA256。无需安装 Python、PyTorch 或 CUDA Toolkit；GPU 加速只需要已有 NVIDIA 驱动。
 
 ## 验证
 

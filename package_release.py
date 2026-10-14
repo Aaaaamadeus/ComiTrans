@@ -7,6 +7,7 @@ from pathlib import Path
 import zipfile
 
 from comic_translate_desktop import __version__
+from comic_translate_core.release_patch import MANIFEST_NAME, json_bytes, manifest_for_files
 
 ROOT = Path(__file__).resolve().parent
 MODELS_SRC = ROOT / "comic-translate-ai" / "models"
@@ -36,11 +37,13 @@ def collect_app(dist: Path):
         rel = path.relative_to(dist)
         if not path.is_file() or any(part in SKIP_DIRS for part in rel.parts):
             continue
-        if path.name in {"config.yaml", ".env"} or path.suffix == ".log":
+        if path.name in {"config.yaml", MANIFEST_NAME, "Apply-Update.ps1", "Update-ComiTrans.bat"} or path.name.startswith('.env') or path.suffix == ".log":
             continue
         files.append((path, "ComiTrans/" + rel.as_posix()))
     for path, name in ((ROOT / f"docs/RELEASE-v{__version__}.md", "README-release.md"),
-                       (ROOT / "CHANGELOG.md", "CHANGELOG.md")):
+                       (ROOT / "CHANGELOG.md", "CHANGELOG.md"),
+                       (ROOT / "scripts/apply_patch.ps1", "Apply-Update.ps1"),
+                       (ROOT / "scripts/apply_patch.bat", "Update-ComiTrans.bat")):
         if not path.is_file():
             raise FileNotFoundError(f"Missing release documentation: {path}")
         files.append((path, "ComiTrans/" + name))
@@ -71,26 +74,41 @@ def write_archive(target: Path, files):
     print(f"{target.name}: {target.stat().st_size / 1e6:.1f} MB", flush=True)
 
 
+def write_checksums(output: Path, paths):
+    checksums = []
+    for path in paths:
+        with path.open('rb') as handle:
+            checksum = hashlib.file_digest(handle, 'sha256').hexdigest()
+        checksums.append(f'{checksum}  {path.name}')
+    (output / f'ComiTrans-v{__version__}-SHA256SUMS.txt').write_text(
+        '\n'.join(checksums) + '\n', encoding='utf-8')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dist", type=Path, default=ROOT / "dist" / "ComiTrans")
     parser.add_argument("--output", type=Path, default=ROOT / "release")
+    parser.add_argument('--app-only', action='store_true', help='Reuse an existing model archive')
     args = parser.parse_args()
     # Validate all inputs before creating either archive.
-    app_files, model_files = collect_app(args.dist), collect_models()
+    app_files = collect_app(args.dist)
+    model_target = args.output / f'ComiTrans-v{__version__}-models.zip'
+    if args.app_only and not model_target.is_file():
+        raise FileNotFoundError(f'--app-only requires an existing model archive: {model_target}')
+    model_files = None if args.app_only else collect_models()
+    baseline = manifest_for_files(__version__, app_files)
     args.output.mkdir(parents=True, exist_ok=True)
+    baseline_path = args.output / f'ComiTrans-v{__version__}-baseline.json'
+    baseline_path.write_bytes(json_bytes(baseline))
+    app_files.append((baseline_path, 'ComiTrans/' + MANIFEST_NAME))
     archives = []
     for kind, files in (("app", app_files), ("models", model_files)):
         target = args.output / f"ComiTrans-v{__version__}-{kind}.zip"
-        write_archive(target, files)
+        if files is not None:
+            write_archive(target, files)
         archives.append(target)
-    checksums = []
-    for path in archives:
-        with path.open("rb") as handle:
-            checksum = hashlib.file_digest(handle, "sha256").hexdigest()
-        checksums.append(f"{checksum}  {path.name}")
-    (args.output / f"ComiTrans-v{__version__}-SHA256SUMS.txt").write_text(
-        "\n".join(checksums) + "\n", encoding="utf-8")
+    write_checksums(args.output, [*archives, baseline_path])
+    print(f'Release baseline: {baseline["build_id"]}', flush=True)
 
 
 if __name__ == "__main__":
