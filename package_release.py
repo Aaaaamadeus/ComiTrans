@@ -1,4 +1,4 @@
-"""Create versioned app/model archives and checksums; keep older releases."""
+"""Create app/model archives and versioned repository metadata."""
 from __future__ import annotations
 
 import argparse
@@ -80,7 +80,7 @@ def write_checksums(output: Path, paths):
         with path.open('rb') as handle:
             checksum = hashlib.file_digest(handle, 'sha256').hexdigest()
         checksums.append(f'{checksum}  {path.name}')
-    (output / f'ComiTrans-v{__version__}-SHA256SUMS.txt').write_text(
+    (output / 'SHA256SUMS.txt').write_text(
         '\n'.join(checksums) + '\n', encoding='utf-8')
 
 
@@ -89,6 +89,9 @@ def main():
     parser.add_argument("--dist", type=Path, default=ROOT / "dist" / "ComiTrans")
     parser.add_argument("--output", type=Path, default=ROOT / "release")
     parser.add_argument('--app-only', action='store_true', help='Reuse an existing model archive')
+    parser.add_argument('--metadata-dir', type=Path,
+                        default=ROOT / 'docs' / 'releases' / f'v{__version__}',
+                        help='Repository directory for the baseline and checksums')
     args = parser.parse_args()
     # Validate all inputs before creating either archive.
     app_files = collect_app(args.dist)
@@ -98,7 +101,8 @@ def main():
     model_files = None if args.app_only else collect_models()
     baseline = manifest_for_files(__version__, app_files)
     args.output.mkdir(parents=True, exist_ok=True)
-    baseline_path = args.output / f'ComiTrans-v{__version__}-baseline.json'
+    args.metadata_dir.mkdir(parents=True, exist_ok=True)
+    baseline_path = args.metadata_dir / 'baseline.json'
     baseline_path.write_bytes(json_bytes(baseline))
     app_files.append((baseline_path, 'ComiTrans/' + MANIFEST_NAME))
     archives = []
@@ -107,8 +111,9 @@ def main():
         if files is not None:
             write_archive(target, files)
         archives.append(target)
-    write_checksums(args.output, [*archives, baseline_path])
+    write_checksums(args.metadata_dir, [*archives, baseline_path])
     print(f'Release baseline: {baseline["build_id"]}', flush=True)
+    print(f'Repository metadata: {args.metadata_dir}', flush=True)
 
 
 if __name__ == "__main__":

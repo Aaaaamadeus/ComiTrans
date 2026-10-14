@@ -261,12 +261,15 @@ Python 扩展通过 `OcrEngine.recognize(image, language) -> OcrResult` 接入�
 python package_release.py
 ```
 
-会生成两个 release 包及 SHA256 校验文件；保留旧版本文件：
+Release 提供两个压缩包：
 
 - `ComiTrans-v2.4.0-app.zip`：主程序，不含模型
 - `ComiTrans-v2.4.0-models.zip`：含日语、韩语、英语 OCR 的 ONNX 模型包
-- `ComiTrans-v2.4.0-SHA256SUMS.txt`：程序、模型和基线清单的 SHA256
-- `ComiTrans-v2.4.0-baseline.json`：程序文件 SHA256 清单与构建指纹，供后续生成补丁
+
+版本元数据保存在源码仓库，随发布提交：
+
+- [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json)：程序文件 SHA256 清单与构建指纹，供后续生成补丁
+- [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt)：程序包、模型包和基线清单的 SHA256
 
 模型包解压到 `ComiTrans\comic-translate-ai\models\`。
 
@@ -303,6 +306,7 @@ ComiTrans
 ### v2.4.0（2026-10-13）
 
 - 新增逐文件 SHA256 补丁基线、构建指纹和 Windows 更新入口；后续小版本可按文件生成补丁，校验原构建、备份修改文件并在失败时恢复。[补丁说明](docs/PATCH_UPDATES.md)。
+- 基线和 SHA256 校验信息保存在源码仓库；发布页提供程序包与模型包，程序内自带更新校验基线。
 - 漫画风界面改为开放式分区，移除大号章节横幅，柔化按钮与边框；增加局部网点和空状态漫画插画，补齐右上角日文字形。
 - 翻译页直接导入字体、设置默认译文字体；加入约 1 MB 的完整 Google Fonts 目录快照，支持名称检索、语言/风格筛选、后台下载、许可证保留及离线使用。
 - 精修支持八个拖拽点自由调整蒙版、拖动位置和 Esc 撤销本次拖动；字号、X/Y、文本与字体自动预览，保存直接输出当前结果并持久化布局。

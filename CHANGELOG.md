@@ -4,11 +4,12 @@
 
 ## v2.4.0 — 2026-10-13
 
-主程序与模型拆包发布，另提供补丁基线和 SHA256 校验文件；v2.3.0 用户可直接复用已有模型。源码可通过 `start.bat` 或 `.venv\Scripts\python run.py` 运行。[v2.4.0 发布说明](docs/RELEASE-v2.4.0.md)。
+主程序与模型拆包发布，补丁基线和 SHA256 校验信息保存在源码仓库；v2.3.0 用户可直接复用已有模型。源码可通过 `start.bat` 或 `.venv\Scripts\python run.py` 运行。[v2.4.0 发布说明](docs/RELEASE-v2.4.0.md)。
 
 ### 补丁基线与更新
 
 - 完整程序包内新增 `release-manifest.json`，记录程序文件的大小、SHA256、目标平台与构建指纹。
+- 将 `baseline.json` 和 `SHA256SUMS.txt` 保存在 `docs/releases/v2.4.0/`，随版本源码提交；发布页提供程序包与模型包。
 - 新增 Windows `Update-ComiTrans.bat` 入口，无需 Python，支持 ZIP 和已解压补丁。
 - 新增按文件生成补丁的维护工具；补丁记录原始和目标构建、新增修改文件及删除清单。
 - 更新前校验所有原始程序文件和补丁内容；备份修改文件，写入失败自动恢复，完成后校验目标构建。

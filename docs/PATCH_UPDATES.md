@@ -20,7 +20,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Apply-Update.ps1 -Patc
 
 ## 维护者生成补丁
 
-`package_release.py` 为完整程序包加入基线，同时输出 `ComiTrans-v<版本>-baseline.json`。基线不包含自身哈希，避免循环依赖。
+`package_release.py` 为完整程序包加入基线，同时将 `baseline.json` 和 `SHA256SUMS.txt` 写入源码目录 `docs/releases/v<版本>/`，随发布源码提交。Release 只提供程序包和模型包。基线不包含自身哈希，校验文件也不进入程序包，避免循环依赖。
 
 ```powershell
 # 构建并打包后续版本，先更新应用版本号和对应发布说明。
@@ -28,7 +28,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Apply-Update.ps1 -Patc
 .\.venv\Scripts\python.exe package_release.py
 
 # 以下以未来的 2.4.1 为例。
-.\.venv\Scripts\python.exe scripts/create_patch.py --base release/v2.4.0/ComiTrans-v2.4.0-baseline.json --target release/ComiTrans-v2.4.1-app.zip --output release/ComiTrans-v2.4.0-to-v2.4.1-patch.zip
+.\.venv\Scripts\python.exe scripts/create_patch.py --base docs/releases/v2.4.0/baseline.json --target release/ComiTrans-v2.4.1-app.zip --output release/ComiTrans-v2.4.0-to-v2.4.1-patch.zip
 ```
 
 `--base` 也可使用包含基线的上一版完整程序 ZIP。目标 ZIP 必须包含基线。补丁按 SHA256 比较，只携带新增或修改文件及删除清单；生成前校验目标包与其清单一致。
@@ -46,3 +46,5 @@ v2.4.0 includes a file-level baseline. Close the app, run `Update-ComiTrans.bat`
 The updater verifies the installed files, payload and final result, backs up changed files, and restores them on a failed write. Configuration, fonts, models and manga are preserved. Backups live in `.comitrans-update`.
 
 Build fingerprints identify the source and target of each patch. Maintainers can use `scripts/create_patch.py` with a prior baseline JSON or app ZIP and a new app ZIP. Full packages remain available for fresh installs.
+
+Baseline JSON and SHA256 checksums are committed under `docs/releases/v<version>/` in the source repository. Releases provide the app and model archives; the app includes its own baseline.

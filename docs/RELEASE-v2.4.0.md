@@ -21,7 +21,7 @@
 
 从 v2.3.0 升级时可直接复用已有模型，只更新主程序。从 v2.2.2 升级可复用日语模型，韩语/英语识别需要新版模型包。保留 `config.yaml`、整个 `user_fonts` 文件夹和漫画输出及布局；不要覆盖旧的用户配置。
 
-`ComiTrans-v2.4.0-baseline.json` 是供维护者生成后续补丁的文件清单。`ComiTrans-v2.4.0-SHA256SUMS.txt` 提供程序、模型和基线清单的 SHA256。无需安装 Python、PyTorch 或 CUDA Toolkit；GPU 加速只需要已有 NVIDIA 驱动。
+基线清单和 SHA256 校验信息保存在[源码的版本元数据目录](https://github.com/Aaaaamadeus/ComiTrans/tree/v2.4.0/docs/releases/v2.4.0)，发布页下载程序包、模型包即可。无需安装 Python、PyTorch 或 CUDA Toolkit；GPU 加速只需要已有 NVIDIA 驱动。
 
 ## 验证
 
@@ -43,5 +43,7 @@
 v2.4.0 refreshes the manga workbench, adds a searchable Google Fonts catalog with on-demand downloads and offline reuse, and introduces free mask resizing with live typesetting previews. Manual editor fonts override the translation default only for the selected block and persist after saving.
 
 It also includes a file-level patch baseline and Windows update launcher for future minor releases, with build checks, backups and restoration on failed writes.
+
+Baseline JSON and SHA256 checksums are stored in the [source repository](https://github.com/Aaaaamadeus/ComiTrans/tree/v2.4.0/docs/releases/v2.4.0). The Release provides the app and model archives.
 
 Download the app and model ZIPs and merge their top-level `ComiTrans` folders. Existing v2.3.0 models can be reused. Preserve your configuration, the entire `user_fonts` folder, and manga outputs/layouts when upgrading. The SHA256 file verifies both archives. See the English README for setup and usage.

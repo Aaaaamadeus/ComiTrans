@@ -1,5 +1,5 @@
 {
-  "baseline_build_id": "7a56df38cb5f9757bec2d4b22139646dcd54a3492c1b03c6842db462a133cce3",
+  "baseline_build_id": "0a914ad3689dc3943f9edd27eba397026c9a007063f837804b88be6f72337625",
   "managed_files": 894,
   "user_data_preserved": true,
   "frozen_startup": {
@@ -26,5 +26,7 @@
   "regression_tests": 176,
   "patch_tests": 13,
   "regression_process_exit": 0,
-  "baseline_file_hashes_verified": true
+  "baseline_file_hashes_verified": true,
+  "repository_metadata": "docs/releases/v2.4.0",
+  "metadata_matches_packaged_baseline": true
 }

@@ -260,12 +260,15 @@ By default the app is built without models. For local testing with models:
 python package_release.py
 ```
 
-This creates two archives and their checksums, preserving older releases:
+The Release provides two archives:
 
 - `ComiTrans-v2.4.0-app.zip`: program only, no models
 - `ComiTrans-v2.4.0-models.zip`: ONNX models including Japanese, Korean, and English OCR
-- `ComiTrans-v2.4.0-SHA256SUMS.txt`: checksums for the app, models and baseline
-- `ComiTrans-v2.4.0-baseline.json`: file hashes and build fingerprint for generating future patches
+
+Version metadata is stored and committed in the source repository:
+
+- [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json): file hashes and build fingerprint for generating future patches
+- [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt): checksums for the app, models and baseline
 
 Extract the models archive into `ComiTrans\comic-translate-ai\models\`.
 
@@ -303,6 +306,7 @@ ComiTrans
 ### v2.4.0 (2026-10-13)
 
 - Added a file-level SHA256 baseline, build fingerprint and Windows patch launcher. Future minor releases can use file-level patches with source-build checks, backups and restoration on failed writes. [Patch guide](docs/PATCH_UPDATES.md).
+- Baselines and checksums are stored in the source repository. Releases provide the app and model archives; the app includes its update baseline.
 - Open manga workspaces with softer buttons and borders, local halftones, and empty-state illustrations; removed large chapter banners and supplied missing Japanese header glyphs.
 - Font imports and default translation font selection on the translation page; an approximately 1 MB Google Fonts catalog with name search, language/style filters, background downloads, license preservation, and offline reuse.
 - Eight mask resize handles, free resizing, position dragging, and Esc to cancel a drag. Text, font, size, and X/Y changes preview automatically; saving exports the current result and persists its layout.
