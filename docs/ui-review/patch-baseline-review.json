@@ -1,9 +1,6 @@
 {
-  "baseline_build_id": "4db1c999bbcd2e3f503090b6b41edd9449f13e9122d5774ee823409c9fddec31",
+  "baseline_build_id": "7a56df38cb5f9757bec2d4b22139646dcd54a3492c1b03c6842db462a133cce3",
   "managed_files": 894,
-  "migration_bytes": 91467,
-  "actual_legacy_migration": true,
-  "migrated_files_match_full_package": true,
   "user_data_preserved": true,
   "frozen_startup": {
     "version": "2.4.0",
@@ -28,5 +25,6 @@
   },
   "regression_tests": 176,
   "patch_tests": 13,
-  "regression_process_exit": 0
+  "regression_process_exit": 0,
+  "baseline_file_hashes_verified": true
 }

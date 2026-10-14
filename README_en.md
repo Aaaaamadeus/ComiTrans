@@ -109,7 +109,7 @@ Upgrading from v2.3.0: reuse your existing models. From v2.2.2, existing Japanes
 
 Release users do not need to install Python, PyTorch, pip, or the CUDA Toolkit. GPU acceleration only requires an existing NVIDIA driver.
 
-The 2026-10-14 refresh of v2.4.0 establishes a patch baseline. Original v2.4.0 users can extract `ComiTrans-v2.4.0-baseline-patch.zip`, run `Update-ComiTrans.bat`, and select their installation. Future updates can use the launcher in the app folder to select a small patch ZIP. See the [patch guide](docs/PATCH_UPDATES.md).
+v2.4.0 includes a patch baseline and Windows update launcher. For future minor releases, run `Update-ComiTrans.bat` in the app folder and select the corresponding small patch ZIP. See the [patch guide](docs/PATCH_UPDATES.md).
 
 ### Run from source (developers)
 
@@ -264,9 +264,8 @@ This creates two archives and their checksums, preserving older releases:
 
 - `ComiTrans-v2.4.0-app.zip`: program only, no models
 - `ComiTrans-v2.4.0-models.zip`: ONNX models including Japanese, Korean, and English OCR
-- `ComiTrans-v2.4.0-SHA256SUMS.txt`: checksums for the app, models, baseline and migration patch
+- `ComiTrans-v2.4.0-SHA256SUMS.txt`: checksums for the app, models and baseline
 - `ComiTrans-v2.4.0-baseline.json`: file hashes and build fingerprint for generating future patches
-- `ComiTrans-v2.4.0-baseline-patch.zip`: migration patch for the original v2.4.0 package
 
 Extract the models archive into `ComiTrans\comic-translate-ai\models\`.
 
@@ -301,22 +300,16 @@ ComiTrans
 
 ## Changelog
 
-### v2.4.0 package refresh (2026-10-14)
-
-- Added a file-level SHA256 baseline, build fingerprint and Windows patch launcher.
-- Future minor releases can use file-level patches with source-build checks, backups and automatic restoration on failed writes.
-- Added a migration patch for original v2.4.0 users, preserving configuration, fonts, models and manga. Replaced the original app archive and refreshed its checksums. [Patch guide](docs/PATCH_UPDATES.md).
-- All 176 regression tests passed; migration of the actual original package and startup of the migrated app were verified.
-
 ### v2.4.0 (2026-10-13)
 
+- Added a file-level SHA256 baseline, build fingerprint and Windows patch launcher. Future minor releases can use file-level patches with source-build checks, backups and restoration on failed writes. [Patch guide](docs/PATCH_UPDATES.md).
 - Open manga workspaces with softer buttons and borders, local halftones, and empty-state illustrations; removed large chapter banners and supplied missing Japanese header glyphs.
 - Font imports and default translation font selection on the translation page; an approximately 1 MB Google Fonts catalog with name search, language/style filters, background downloads, license preservation, and offline reuse.
 - Eight mask resize handles, free resizing, position dragging, and Esc to cancel a drag. Text, font, size, and X/Y changes preview automatically; saving exports the current result and persists its layout.
 - Fixed global defaults overriding editor font choices and whole-text replacement on missing glyphs. Manual fonts affect only the selected block, retain per-glyph fallback, and survive save/reload.
 - Removed the approved 82 legacy web, obsolete CLI, and training files. Simplified ONNX imports, warmup, and build dependencies; closed diagnosis HTTP clients correctly.
 - Separate multimodal translation and experimental font-comparison switches, with comparison disabled by default. Improved local candidates, voting, and API thinking controls; documented the proposed translation constraints.
-- Validation: 163 automated tests passed, 33 real Qt captures at each of normal and 200% scaling passed, and real font downloads plus offline selection were verified.
+- Validation: 176 automated tests passed, 33 real Qt captures at each of normal and 200% scaling passed, and real font downloads, offline selection, patch validation and rollback were verified.
 
 App and models remain separate packages; v2.3.0 users can reuse their models. See the [v2.4.0 release notes](docs/RELEASE-v2.4.0.md), [detailed changelog](CHANGELOG.md), [cleanup record](docs/PROJECT_CLEANUP.md), and [editor guide](docs/EDITOR_LIVE_PREVIEW.md).
 
