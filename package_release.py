@@ -81,7 +81,7 @@ def write_checksums(output: Path, paths):
             checksum = hashlib.file_digest(handle, 'sha256').hexdigest()
         checksums.append(f'{checksum}  {path.name}')
     (output / 'SHA256SUMS.txt').write_text(
-        '\n'.join(checksums) + '\n', encoding='utf-8')
+        '\n'.join(checksums) + '\n', encoding='utf-8', newline='\n')
 
 
 def main():

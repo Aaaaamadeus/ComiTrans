@@ -1,0 +1,3 @@
+# Preserve checksum-related metadata bytes on Windows and other platforms.
+docs/releases/**/baseline.json text eol=lf
+docs/releases/**/SHA256SUMS.txt text eol=lf
