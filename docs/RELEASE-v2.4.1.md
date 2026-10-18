@@ -2,13 +2,13 @@
 
 ## 下载与安装
 
-本版提供完整程序包 **`ComiTrans-v2.4.1-app.zip`**，不提供本版增量补丁。无需安装 Python 或 CUDA Toolkit。
+1. 下载本页的 `ComiTrans-v2.4.1-app.zip`（程序包）和 `ComiTrans-v2.4.1-models.zip`（模型包）。
+2. 两个压缩包解压到同一个父目录，合并顶层同名 `ComiTrans` 文件夹，保留子目录结构。
+3. 双击合并后的 `ComiTrans/ComiTrans.exe`，在“设置”中配置翻译服务即可。
 
-- 首次安装：解压程序包，再将 [v2.4.0 模型包](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.4.0/ComiTrans-v2.4.0-models.zip) 合并到 `ComiTrans/comic-translate-ai/models/`，运行 `ComiTrans.exe`。
-- 已有安装：关闭程序，将完整程序包解压到新目录。从旧目录复制 `config.yaml`、`user_fonts/` 和整个 `comic-translate-ai/models/` 到新目录的对应位置，再启动新程序。已有模型无需重复下载。
-- 漫画、输出图片、布局和日志继续保留在原位置；需要迁移时一并复制，保持输出图片与对应 `_cleaned`、`_layout` 目录的相对位置。确认新程序正常后再整理旧目录。
+合并后模型位于 `ComiTrans/comic-translate-ai/models/`。已有模型可继续复用，无需重复下载。无需安装 Python、PyTorch 或 CUDA Toolkit。
 
-基线 JSON 和 SHA256 校验信息保存在 [源码 docs/releases/v2.4.1/](https://github.com/Aaaaamadeus/ComiTrans/tree/v2.4.1/docs/releases/v2.4.1)，不作为额外下载附件。
+基线 JSON 和 SHA256 校验信息保存在 [源码 docs/releases/v2.4.1/](https://github.com/Aaaaamadeus/ComiTrans/tree/main/docs/releases/v2.4.1)，不作为额外下载附件。
 
 ## 更新内容
 
@@ -32,4 +32,4 @@
 
 v2.4.1 adds English and Japanese interfaces (Chinese remains the default), a first-launch language chooser and a language setting. It also includes Simplified/Traditional Chinese output, bundled manga fonts, manual line breaks, outline lettering, vertical column alignment and continuous vertical punctuation. Font and alignment choices are grouped inside Translation Preferences. Successful batches have a 15% chance to show a dismissible Star prompt that closes after eight idle seconds.
 
-Download the full **`ComiTrans-v2.4.1-app.zip`**. This release does not provide an incremental patch. Close the old app, extract the full archive into a new folder, and copy `config.yaml`, `user_fonts/` and `comic-translate-ai/models/` from the old installation to the same relative locations. Keep your output images and their companion cleaned/layout folders together. Existing models remain reusable; fresh installs use the [v2.4.0 model archive](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.4.0/ComiTrans-v2.4.0-models.zip).
+Download **`ComiTrans-v2.4.1-app.zip`** and **`ComiTrans-v2.4.1-models.zip`** from this release. Extract both into the same parent directory and merge their top-level `ComiTrans` folders, preserving the subfolder structure. Run `ComiTrans/ComiTrans.exe` and configure your translation service in Settings. Existing models can be reused. Python, PyTorch and the CUDA Toolkit are not required.

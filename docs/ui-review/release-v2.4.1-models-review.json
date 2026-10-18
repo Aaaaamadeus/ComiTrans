@@ -1,0 +1,16 @@
+{
+  "reviewed_on": "2026-10-18",
+  "version": "2.4.1",
+  "asset": "ComiTrans-v2.4.1-models.zip",
+  "bytes": 485652354,
+  "sha256": "91ab483d147caab5ea1ea18a1d9ac6f5c4719291bf7adbdbe3876332b34c1c32",
+  "source": "v2.4.0 model archive, unchanged content",
+  "required_files_present": 22,
+  "zip_integrity_passed": true,
+  "compatible_with": "v2.4.1 full app; no new models required for existing installations",
+  "release": "https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.4.1",
+  "browser_download_url": "https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.4.1/ComiTrans-v2.4.1-models.zip",
+  "github_digest_matches_local": true,
+  "app_archive_unchanged": true,
+  "install_instructions": "Extract both archives into one parent directory and merge the top-level ComiTrans folders."
+}

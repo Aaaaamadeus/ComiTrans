@@ -104,10 +104,9 @@ A fully successful translation batch has a 15% chance of showing a small reposit
 
 ### Release users (recommended)
 
-1. Download `ComiTrans-v2.4.1-app.zip` from [Releases](https://github.com/Aaaaamadeus/ComiTrans/releases) and reuse `ComiTrans-v2.4.0-models.zip`. Existing installations can migrate their settings and models using the steps below.
-2. Extract the app archive into a `ComiTrans` folder.
-3. Extract both archives into the same parent directory, merging their top-level `ComiTrans` folders. The final model path is `ComiTrans\comic-translate-ai\models\`.
-4. Double-click `ComiTrans.exe` and enter your translation API key and model on the "Settings" page.
+1. Download `ComiTrans-v2.4.1-app.zip` and `ComiTrans-v2.4.1-models.zip` from the [v2.4.1 release](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.4.1).
+2. Extract both archives into the same parent directory and merge their top-level `ComiTrans` folders, preserving the subfolder structure. The final model path is `ComiTrans\comic-translate-ai\models\`.
+3. Double-click the merged `ComiTrans.exe` and enter your translation API key and model on the "Settings" page.
 
 Upgrading from v2.3.0: reuse your existing models. From v2.2.2, existing Japanese models can be reused; merge the new model archive to add Korean/English recognition. Keep your existing `config.yaml`, entire `user_fonts` folder, and output files.
 
@@ -276,15 +275,15 @@ By default the app is built without models. For local testing with models:
 python package_release.py
 ```
 
-This Release provides the full app archive; models are reused from v2.4.0:
+This Release provides the full app and model archives:
 
 - `ComiTrans-v2.4.1-app.zip`: program only, no models
-- [ComiTrans-v2.4.0-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.4.0/ComiTrans-v2.4.0-models.zip): ONNX models including Japanese, Korean, and English OCR
+- [ComiTrans-v2.4.1-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.4.1/ComiTrans-v2.4.1-models.zip): ONNX models including Japanese, Korean, and English OCR; existing models can be reused
 
 Version metadata is stored and committed in the source repository:
 
 - [docs/releases/v2.4.1/baseline.json](docs/releases/v2.4.1/baseline.json): v2.4.1 target build fingerprint
-- [docs/releases/v2.4.1/SHA256SUMS.txt](docs/releases/v2.4.1/SHA256SUMS.txt): v2.4.1 app and target baseline checksums
+- [docs/releases/v2.4.1/SHA256SUMS.txt](docs/releases/v2.4.1/SHA256SUMS.txt): v2.4.1 app, models and target baseline checksums
 
 - [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json): file hashes and build fingerprint for generating future patches
 - [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt): checksums for the app, models and baseline
@@ -331,7 +330,7 @@ ComiTrans
 - Translation font and default vertical alignment choices grouped inside collapsible Translation Preferences.
 - Manual hard line breaks, outline lettering, top/center/bottom column alignment and persistent live editor previews.
 - Default watermark with an off switch on the first Settings tab; prior off choices remain honored.
-- Full app archive for this release; existing models remain reusable. [Update guide](docs/RELEASE-v2.4.1.md).
+- Full app and model archives are provided together; extract and merge their top-level `ComiTrans` folders. Existing models remain reusable. [Update guide](docs/RELEASE-v2.4.1.md).
 
 ### v2.4.0 (2026-10-13)
 

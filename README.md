@@ -102,10 +102,9 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ### Release 用户（推荐）
 
-1. 在[发布页](https://github.com/Aaaaamadeus/ComiTrans/releases)下载 `ComiTrans-v2.4.1-app.zip`（主程序），模型沿用 `ComiTrans-v2.4.0-models.zip`。已有安装按下方步骤迁移配置与模型。
-2. 解压主程序包得到 `ComiTrans` 文件夹。
-3. 两个压缩包都解压到同一个父目录，让包内的 `ComiTrans` 文件夹合并，最终模型路径为 `ComiTrans\comic-translate-ai\models\`。
-4. 双击 `ComiTrans.exe`，在“设置”页填写翻译 API Key 和模型。
+1. 在[发布页](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.4.1)下载 `ComiTrans-v2.4.1-app.zip`（程序包）和 `ComiTrans-v2.4.1-models.zip`（模型包）。
+2. 两个压缩包解压到同一个父目录，合并顶层同名 `ComiTrans` 文件夹，保留子目录结构。最终模型路径为 `ComiTrans\comic-translate-ai\models\`。
+3. 双击合并后的 `ComiTrans.exe`，在“设置”页填写翻译 API Key 和模型。
 
 从 v2.3.0 升级可复用已有模型；从 v2.2.2 升级时，日语模型可复用，韩语/英语识别需合并新版模型包。保留原有 `config.yaml`、整个 `user_fonts` 文件夹与输出文件。
 
@@ -277,15 +276,15 @@ Python 扩展通过 `OcrEngine.recognize(image, language) -> OcrResult` 接入�
 python package_release.py
 ```
 
-本版 Release 提供完整程序包；模型沿用 v2.4.0：
+本版 Release 提供完整程序包与模型包：
 
 - `ComiTrans-v2.4.1-app.zip`：主程序，不含模型
-- [ComiTrans-v2.4.0-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.4.0/ComiTrans-v2.4.0-models.zip)：含日语、韩语、英语 OCR 的 ONNX 模型包
+- [ComiTrans-v2.4.1-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.4.1/ComiTrans-v2.4.1-models.zip)：含日语、韩语、英语 OCR 的 ONNX 模型包；已有模型可复用
 
 版本元数据保存在源码仓库，随发布提交：
 
 - [docs/releases/v2.4.1/baseline.json](docs/releases/v2.4.1/baseline.json)：2.4.1 目标构建基线
-- [docs/releases/v2.4.1/SHA256SUMS.txt](docs/releases/v2.4.1/SHA256SUMS.txt)：2.4.1 完整程序及目标基线的 SHA256
+- [docs/releases/v2.4.1/SHA256SUMS.txt](docs/releases/v2.4.1/SHA256SUMS.txt)：2.4.1 程序包、模型包及目标基线的 SHA256
 
 - [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json)：程序文件 SHA256 清单与构建指纹，供后续生成补丁
 - [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt)：程序包、模型包和基线清单的 SHA256
