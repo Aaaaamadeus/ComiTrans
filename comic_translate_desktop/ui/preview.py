@@ -1,4 +1,5 @@
 from __future__ import annotations
+from ..i18n import tr
 
 from pathlib import Path
 from functools import lru_cache
@@ -77,7 +78,7 @@ class PageCanvas(QLabel):
         self.region_editable = False
         self._region_drag = None
         self.setMouseTracking(True)
-        self.setAccessibleName('漫画画布')
+        self.setAccessibleName(tr('漫画画布'))
 
     def page_rect(self):
         pixmap = self.pixmap()
@@ -293,19 +294,19 @@ class ImagePreview(QWidget):
         content.addWidget(self._art, 0, Qt.AlignVCenter)
         message_layout = QVBoxLayout()
         message_layout.setSpacing(12)
-        self._empty_title = QLabel('从一页漫画开始' if import_action else '等待预览')
+        self._empty_title = QLabel(tr('从一页漫画开始') if import_action else tr('等待预览'))
         self._empty_title.setObjectName('emptyPreviewTitle')
         self._empty_title.setFont(display_font(28))
         self._empty_title.setWordWrap(True)
         self._empty_title.setAlignment(Qt.AlignCenter)
         message_layout.addWidget(self._empty_title)
-        self._hint = QLabel('导入原稿，让故事跨越语言。\n支持图片、PDF 与整个文件夹。' if import_action else '选择页面后在这里检查图像')
+        self._hint = QLabel(tr('导入原稿，让故事跨越语言。\n支持图片、PDF 与整个文件夹。') if import_action else tr('选择页面后在这里检查图像'))
         self._hint.setProperty('muted', True)
         self._hint.setAlignment(Qt.AlignCenter)
         self._hint.setWordWrap(True)
         self._hint.setMaximumWidth(340)
         message_layout.addWidget(self._hint)
-        self.import_button = QPushButton('选择漫画  →')
+        self.import_button = QPushButton(tr('选择漫画  →'))
         self.import_button.setProperty('role', 'primary')
         self.import_button.setVisible(import_action)
         self.import_button.clicked.connect(self.import_requested)
@@ -344,22 +345,22 @@ class ImagePreview(QWidget):
                 reader.setAutoTransform(True)
                 self.set_pixmap(QPixmap.fromImage(reader.read()))
         except Exception as exc:
-            self.clear(f'无法预览：{exc}')
+            self.clear(tr('无法预览：{_0}', _0=exc))
 
     def set_pixmap(self, pixmap):
         self._original = pixmap
         self._label.image_size = pixmap.size()
         if pixmap.isNull():
-            self.clear('无法读取图片')
+            self.clear(tr('无法读取图片'))
             return
         self._stack.setCurrentWidget(self._scroll)
         self._update_scaled()
 
-    def clear(self, text='等待预览'):
+    def clear(self, text=tr('等待预览')):
         self._original = QPixmap()
         self.set_region(None)
         self._label.clear()
-        self._empty_title.setText(text)
+        self._empty_title.setText(tr(text))
         self._stack.setCurrentWidget(self._empty)
 
     def set_zoom(self, factor=None):
@@ -372,8 +373,8 @@ class ImagePreview(QWidget):
         self._label.region = tuple(box) if box is not None else None
         self._label.region_editable = editable and box is not None
         self._label.setFocusPolicy(Qt.StrongFocus if self._label.region_editable else Qt.NoFocus)
-        self._label.setToolTip('拖动边角调整蒙版大小，框内拖动位置；Esc 恢复本次拖动前的范围'
-                               if self._label.region_editable else '')
+        self._label.setToolTip(tr(tr('拖动边角调整蒙版大小，框内拖动位置；Esc 恢复本次拖动前的范围')
+                               if self._label.region_editable else ''))
         if not self._label.region_editable:
             self.cancel_region_drag()
         self._label.update()

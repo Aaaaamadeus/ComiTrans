@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 from pathlib import Path
 import zipfile
 
@@ -26,9 +27,29 @@ def collect_app(dist: Path):
                 "_internal/assets/ui/fonts/AaJinRiHuaQing-ChunLanMaoKun.ttf",
                 "_internal/assets/ui/icons/chevron-down.svg",
                 "_internal/assets/font_catalog.json",
+                "_internal/assets/i18n/en.json",
+                "_internal/assets/i18n/ja.json",
+                "_internal/PySide6/translations/qtbase_ja.qm",
+                "_internal/PySide6/translations/qtbase_zh_CN.qm",
                 "_internal/assets/ui/illustrations/studio-import-v1.png",
                 "_internal/assets/ui/illustrations/studio-editor-v1.png",
-                "_internal/licenses/comic-text-detector/LICENSE"]
+                "_internal/licenses/comic-text-detector/LICENSE",
+                "_internal/opencc/config/s2t.json",
+                "_internal/opencc/config/t2s.json",
+                "_internal/opencc/dictionary/STCharacters.txt",
+                "_internal/opencc/dictionary/STPhrases.txt",
+                "_internal/opencc/dictionary/TSCharacters.txt",
+                "_internal/opencc/dictionary/TSPhrases.txt",
+                "_internal/opencc/NOTICE.txt",
+                "_internal/opencc_python_reimplemented-0.1.7.dist-info/LICENSE.txt",
+                "_internal/comic-translate-ai/font_file/TC/manifest.json"]
+    for folder in ('TC', 'Manga'):
+        prefix = '_internal/comic-translate-ai/font_file/' + folder + '/'
+        required.append(prefix + 'manifest.json')
+        font_manifest = dist / (prefix + 'manifest.json')
+        if font_manifest.is_file():
+            bundled = json.loads(font_manifest.read_text(encoding='utf-8'))
+            required.extend(prefix + asset['file'] for asset in bundled['assets'])
     for name in required:
         if not (dist / name).is_file():
             raise FileNotFoundError(f"Build is incomplete: {dist / name}")

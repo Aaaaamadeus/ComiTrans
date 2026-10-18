@@ -1,6 +1,8 @@
 from __future__ import annotations
+from ..i18n import tr, ui_language
 
 from pathlib import Path
+import random
 
 from PySide6.QtCore import (
     QSize,
@@ -37,6 +39,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPlainTextEdit,
+    QScrollArea,
     QPushButton,
     QSplitter,
     QTabWidget,
@@ -48,6 +51,8 @@ from PySide6.QtWidgets import (
 from .. import config as app_config
 from ..config import config_fingerprint, missing_models, save_ai_config
 from comic_translate_core.languages import SOURCE_LANGUAGES, validate_ocr_config
+from comic_translate_core.chinese import TARGET_LANGUAGES, target_language_name
+from comic_translate_core.layout_options import VERTICAL_ALIGNMENTS
 from ..diagnostics import Diagnostics
 from ..pdf_utils import render_pdf_preview
 from ..worker import BatchWorker
@@ -61,6 +66,7 @@ from .log_panel import LogPanel
 from .font_picker import TranslationFontPicker
 from .manga_components import PanelHeading, StageFocus
 from .step_panel import STAGE_LABELS, STAGE_ORDER
+from .star_prompt import StarPrompt, STAR_PROMPT_PROBABILITY
 
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
@@ -70,7 +76,7 @@ DOCUMENT_EXTS = IMAGE_EXTS | {".pdf"}
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ComiTrans 本地漫画翻译")
+        self.setWindowTitle(tr('ComiTrans 本地漫画翻译'))
         self.setWindowIcon(QIcon(str(app_config.ICON_PATH)))
         self._ui_settings = QSettings()
         self._stop_requested = False
@@ -98,9 +104,10 @@ class MainWindow(QMainWindow):
         self._prompt_refresh_timer.timeout.connect(self._refresh_error_page)
 
         self._build_ui()
-        self._append_log("本地客户端已就绪。")
+        self._star_prompt = StarPrompt(self.centralWidget())
+        self._append_log(tr('本地客户端已就绪。'))
         if self.config["api_key"] and self.config["api_key"] == self.config["translation_model"]:
-            self._append_log("警告：API Key 与模型名相同，看起来把模型名填到了密钥栏。")
+            self._append_log(tr('警告：API Key 与模型名相同，看起来把模型名填到了密钥栏。'))
         self._update_actions()
         self._start_warmup()
 
@@ -121,51 +128,51 @@ class MainWindow(QMainWindow):
         self._header_layout = header
         header.setContentsMargins(20, 10, 20, 10)
         header.setSpacing(8)
-        title = QLabel("ComiTrans")
+        title = QLabel('ComiTrans')
         title.setObjectName("brandTitle")
         self._brand_title = title
         title.setFont(brand_font(40))
         title.setContentsMargins(0, 0, 12, 0)
         header.addWidget(title)
         header.addSpacing(8)
-        self._nav_auto = QPushButton("01  自动处理")
-        self._nav_editor = QPushButton("02  嵌字精修")
+        self._nav_auto = QPushButton(tr('01  自动处理'))
+        self._nav_editor = QPushButton(tr('02  嵌字精修'))
         for button in (self._nav_auto, self._nav_editor):
             button.setCheckable(True)
             button.setProperty("role", "nav")
             header.addWidget(button)
         header.addStretch()
-        self.status_label = QLabel("○ 就绪")
+        self.status_label = QLabel(tr('○ 就绪'))
         self.status_label.setObjectName("statusPill")
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         self.status_label.setMinimumWidth(100)
         self.status_label.setMaximumWidth(180)
         header.addWidget(self.status_label)
-        self._stop_btn = QPushButton("□ 停止任务")
-        self._stop_btn.setToolTip("请求停止，等待后台安全收尾")
+        self._stop_btn = QPushButton(tr('□ 停止任务'))
+        self._stop_btn.setToolTip(tr('请求停止，等待后台安全收尾'))
         header.addWidget(self._stop_btn)
-        self._settings_btn = QPushButton("设置")
-        self._logs_btn = QPushButton("诊断")
-        self._output_btn = QPushButton("输出目录")
-        self._issue_btn = QPushButton("反馈")
-        for button, tooltip in ((self._settings_btn, "翻译服务、OCR、模型与默认输出"), (self._logs_btn, "日志文件与 AI 诊断"), (self._output_btn, "打开输出目录"), (self._issue_btn, "打开反馈页面")):
+        self._settings_btn = QPushButton(tr('设置'))
+        self._logs_btn = QPushButton(tr('诊断'))
+        self._output_btn = QPushButton(tr('输出目录'))
+        self._issue_btn = QPushButton(tr('反馈'))
+        for button, tooltip in ((self._settings_btn, tr('翻译服务、OCR、模型与默认输出')), (self._logs_btn, tr('日志文件与 AI 诊断')), (self._output_btn, tr('打开输出目录')), (self._issue_btn, tr('打开反馈页面'))):
             button.setProperty("role", "utility" if button in (self._settings_btn, self._logs_btn) else "quiet")
             button.setProperty("compact", True)
-            button.setToolTip(tooltip)
-            button.setAccessibleName(tooltip)
+            button.setToolTip(tr(tooltip))
+            button.setAccessibleName(tr(tooltip))
             header.addWidget(button)
         self._settings_btn.setCheckable(True)
         self._logs_btn.setCheckable(True)
         self._more_btn = QToolButton()
-        self._more_btn.setText("更多")
+        self._more_btn.setText(tr('更多'))
         self._more_btn.setProperty("role", "quiet")
         self._more_btn.setPopupMode(QToolButton.InstantPopup)
         more_menu = QMenu(self._more_btn)
-        more_menu.addAction("设置", self._show_api_config)
-        more_menu.addAction("诊断", self._show_error_log)
-        more_menu.addAction("打开输出目录", self._open_output_dir)
-        more_menu.addAction("反馈问题", self._open_issue)
+        more_menu.addAction(tr('设置'), self._show_api_config)
+        more_menu.addAction(tr('诊断'), self._show_error_log)
+        more_menu.addAction(tr('打开输出目录'), self._open_output_dir)
+        more_menu.addAction(tr('反馈问题'), self._open_issue)
         self._more_btn.setMenu(more_menu)
         header.addWidget(self._more_btn)
         root.addWidget(top_bar)
@@ -221,10 +228,10 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(16, 8, 16, 16)
         layout.setSpacing(10)
         self._queue_layout = layout
-        heading = PanelHeading("01", "漫画队列", sidebar=True)
+        heading = PanelHeading("01", tr('漫画队列'), sidebar=True)
         layout.addWidget(heading)
-        self._file_count_label = QLabel("0 个文件")
-        self._file_selection_label = QLabel("支持图片与 PDF")
+        self._file_count_label = QLabel(tr('0 个文件'))
+        self._file_selection_label = QLabel(tr('支持图片与 PDF'))
         self._file_selection_label.setProperty("muted", True)
         layout.addWidget(self._file_count_label)
         layout.addWidget(self._file_selection_label)
@@ -233,18 +240,18 @@ class MainWindow(QMainWindow):
         self._drop_zone.setProperty("dragActive", False)
         drop = QVBoxLayout(self._drop_zone)
         drop.setContentsMargins(8, 12, 8, 12)
-        label = QLabel("拖入漫画或文件夹")
+        label = QLabel(tr('拖入漫画或文件夹'))
         self._drop_title = label
         label.setObjectName("dropTitle")
         label.setAlignment(Qt.AlignCenter)
         drop.addWidget(label)
-        self._add_btn = QPushButton("＋ 添加文件")
+        self._add_btn = QPushButton(tr('＋ 添加文件'))
         self._add_btn.setProperty('role', 'quiet')
-        self._folder_btn = QPushButton("添加文件夹")
+        self._folder_btn = QPushButton(tr('添加文件夹'))
         self._folder_btn.setProperty("role", "quiet")
         drop.addWidget(self._add_btn)
         drop.addWidget(self._folder_btn)
-        hint = QLabel("PNG / JPG / WEBP / BMP / PDF")
+        hint = QLabel('PNG / JPG / WEBP / BMP / PDF')
         hint.setObjectName("dropHint")
         hint.setWordWrap(True)
         self._drop_hint = hint
@@ -255,12 +262,12 @@ class MainWindow(QMainWindow):
         self.file_list.setWordWrap(True)
         self.file_list.setTextElideMode(Qt.ElideMiddle)
         self.file_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.file_list.setAccessibleName("漫画文件队列")
+        self.file_list.setAccessibleName(tr('漫画文件队列'))
         self.file_list.itemSelectionChanged.connect(self._on_file_selection)
         layout.addWidget(self.file_list, 1)
         buttons = QHBoxLayout()
-        self._remove_btn = QPushButton("移除选中")
-        self._clear_btn = QPushButton("清空")
+        self._remove_btn = QPushButton(tr('移除选中'))
+        self._clear_btn = QPushButton(tr('清空'))
         for button in (self._remove_btn, self._clear_btn):
             button.setProperty("compact", True)
             buttons.addWidget(button)
@@ -277,7 +284,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(24, 20, 24, 16)
         layout.setSpacing(10)
         self._work_layout = layout
-        self._elapsed_label = QLabel("批量翻译 · 输出简体中文")
+        self._elapsed_label = QLabel(tr('批量翻译 · 输出{_0}', _0=tr(target_language_name(self.config.get('target_language')))))
         self._elapsed_label.setProperty("muted", True)
         control_card = QFrame()
         control_card.setObjectName("controlCard")
@@ -290,41 +297,56 @@ class MainWindow(QMainWindow):
         self._control_grid.setVerticalSpacing(4)
         self._controls_inline = None
         self._language_controls = QWidget()
-        control_row = QHBoxLayout(self._language_controls)
+        control_row = QGridLayout(self._language_controls)
+        self._language_grid = control_row
         control_row.setContentsMargins(0, 0, 0, 0)
         control_row.setSpacing(6)
-        control_row.addWidget(QLabel("原文语言"))
+        self._source_caption = QLabel(tr('原文语言'))
+        control_row.addWidget(self._source_caption, 0, 0)
         self._source_language = QComboBox()
         self._source_language.setMinimumWidth(100)
         self._source_language.setMaximumWidth(130)
         for code, label in SOURCE_LANGUAGES:
-            self._source_language.addItem(label, code)
+            self._source_language.addItem(tr(label), code)
         self._source_language.setCurrentIndex(max(0, self._source_language.findData(self.config.get("source_language", "ja"))))
-        self._source_language.setToolTip("其它语言可在设置中接入自定义 OCR")
+        self._source_language.setToolTip(tr('其它语言可在设置中接入自定义 OCR'))
         self._source_language.currentIndexChanged.connect(self._change_source_language)
-        control_row.addWidget(self._source_language)
+        control_row.addWidget(self._source_language, 0, 1)
+        self._target_caption = QLabel(tr('译文'))
+        control_row.addWidget(self._target_caption, 0, 2)
+        self._target_language = QComboBox()
+        self._target_language.setAccessibleName(tr('译文简繁切换'))
+        self._target_language.setMinimumWidth(170 if ui_language() == 'en' else 140 if ui_language() == 'ja' else 110)
+        self._target_language.setMaximumWidth(200 if ui_language() == 'en' else 160 if ui_language() == 'ja' else 140)
+        for code, label in TARGET_LANGUAGES:
+            self._target_language.addItem(tr(label), code)
+        self._target_language.setCurrentIndex(max(0, self._target_language.findData(self.config.get('target_language', 'zh-Hans'))))
+        self._target_language.setToolTip(tr('选择简体中文或繁體中文，自动保存并用于后续翻译。'))
+        self._target_language.currentIndexChanged.connect(self._change_target_language)
+        control_row.addWidget(self._target_language, 0, 3)
         self._pref_toggle = QToolButton()
-        self._pref_toggle.setText("翻译偏好")
+        self._pref_toggle.setText(tr('翻译偏好'))
         self._pref_toggle.setCheckable(True)
         self._pref_toggle.setArrowType(Qt.RightArrow)
         self._pref_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self._pref_toggle.setProperty("role", "quiet")
-        control_row.addWidget(self._pref_toggle)
-        control_row.addStretch()
-        self._start_btn = QPushButton("开始翻译")
+        control_row.addWidget(self._pref_toggle, 0, 4)
+        control_row.setColumnStretch(5, 1)
+        self._language_stacked = False
+        self._start_btn = QPushButton(tr('开始翻译'))
         self._start_btn.setProperty("role", "primary")
         self._output_controls = QWidget()
         output_row = QHBoxLayout(self._output_controls)
         output_row.setContentsMargins(0, 0, 0, 0)
         output_row.setSpacing(6)
-        self._output_label = QLabel("输出目录")
+        self._output_label = QLabel(tr('输出目录'))
         output_row.addWidget(self._output_label)
         self._output_dir_input = QLineEdit(str(self.config.get("page_output_dir", "")))
         self._output_dir_input.setMinimumWidth(100)
         self._output_dir_input.setCursorPosition(len(self._output_dir_input.text()))
         self._output_dir_input.setToolTip(self._output_dir_input.text())
         self._output_dir_input.textChanged.connect(self._output_dir_input.setToolTip)
-        self._browse_output_btn = QPushButton("浏览")
+        self._browse_output_btn = QPushButton(tr('浏览'))
         self._browse_output_btn.setProperty("compact", True)
         self._browse_output_btn.clicked.connect(self._browse_output_dir)
         output_row.addWidget(self._output_dir_input, 1)
@@ -332,20 +354,42 @@ class MainWindow(QMainWindow):
         control_layout.addLayout(self._control_grid)
         self._font_picker = TranslationFontPicker(self.config)
         self._font_picker.selection_changed.connect(self._change_translation_font)
-        control_layout.addWidget(self._font_picker)
-        self._pref_container = QWidget()
+        self._pref_container = QScrollArea()
+        self._pref_container.setWidgetResizable(True)
+        self._pref_container.setFrameShape(QFrame.NoFrame)
+        self._pref_container.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._pref_container.setVisible(False)
-        pref_layout = QHBoxLayout(self._pref_container)
+        pref_content = QWidget()
+        self._pref_container.setWidget(pref_content)
+        pref_layout = QVBoxLayout(pref_content)
         pref_layout.setContentsMargins(0, 0, 0, 0)
         pref_layout.setSpacing(10)
+        pref_layout.addWidget(self._font_picker)
+        alignment_row = QHBoxLayout()
+        alignment_row.addWidget(QLabel(tr('竖排列对齐')))
+        self._translation_alignment = QComboBox()
+        self._translation_alignment.setAccessibleName(tr('译文默认竖排列对齐'))
+        self._translation_alignment.setMinimumWidth(140)
+        self._translation_alignment.setMaximumWidth(180)
+        for value, label in VERTICAL_ALIGNMENTS:
+            self._translation_alignment.addItem(tr(label), value)
+        self._translation_alignment.setCurrentIndex(self._translation_alignment.findData(self.config['vertical_alignment']))
+        self._translation_alignment.setToolTip(tr('自动保存，下次翻译生效；竖排各列按最长列的顶部或底部对齐，整组文字保持居中。横排不受影响。'))
+        self._translation_alignment.currentIndexChanged.connect(self._change_translation_alignment)
+        alignment_row.addWidget(self._translation_alignment)
+        alignment_hint = QLabel(tr('自动保存 · 下次翻译生效'))
+        alignment_hint.setProperty('muted', True)
+        alignment_hint.setWordWrap(True)
+        alignment_row.addWidget(alignment_hint, 1)
+        pref_layout.addLayout(alignment_row)
 
         prompt_panel = QVBoxLayout()
         prompt_panel.setSpacing(4)
-        prompt_label = QLabel("背景提示词")
+        prompt_label = QLabel(tr('背景提示词'))
         prompt_label.setProperty("muted", True)
         self._prompt_input = QPlainTextEdit()
         self._prompt_input.setPlaceholderText(
-            "可填写故事背景、世界观、人物关系、语气风格等，翻译时会自动附加到提示词中"
+            tr('可填写故事背景、世界观、人物关系、语气风格等，翻译时会自动附加到提示词中')
         )
         self._prompt_input.setMinimumHeight(68)
         self._prompt_input.setMaximumHeight(78)
@@ -354,17 +398,20 @@ class MainWindow(QMainWindow):
 
         names_panel = QVBoxLayout()
         names_panel.setSpacing(4)
-        names_label = QLabel("中文人名（每行一个，AI 会自动对照）")
+        names_label = QLabel(tr('中文人名（每行一个，AI 会自动对照）'))
         names_label.setProperty("muted", True)
         self._names_input = QPlainTextEdit()
-        self._names_input.setPlaceholderText("例如：\n路飞\n娜美\n索隆")
+        self._names_input.setPlaceholderText(tr('例如：\n路飞\n娜美\n索隆'))
         self._names_input.setMinimumHeight(68)
         self._names_input.setMaximumHeight(78)
         names_panel.addWidget(names_label)
         names_panel.addWidget(self._names_input)
 
-        pref_layout.addLayout(prompt_panel, 1)
-        pref_layout.addLayout(names_panel, 1)
+        context_row = QHBoxLayout()
+        context_row.setSpacing(10)
+        context_row.addLayout(prompt_panel, 1)
+        context_row.addLayout(names_panel, 1)
+        pref_layout.addLayout(context_row)
 
         self._prompt_input.setPlainText(self.config.get("translation_prompt", ""))
         self._names_input.setPlainText(self.config.get("chinese_names", ""))
@@ -382,9 +429,9 @@ class MainWindow(QMainWindow):
         self._output_dir_input.editingFinished.connect(self._apply_output_dir)
         self.stage_focus = StageFocus()
         self.stage_label = self.stage_focus._detail
-        self._progress_label = QLabel("0 / 0 个文件")
+        self._progress_label = QLabel(tr('0 / 0 个文件'))
         self._progress_label.setProperty("muted", True)
-        self._page_progress_label = QLabel("页数待确定")
+        self._page_progress_label = QLabel(tr('页数待确定'))
         self._page_progress_label.setProperty("muted", True)
         progress_header = QHBoxLayout()
         progress_header.addWidget(self.stage_focus, 1)
@@ -394,15 +441,15 @@ class MainWindow(QMainWindow):
         self.step_panel = StepPanel()
         layout.addWidget(self.step_panel)
         content_header = QHBoxLayout()
-        preview_label = PanelHeading("02", "检查结果")
+        preview_label = PanelHeading("02", tr('检查结果'))
         content_header.addWidget(preview_label, 1)
         content_header.addWidget(self._elapsed_label)
-        self._edit_result_btn = QPushButton("进入精修 →")
+        self._edit_result_btn = QPushButton(tr('进入精修 →'))
         self._edit_result_btn.setProperty("compact", True)
         self._edit_result_btn.clicked.connect(lambda: self.tabs.setCurrentWidget(self.editor_page))
         content_header.addWidget(self._edit_result_btn)
         self._log_toggle = QToolButton()
-        self._log_toggle.setText("详细日志")
+        self._log_toggle.setText(tr('详细日志'))
         self._log_toggle.setCheckable(True)
         self._log_toggle.setChecked(True)
         self._log_toggle.setArrowType(Qt.DownArrow)
@@ -416,8 +463,8 @@ class MainWindow(QMainWindow):
         self.original_view = ImagePreview(import_action=True)
         self.original_view.import_requested.connect(self._choose_files)
         self.result_view = ImagePreview(illustration='studio-editor-v1.png')
-        self.preview_tabs.addTab(self.original_view, "原图")
-        self.preview_tabs.addTab(self.result_view, "译图")
+        self.preview_tabs.addTab(self.original_view, tr('原图'))
+        self.preview_tabs.addTab(self.result_view, tr('译图'))
         self._log_panel = LogPanel(self.diagnostics.log_path)
         self.log_view = self._log_panel.view
         self.work_splitter = QSplitter(Qt.Vertical)
@@ -432,7 +479,7 @@ class MainWindow(QMainWindow):
         return group
 
     def _browse_output_dir(self) -> None:
-        path = QFileDialog.getExistingDirectory(self, "选择输出目录", self._output_dir_input.text())
+        path = QFileDialog.getExistingDirectory(self, tr('选择输出目录'), self._output_dir_input.text())
         if path:
             self._output_dir_input.setText(path)
             self._apply_output_dir()
@@ -450,7 +497,7 @@ class MainWindow(QMainWindow):
             return
         if hasattr(self, "api_config_page"):
             self.api_config_page._output_input.setText(value)
-        self._append_log(f"输出目录已更新: {value}")
+        self._append_log(tr('输出目录已更新: {_0}', _0=value))
 
     def _change_source_language(self) -> None:
         language = self._source_language.currentData()
@@ -459,7 +506,7 @@ class MainWindow(QMainWindow):
         self.pipeline = None
         self.pipeline_fingerprint = None
         self.api_config_page.load_config(self.config)
-        self._append_log(f"被翻译语言已切换为 {self._source_language.currentText()}，将在下次翻译时加载对应 OCR。")
+        self._append_log(tr('被翻译语言已切换为 {_0}，将在下次翻译时加载对应 OCR。', _0=self._source_language.currentText()))
         if language == "custom":
             self.api_config_page._sections.setCurrentIndex(1)
             self.tabs.setCurrentWidget(self.api_config_page)
@@ -469,11 +516,45 @@ class MainWindow(QMainWindow):
             updated = save_ai_config({'translation_font': reference})
         except OSError as exc:
             self._font_picker.load_config(self.config)
-            self._font_picker.show_error(f'字体选择未保存：{exc}')
+            self._font_picker.show_error(tr('字体选择未保存：{_0}', _0=exc))
             return
         self.config = updated
         self.editor_page.set_translation_fonts(updated)
-        self._append_log(f'译文字体已保存：{self._font_picker.combo.currentText()}，下次翻译生效。')
+        self._append_log(tr('译文字体已保存：{_0}，下次翻译生效。', _0=self._font_picker.combo.currentText()))
+
+    def _change_target_language(self) -> None:
+        target = self._target_language.currentData()
+        try:
+            updated = save_ai_config({'target_language': target})
+        except OSError as exc:
+            self._target_language.blockSignals(True)
+            self._target_language.setCurrentIndex(max(0, self._target_language.findData(self.config.get('target_language', 'zh-Hans'))))
+            self._target_language.blockSignals(False)
+            self._set_status(tr('译文简繁选择未保存'), 'error')
+            self._append_log(tr('译文简繁选择未保存：{_0}', _0=exc))
+            return
+        self.config = updated
+        if self.pipeline is not None:
+            self.pipeline.target_language = updated['target_language']
+        self._font_picker.load_config(updated)
+        self._elapsed_label.setText(tr('批量翻译 · 输出{_0}', _0=tr(target_language_name(target))))
+        self._append_log(tr('译文已切换为 {_0}，下次翻译生效。', _0=tr(target_language_name(target))))
+
+    def _change_translation_alignment(self) -> None:
+        value = self._translation_alignment.currentData()
+        try:
+            updated = save_ai_config({'vertical_alignment': value})
+        except OSError as exc:
+            self._translation_alignment.blockSignals(True)
+            self._translation_alignment.setCurrentIndex(self._translation_alignment.findData(self.config['vertical_alignment']))
+            self._translation_alignment.blockSignals(False)
+            self._set_status(tr('竖排列对齐未保存'), 'error')
+            self._append_log(tr('竖排列对齐未保存：{_0}', _0=exc))
+            return
+        self.config = updated
+        if self.pipeline is not None:
+            self.pipeline.vertical_alignment = updated['vertical_alignment']
+        self._append_log(tr('译文竖排列对齐已保存：{_0}，下次翻译生效。', _0=self._translation_alignment.currentText()))
 
     def _expand_document_paths(self, paths) -> tuple[list[Path], int]:
         documents: list[Path] = []
@@ -520,7 +601,7 @@ class MainWindow(QMainWindow):
             item.setData(Qt.UserRole, key)
             item.setData(Qt.UserRole + 1, path.name)
             item.setToolTip(str(path))
-            item.setText(f"○ 等待\n{path.name}")
+            item.setText(tr('○ 等待\n{_0}', _0=path.name))
             item.setSizeHint(QSize(180, 92))
             self.file_list.addItem(item)
             if first_added is None:
@@ -528,16 +609,16 @@ class MainWindow(QMainWindow):
             existing.add(key)
             added += 1
         if added:
-            self._append_log(f"已添加 {added} 个文件。")
+            self._append_log(tr('已添加 {_0} 个文件。', _0=added))
             self.file_list.setCurrentItem(first_added)
             self.tabs.setCurrentWidget(self.translate_tab)
         if duplicates or skipped:
             details = []
             if duplicates:
-                details.append(f"{duplicates} 个重复项")
+                details.append(tr('{_0} 个重复项', _0=duplicates))
             if skipped:
-                details.append(f"{skipped} 个不支持的项目")
-            self._append_log(f"已跳过{'、'.join(details)}。")
+                details.append(tr('{_0} 个不支持的项目', _0=skipped))
+            self._append_log(tr('已跳过{_0}。', _0='、'.join(details)))
         self._update_actions()
 
     def _thumbnail_icon(self, path: Path) -> QIcon:
@@ -557,14 +638,14 @@ class MainWindow(QMainWindow):
     def _choose_files(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "选择漫画图片或 PDF",
+            tr('选择漫画图片或 PDF'),
             "",
-            "漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf);;图片文件 (*.png *.jpg *.jpeg *.webp *.bmp);;PDF 文件 (*.pdf)",
+            tr('漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf);;图片文件 (*.png *.jpg *.jpeg *.webp *.bmp);;PDF 文件 (*.pdf)'),
         )
         self._add_paths(paths)
 
     def _choose_folder(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "选择漫画文件夹", "")
+        folder = QFileDialog.getExistingDirectory(self, tr('选择漫画文件夹'), "")
         if not folder:
             return
         self._add_paths([folder])
@@ -578,8 +659,8 @@ class MainWindow(QMainWindow):
     def _on_file_selection(self) -> None:
         items = self.file_list.selectedItems()
         if not items:
-            self.original_view.clear("选择文件后显示原图")
-            self.result_view.clear("处理完成后显示译文")
+            self.original_view.clear(tr('选择文件后显示原图'))
+            self.result_view.clear(tr('处理完成后显示译文'))
             self._update_actions()
             return
         key = items[-1].data(Qt.UserRole)
@@ -588,7 +669,7 @@ class MainWindow(QMainWindow):
         if output:
             self.result_view.set_image(output)
         else:
-            self.result_view.clear("处理完成后显示译文")
+            self.result_view.clear(tr('处理完成后显示译文'))
         self._update_actions()
 
     def _remove_selected(self) -> None:
@@ -603,37 +684,37 @@ class MainWindow(QMainWindow):
         if self.file_list.count():
             self.file_list.setCurrentRow(max(0, next_row))
         else:
-            self.original_view.clear("选择文件后显示原图")
-            self.result_view.clear("处理完成后显示译文")
+            self.original_view.clear(tr('选择文件后显示原图'))
+            self.result_view.clear(tr('处理完成后显示译文'))
         self._update_actions()
 
     def _clear_files(self) -> None:
         self.file_list.clear()
         self.results.clear()
-        self.original_view.clear("选择文件后显示原图")
-        self.result_view.clear("处理完成后显示译文")
-        self.stage_label.setText("尚未开始")
-        self._progress_label.setText("0 / 0 个文件")
-        self._page_progress_label.setText("页数待确定")
+        self.original_view.clear(tr('选择文件后显示原图'))
+        self.result_view.clear(tr('处理完成后显示译文'))
+        self.stage_label.setText(tr('尚未开始'))
+        self._progress_label.setText(tr('0 / 0 个文件'))
+        self._page_progress_label.setText(tr('页数待确定'))
         self.step_panel.reset()
         if self.warmup_worker is None:
-            self._set_status("等待任务", "idle")
+            self._set_status(tr('等待任务'), "idle")
         self._update_actions()
 
     def _set_status(self, text: str, state: str = "idle") -> None:
         symbol = {"idle": "○", "warming": "◉", "running": "◉", "ready": "✓", "success": "✓", "error": "⊠", "warning": "△", "stopping": "□", "cancelled": "—"}.get(state, "○")
-        self.status_label.setText(f"{symbol} {text}")
+        self.status_label.setText(f'{symbol} {text}')
         self.status_label.setProperty("state", state)
         refresh_style(self.status_label)
-        self.status_label.setAccessibleName(text)
-        self.status_label.setToolTip(text)
+        self.status_label.setAccessibleName(tr(text))
+        self.status_label.setToolTip(tr(text))
         if state not in ('running', 'stopping'):
             self.stage_focus.set_stage('—', text, self.stage_label.text())
 
     def _update_elapsed(self):
         if self._task_clock.isValid():
             seconds = self._task_clock.elapsed() // 1000
-            self._elapsed_label.setText(f"耗时 {seconds // 60:02d}:{seconds % 60:02d}")
+            self._elapsed_label.setText(tr('耗时 {_0:02d}:{_1:02d}', _0=seconds // 60, _1=seconds % 60))
 
     def _start_warmup(self) -> None:
         if self.pipeline is not None or self.warmup_worker is not None:
@@ -650,29 +731,29 @@ class MainWindow(QMainWindow):
         self.warmup_worker.pipeline_ready.connect(self._on_pipeline_ready)
         self.warmup_worker.finished.connect(self._on_warmup_finished)
         self.warmup_worker.start()
-        self.stage_label.setText("正在加载本地模型，可先添加待处理文件")
-        self._progress_label.setText("模型预热")
-        self._set_status("模型准备中", "warming")
+        self.stage_label.setText(tr('正在加载本地模型，可先添加待处理文件'))
+        self._progress_label.setText(tr('模型预热'))
+        self._set_status(tr('模型准备中'), "warming")
         self._update_actions()
-        self._append_log("正在预热 AI 管线...")
+        self._append_log(tr('正在预热 AI 管线...'))
 
     def _on_warmup_log(self, message: str) -> None:
         if message and not message.startswith("["):
-            self.stage_label.setText(message)
+            self.stage_label.setText(tr(message))
 
     def _on_warmup_finished(self, success: int, failed: int) -> None:
         if self.warmup_worker is not None:
             self.warmup_worker.wait()
             self.warmup_worker.deleteLater()
         self.warmup_worker = None
-        self._progress_label.setText("0 / 0 个文件")
-        self._page_progress_label.setText("页数待确定")
+        self._progress_label.setText(tr('0 / 0 个文件'))
+        self._page_progress_label.setText(tr('页数待确定'))
         if self.pipeline is None:
-            self.stage_label.setText("模型初始化未完成，请在报错日志中查看原因")
-            self._set_status("模型准备失败", "error")
+            self.stage_label.setText(tr('模型初始化未完成，请在报错日志中查看原因'))
+            self._set_status(tr('模型准备失败'), "error")
         else:
-            self.stage_label.setText("模型已就绪，添加文件后即可开始")
-            self._set_status("模型已就绪", "ready")
+            self.stage_label.setText(tr('模型已就绪，添加文件后即可开始'))
+            self._set_status(tr('模型已就绪'), "ready")
         self._update_actions()
 
     def _start_translation(self) -> None:
@@ -681,7 +762,7 @@ class MainWindow(QMainWindow):
         self._stop_requested = False
         files = self._all_files()
         if not files:
-            self._set_status("请先添加文件", "warning")
+            self._set_status(tr('请先添加文件'), "warning")
             return
 
         self._apply_output_dir()
@@ -692,8 +773,8 @@ class MainWindow(QMainWindow):
             detail = "\n".join(missing)
             QMessageBox.warning(
                 self,
-                "OCR 或模型尚未就绪",
-                f"请先完成以下配置再开始翻译：\n\n{detail}",
+                tr('OCR 或模型尚未就绪'),
+                tr('请先完成以下配置再开始翻译：\n\n{_0}', _0=detail),
             )
             return
 
@@ -704,11 +785,10 @@ class MainWindow(QMainWindow):
         ):
             QMessageBox.warning(
                 self,
-                "翻译 API 未配置",
-                "请先填写 API Key、Base URL 和翻译模型。\n"
-                "未连接翻译 API 时不会生成伪装成译文的输出文件。",
+                tr('翻译 API 未配置'),
+                tr('请先填写 API Key、Base URL 和翻译模型。\n未连接翻译 API 时不会生成伪装成译文的输出文件。'),
             )
-            self._set_status("需要配置翻译 API", "warning")
+            self._set_status(tr('需要配置翻译 API'), "warning")
             self._show_api_config()
             return
 
@@ -720,7 +800,7 @@ class MainWindow(QMainWindow):
         for index in range(self.file_list.count()):
             item = self.file_list.item(index)
             key = item.data(Qt.UserRole)
-            item.setText(f"○ 等待\n{item.data(Qt.UserRole + 1) or Path(key).name}")
+            item.setText(tr('○ 等待\n{_0}', _0=item.data(Qt.UserRole + 1) or Path(key).name))
             self.results.pop(key, None)
 
         self.worker = BatchWorker(
@@ -744,9 +824,9 @@ class MainWindow(QMainWindow):
         self._elapsed_timer.start()
         self.worker.start()
 
-        self._progress_label.setText(f"0 / {len(files)}")
-        self._page_progress_label.setText("页数待确定")
-        self.stage_label.setText("任务已创建，正在准备第一份文件")
+        self._progress_label.setText(f'0 / {len(files)}')
+        self._page_progress_label.setText(tr('页数待确定'))
+        self.stage_label.setText(tr('任务已创建，正在准备第一份文件'))
         self._set_running(True)
 
     def _stop_translation(self) -> None:
@@ -754,13 +834,14 @@ class MainWindow(QMainWindow):
             self._stop_requested = True
             self.worker.stop()
             self._stop_btn.setEnabled(False)
-            self._set_status("正在停止", "stopping")
-            self.stage_label.setText("正在安全停止当前任务…")
+            self._set_status(tr('正在停止'), "stopping")
+            self.stage_label.setText(tr('正在安全停止当前任务…'))
 
     def _set_running(self, running: bool) -> None:
         if running:
-            self._set_status("正在翻译", "running")
-            self.stage_focus.set_stage('—', '准备处理', self.stage_label.text())
+            self._star_prompt.dismiss()
+            self._set_status(tr('正在翻译'), "running")
+            self.stage_focus.set_stage('—', tr('准备处理'), self.stage_label.text())
         self._update_actions()
 
     def _update_actions(self) -> None:
@@ -768,7 +849,7 @@ class MainWindow(QMainWindow):
         warming = self.warmup_worker is not None and self.warmup_worker.isRunning()
         count = self.file_list.count()
         selected_count = len(self.file_list.selectedItems())
-        self._start_btn.setText(f"开始翻译（{count}）" if count else "开始翻译")
+        self._start_btn.setText(tr('开始翻译（{_0}）', _0=count) if count else tr('开始翻译'))
         self._start_btn.setEnabled(not running and not warming and count > 0)
         self._stop_btn.setVisible(running)
         self._stop_btn.setEnabled(running and not self._stop_requested)
@@ -784,51 +865,59 @@ class MainWindow(QMainWindow):
         self._clear_btn.setEnabled(not running and count > 0)
         self.api_config_page.setEnabled(not running and not warming)
         self._source_language.setEnabled(not running and not warming)
-        self._file_count_label.setText(f"{count} 个文件")
+        self._target_language.setEnabled(not running and not warming)
+        self._translation_alignment.setEnabled(not running and not warming)
+        self._file_count_label.setText(tr('{_0} 个文件', _0=count))
         self.step_panel.setVisible(count > 0 or running)
         self.stage_focus.setVisible(count > 0 or running or warming)
         self._page_progress_label.setVisible(count > 0 or running)
         self._progress_label.setVisible(count > 0 or running)
         self._file_selection_label.setText(
-            f"已选 {selected_count} 个" if selected_count else "支持图片与 PDF"
+            tr('已选 {_0} 个', _0=selected_count) if selected_count else tr('支持图片与 PDF')
         )
         selected = self.file_list.selectedItems()
         output = self.results.get(selected[-1].data(Qt.UserRole)) if selected else None
         self._edit_result_btn.setEnabled(bool(output and Path(output).suffix.lower() != ".pdf"))
-        self._edit_result_btn.setToolTip("精修已生成的图片" if self._edit_result_btn.isEnabled() else "请选择已完成的图片；PDF 暂无持久化精修数据")
+        self._edit_result_btn.setToolTip(tr('精修已生成的图片') if self._edit_result_btn.isEnabled() else tr('请选择已完成的图片；PDF 暂无持久化精修数据'))
         if warming:
-            self._start_btn.setToolTip("本地模型正在准备，完成后即可开始")
+            self._start_btn.setToolTip(tr('本地模型正在准备，完成后即可开始'))
         elif not count:
-            self._start_btn.setToolTip("请先添加漫画图片或 PDF")
+            self._start_btn.setToolTip(tr('请先添加漫画图片或 PDF'))
         else:
-            self._start_btn.setToolTip(f"开始处理当前列表中的 {count} 个文件")
+            self._start_btn.setToolTip(tr('开始处理当前列表中的 {_0} 个文件', _0=count))
 
     def _on_progress(self, done: int, total: int, message: str) -> None:
-        self._progress_label.setText(f"{done} / {total} 个文件")
-        self.stage_label.setText(message)
+        self._progress_label.setText(tr('{_0} / {_1} 个文件', _0=done, _1=total))
+        self.stage_label.setText(tr(message))
 
     def _on_stage_event(self, event) -> None:
         if self.worker is None or event['task_id'] != self.worker.task_id:
             return
         self.step_panel.consume_event(event)
         number = f"{STAGE_ORDER.index(event['stage']) + 1:02d}" if event['stage'] in STAGE_ORDER else '×'
-        state_label = {'running': '运行中', 'done': '完成', 'failed': '失败', 'skipped': '已跳过', 'cancelled': '已取消'}[event['state']]
-        self.stage_focus.set_stage(number, STAGE_LABELS.get(event['stage'], '当前页面') + ' · ' + state_label, event['page_label'])
-        self.stage_label.setText(event['message'])
-        self.stage_label.setToolTip(event['message'])
+        state_label = {'running': tr('运行中'), 'done': tr('完成'), 'failed': tr('失败'), 'skipped': tr('已跳过'), 'cancelled': tr('已取消')}[event['state']]
+        self.stage_focus.set_stage(number, tr(STAGE_LABELS.get(event['stage'], '当前页面')) + ' · ' + state_label, event['page_label'])
+        detail = tr(event['message'])
+        if (ui_language() != 'zh-CN' and detail == event['message']
+                and any('\u3400' <= char <= '\u9fff' for char in detail)):
+            # Core libraries retain original diagnostics; UI state uses stable
+            # stage/state codes, never guesses translations of arbitrary data.
+            detail = f"{event['page_label']} · {state_label}"
+        self.stage_label.setText(detail)
+        self.stage_label.setToolTip(tr(event['message']))
         index = event['document_index']
         if 0 < index <= self.file_list.count():
             item = self.file_list.item(index - 1)
-            state = {'failed': '⊠ 失败', 'cancelled': '— 已取消'}.get(event['state'], '◉ 处理中')
-            item.setText(f"{state}\n{item.data(Qt.UserRole + 1)}")
+            state = {'failed': tr('⊠ 失败'), 'cancelled': tr('— 已取消')}.get(event['state'], tr('◉ 处理中'))
+            item.setText(f'{state}\n{item.data(Qt.UserRole + 1)}')
 
     def _on_page_progress(self, done, total):
-        self._page_progress_label.setText(f"已处理 {done} / {total} 页")
+        self._page_progress_label.setText(tr('已处理 {_0} / {_1} 页', _0=done, _1=total))
 
     def _on_pipeline_ready(self, pipeline) -> None:
         self.pipeline = pipeline
         self.pipeline_fingerprint = config_fingerprint(self.config)
-        self._append_log("AI 模型初始化完成。")
+        self._append_log(tr('AI 模型初始化完成。'))
 
     def _on_image_done(self, input_path: str, output_path: str) -> None:
         key = str(Path(input_path).resolve())
@@ -836,7 +925,7 @@ class MainWindow(QMainWindow):
         for i in range(self.file_list.count()):
             item = self.file_list.item(i)
             if item.data(Qt.UserRole) == key:
-                item.setText(f"✓ 完成\n{item.data(Qt.UserRole + 1) or Path(key).name}")
+                item.setText(tr('✓ 完成\n{_0}', _0=item.data(Qt.UserRole + 1) or Path(key).name))
                 break
 
         selected = self.file_list.selectedItems()
@@ -850,10 +939,10 @@ class MainWindow(QMainWindow):
             item = self.file_list.item(index)
             original_name = item.data(Qt.UserRole + 1) or Path(item.data(Qt.UserRole)).name
             if original_name == name:
-                item.setText(f"⊠ 失败\n{original_name}")
-                item.setToolTip(f"{item.data(Qt.UserRole)}\n{message}")
+                item.setText(tr('⊠ 失败\n{_0}', _0=original_name))
+                item.setToolTip(f'{item.data(Qt.UserRole)}\n{message}')
                 break
-        self._append_log(f"[失败] {name}: {message}")
+        self._append_log(tr('[失败] {_0}: {_1}', _0=name, _1=message))
 
     def _on_finished(self, success: int, failed: int) -> None:
         # The terminal signal is emitted as run() returns. Keep the worker until it exits.
@@ -867,30 +956,36 @@ class MainWindow(QMainWindow):
         self._set_running(False)
         total_done = success + failed
         if self._stop_requested and total_done < self.file_list.count():
-            summary = f"已停止，完成 {success} 个文件，失败 {failed} 个文件。"
+            summary = tr('已停止，完成 {_0} 个文件，失败 {_1} 个文件。', _0=success, _1=failed)
             self.step_panel.mark_cancelled()
             state = "cancelled"
-            status = "任务已取消"
+            status = tr('任务已取消')
             for index in range(self.file_list.count()):
                 item = self.file_list.item(index)
                 if item.data(Qt.UserRole) not in self.results and not item.text().startswith("⊠"):
-                    item.setText(f"— 已取消\n{item.data(Qt.UserRole + 1)}")
+                    item.setText(tr('— 已取消\n{_0}', _0=item.data(Qt.UserRole + 1)))
         elif failed or total_done < self.file_list.count():
-            summary = f"处理结束：成功 {success} 个文件，失败 {failed} 个文件。"
+            summary = tr('处理结束：成功 {_0} 个文件，失败 {_1} 个文件。', _0=success, _1=failed)
             self.step_panel.mark_failed()
             state = "error"
-            status = "部分文件失败"
+            status = tr('部分文件失败')
         else:
-            summary = f"全部完成，共 {success} 个文件。"
+            summary = tr('全部完成，共 {_0} 个文件。', _0=success)
             state = "success"
-            status = "全部完成"
+            status = tr('全部完成')
         self._set_status(status, state)
-        self.stage_label.setText(summary)
+        self.stage_label.setText(tr(summary))
         self._append_log(summary)
         self._log_panel.flush_all()
         self._update_actions()
         if failed and total_done == self.file_list.count():
             self._show_issue_prompt()
+        if state == 'success' and success > 0 and not self._stop_requested:
+            self._maybe_show_star_prompt()
+
+    def _maybe_show_star_prompt(self):
+        if random.random() < STAR_PROMPT_PROBABILITY:
+            self._star_prompt.show_prompt()
 
     def _open_output_dir(self) -> None:
         path = Path(self.config["page_output_dir"])
@@ -902,22 +997,21 @@ class MainWindow(QMainWindow):
         if not url:
             QMessageBox.information(
                 self,
-                "Issue 链接未配置",
-                "请先在 API 配置页填写 Issue 链接，例如：\nhttps://github.com/你的用户名/ComiTrans/issues",
+                tr('Issue 链接未配置'),
+                tr('请先在 API 配置页填写 Issue 链接，例如：\nhttps://github.com/你的用户名/ComiTrans/issues'),
             )
             return
         QDesktopServices.openUrl(QUrl(url))
 
     def _show_issue_prompt(self) -> None:
         box = QMessageBox(self)
-        box.setWindowTitle("翻译失败")
+        box.setWindowTitle(tr('翻译失败'))
         box.setText(
-            "本次翻译有图片失败。\n"
-            "建议到 GitHub 提交 Issue，并附带报错日志页生成的诊断提示词。"
+            tr('本次翻译有图片失败。\n建议到 GitHub 提交 Issue，并附带报错日志页生成的诊断提示词。')
         )
-        copy_btn = box.addButton("复制诊断提示词", QMessageBox.ActionRole)
-        issue_btn = box.addButton("打开 Issue 页面", QMessageBox.ActionRole)
-        box.addButton("关闭", QMessageBox.RejectRole)
+        copy_btn = box.addButton(tr('复制诊断提示词'), QMessageBox.ActionRole)
+        issue_btn = box.addButton(tr('打开 Issue 页面'), QMessageBox.ActionRole)
+        box.addButton(tr('关闭'), QMessageBox.RejectRole)
         box.exec()
         clicked = box.clickedButton()
         if clicked is copy_btn:
@@ -953,10 +1047,11 @@ class MainWindow(QMainWindow):
     def _toggle_preferences(self, checked: bool) -> None:
         self._pref_toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow)
         self._pref_container.setVisible(checked)
+        self._apply_compact_layout()
 
     def _toggle_log_panel(self, visible: bool) -> None:
         self._log_panel.setVisible(visible)
-        self._log_toggle.setText("详细日志" if visible else "展开日志")
+        self._log_toggle.setText(tr('详细日志') if visible else tr('展开日志'))
         self._log_toggle.setArrowType(Qt.DownArrow if visible else Qt.RightArrow)
         self._apply_compact_layout()
 
@@ -964,17 +1059,29 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'preview_tabs'):
             return
         compact = self.height() < 680
+        self._pref_container.setMaximumHeight(160 if compact else 240)
         self._brand_title.setFont(brand_font(28 if self.width() < 960 else 36 if self.width() < 1180 else 40))
         self._header_layout.setContentsMargins(12 if self.width() < 1120 else 20, 8, 12 if self.width() < 1120 else 20, 8)
-        self._nav_auto.setText('自动处理' if self.width() < 1120 else '01  自动处理')
-        self._nav_editor.setText('嵌字精修' if self.width() < 1120 else '02  嵌字精修')
+        self._nav_auto.setText(tr('自动处理') if self.width() < 1120 else tr('01  自动处理'))
+        self._nav_editor.setText(tr('嵌字精修') if self.width() < 1120 else tr('02  嵌字精修'))
         narrow = self.width() < 1120
         self._more_btn.setVisible(narrow)
         self._output_btn.setVisible(not narrow)
         self._issue_btn.setVisible(not narrow)
         self._settings_btn.setVisible(self.width() >= 960)
         self._logs_btn.setVisible(self.width() >= 960)
-        inline = self.width() >= 1180
+        inline = self.width() >= (1400 if ui_language() == 'en' else 1280 if ui_language() == 'ja' else 1180)
+        stacked = not inline and ui_language() != 'zh-CN'
+        if stacked != self._language_stacked:
+            self._language_stacked = stacked
+            fields = (self._source_caption, self._source_language, self._target_caption,
+                      self._target_language, self._pref_toggle)
+            for widget in fields:
+                self._language_grid.removeWidget(widget)
+            positions = ((0, 0), (1, 0), (0, 1), (1, 1), (1, 2)) if stacked else tuple((0, i) for i in range(5))
+            for widget, (row, column) in zip(fields, positions):
+                self._language_grid.addWidget(widget, row, column)
+            self._language_grid.setColumnStretch(5, 0 if stacked else 1)
         if inline != self._controls_inline:
             self._controls_inline = inline
             for widget in (self._language_controls, self._output_controls, self._start_btn):
@@ -987,7 +1094,7 @@ class MainWindow(QMainWindow):
         self._elapsed_label.setVisible(not compact)
         self.step_panel.set_compact(compact)
         self.preview_tabs.setVisible(not compact or not self._log_toggle.isChecked())
-        self._log_toggle.setToolTip('小窗口下，收起日志可查看图像' if compact else '独立展开或收起详细日志')
+        self._log_toggle.setToolTip(tr('小窗口下，收起日志可查看图像') if compact else tr('独立展开或收起详细日志'))
         margin = 12 if self.width() < 1180 else 20
         self._work_layout.setContentsMargins(margin, 8 if compact else 14, margin, 12)
         self._work_layout.setSpacing(4 if compact else 8)
@@ -1000,6 +1107,8 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._apply_compact_layout()
+        if hasattr(self, '_star_prompt'):
+            self._star_prompt.reposition()
 
     def _schedule_save_preferences(self) -> None:
         self._pref_save_timer.start()
@@ -1021,44 +1130,57 @@ class MainWindow(QMainWindow):
         updates = self.api_config_page.values()
         errors = validate_ocr_config({**self.config, **updates})
         if errors:
-            QMessageBox.warning(self, "OCR 配置不完整", "\n".join(errors))
+            QMessageBox.warning(self, tr('OCR 配置不完整'), "\n".join(tr(error) for error in errors))
             return
         if updates.get("api_key") and updates["api_key"] == updates.get("translation_model"):
             QMessageBox.warning(
                 self,
-                "API 配置提示",
-                "API Key 与模型名相同，看起来把模型名填到了密钥栏。"
-                "DeepSeek / OpenAI 等平台的密钥通常以 sk- 开头。",
+                tr('API 配置提示'),
+                tr('API Key 与模型名相同，看起来把模型名填到了密钥栏。DeepSeek / OpenAI 等平台的密钥通常以 sk- 开头。'),
             )
             return
-        self.config = save_ai_config(updates)
+        try:
+            self.config = save_ai_config(updates)
+        except OSError as exc:
+            QMessageBox.warning(self, tr('设置未保存'), tr('无法保存设置：{error}', error=str(exc)))
+            return
         self.api_config_page.load_config(self.config)
         self._font_picker.load_config(self.config)
-        self.editor_page.set_watermark_enabled(bool(self.config.get("watermark_enabled", False)))
+        self.editor_page.set_watermark_enabled(bool(self.config.get("watermark_enabled", True)))
         self._source_language.blockSignals(True)
         self._source_language.setCurrentIndex(max(0, self._source_language.findData(self.config.get("source_language", "ja"))))
         self._source_language.blockSignals(False)
+        self._target_language.blockSignals(True)
+        self._target_language.setCurrentIndex(max(0, self._target_language.findData(self.config['target_language'])))
+        self._target_language.blockSignals(False)
+        self._translation_alignment.blockSignals(True)
+        self._translation_alignment.setCurrentIndex(self._translation_alignment.findData(self.config['vertical_alignment']))
+        self._translation_alignment.blockSignals(False)
         self._output_dir_input.setText(self.config.get("page_output_dir", ""))
         self.api_config_page.mark_saved()
+        if self.config['ui_language'] != ui_language():
+            self.api_config_page._save_status.setText(tr('界面语言已保存，下次启动生效。'))
         fingerprint = config_fingerprint(self.config)
         if self.pipeline and self.pipeline_fingerprint == fingerprint:
             self.pipeline.api_key = self.config["api_key"]
             self.pipeline.api_base_url = self.config["api_base_url"]
             self.pipeline.translation_model = self.config["translation_model"]
             self.pipeline.translation_prompt = self.config.get("translation_prompt", "")
+            self.pipeline.target_language = self.config['target_language']
+            self.pipeline.vertical_alignment = self.config['vertical_alignment']
             self.pipeline.chinese_names = self.config.get("chinese_names", "")
             self.pipeline.multimodal = bool(self.config.get("multimodal", False))
         else:
             self.pipeline = None
-        self._set_status("配置已保存", "success")
-        self._append_log("API 配置已保存，将在下次翻译时生效。")
+        self._set_status(tr('配置已保存'), "success")
+        self._append_log(tr('API 配置已保存，将在下次翻译时生效。'))
 
     def _append_log(self, message: str) -> None:
         sender = self.sender()
         if isinstance(sender, BatchWorker) and sender.task_id not in (self._active_task_id, self._warmup_task_id):
             return
         self._log_panel.append(message)
-        if message.startswith(("[失败]", "[严重错误]", "[失败堆栈]")):
+        if message.startswith(("[失败]", "[严重错误]", "[失败堆栈]", "[ERROR]")):
             self.diagnostics.add_error(message)
         else:
             self.diagnostics.append(message)
@@ -1103,8 +1225,8 @@ class MainWindow(QMainWindow):
         if self.worker and self.worker.isRunning():
             answer = QMessageBox.question(
                 self,
-                "退出确认",
-                "翻译仍在进行中，退出会中断当前任务。确定退出吗？",
+                tr('退出确认'),
+                tr('翻译仍在进行中，退出会中断当前任务。确定退出吗？'),
                 QMessageBox.Yes | QMessageBox.No,
             )
             if answer != QMessageBox.Yes:
@@ -1121,4 +1243,5 @@ class MainWindow(QMainWindow):
             self._ui_settings.setValue(f"ui/{key}", splitter.saveState())
         self._ui_settings.setValue("ui/logVisible", self._log_toggle.isChecked())
         self._ui_settings.setValue("ui/preferencesVisible", self._pref_toggle.isChecked())
+        self._star_prompt.dismiss()
         event.accept()

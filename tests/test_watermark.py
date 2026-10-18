@@ -5,6 +5,7 @@ import os
 import sys
 import tempfile
 import unittest
+from tests.qt_utils import destroy_widget
 from pathlib import Path
 from unittest.mock import patch
 
@@ -74,7 +75,6 @@ class WatermarkTests(unittest.TestCase):
     def test_disabled_is_pixel_identical_and_does_not_load_font(self):
         source = Image.new("RGBA", (1200, 1800), (50, 80, 110, 160))
         with patch("comic_translate_core.watermark.ImageFont.truetype", side_effect=AssertionError):
-            self.assertIs(apply_watermark(source), source)
             self.assertIs(apply_watermark(source, enabled=False), source)
 
     def test_enabled_preserves_source_and_stays_in_corner_on_light_and_dark_pages(self):
@@ -83,7 +83,7 @@ class WatermarkTests(unittest.TestCase):
                 with self.subTest(mode=mode, color=color, size=size):
                     original = Image.new(mode, size, color)
                     before = original.tobytes()
-                    marked = apply_watermark(original, enabled=True)
+                    marked = apply_watermark(original)
                     self.assertEqual(original.tobytes(), before)
                     self.assert_corner_only(original, marked)
 
@@ -95,11 +95,13 @@ class WatermarkTests(unittest.TestCase):
                 self.assertEqual(marked.size, size)
                 self.assertEqual(marked.getpixel((size[0] - 1, size[1] - 1)), (255, 255, 255))
 
-    def test_config_defaults_off_and_round_trips_both_settings(self):
-        self.assertFalse(app_config.load_ai_config()["watermark_enabled"])
-        page = ApiConfigPage(app_config.load_ai_config())
-        self.addCleanup(page.close)
-        self.assertFalse(page._watermark_check.isChecked())
+    def test_config_defaults_on_in_first_tab_and_round_trips_both_settings(self):
+        self.assertTrue(app_config.load_ai_config()["watermark_enabled"])
+        page = ApiConfigPage({})
+        self.addCleanup(destroy_widget, page)
+        self.assertTrue(page._watermark_check.isChecked())
+        self.assertTrue(page._sections.widget(0).isAncestorOf(page._watermark_check))
+        self.assertFalse(page._sections.widget(2).isAncestorOf(page._watermark_check))
         for enabled in (True, False):
             page._watermark_check.setChecked(enabled)
             app_config.save_ai_config(page.values())
@@ -108,8 +110,10 @@ class WatermarkTests(unittest.TestCase):
             page.load_config(loaded)
             self.assertEqual(page._watermark_check.isChecked(), enabled)
 
-    def run_worker(self, source, output, pipeline, *, enabled):
-        config = dict(api_key="", api_base_url="", translation_model="", pdf_dpi=96, watermark_enabled=enabled)
+    def run_worker(self, source, output, pipeline, *, enabled=None):
+        config = dict(api_key="", api_base_url="", translation_model="", pdf_dpi=96)
+        if enabled is not None:
+            config['watermark_enabled'] = enabled
         worker = BatchWorker([source], output, config, pipeline=pipeline)
         summary, errors = [], []
         worker.finished.connect(lambda success, failure: summary.append((success, failure)))
@@ -124,11 +128,11 @@ class WatermarkTests(unittest.TestCase):
         image.save(source)
         before = source.read_bytes()
         pipeline = _BlankPipeline()
-        for enabled in (True, False):
+        for enabled in (None, False, True):
             out = self.root / str(enabled)
             self.run_worker(source, out, pipeline, enabled=enabled)
             with Image.open(out / "page_translated.png") as result:
-                if enabled:
+                if enabled is not False:
                     self.assert_corner_only(image, result)
                 else:
                     self.assertEqual(result.tobytes(), image.tobytes())
@@ -143,7 +147,7 @@ class WatermarkTests(unittest.TestCase):
             Image.new("RGB", size, "white").save(path)
         source = self.root / "comic.pdf"
         build_pdf_from_images(paths, sizes, source)
-        self.run_worker(source, self.root / "output", _BlankPipeline(), enabled=True)
+        self.run_worker(source, self.root / "output", _BlankPipeline())
         pages = render_pdf_pages(self.root / "output/comic_translated.pdf", self.root / "rendered", dpi=96)
         self.assertEqual(len(pages), 2)
         for page, size in zip(pages, sizes):
@@ -162,8 +166,9 @@ class WatermarkTests(unittest.TestCase):
         image.save(output)
         image.save(clean)
         layout.write_text(json.dumps([dict(box=[30, 30, 130, 300], text="", custom_metadata="keep")]), encoding="utf-8")
+        app_config.save_ai_config({'watermark_enabled': False})
         editor = EditorPage()
-        self.addCleanup(editor.close)
+        self.addCleanup(destroy_widget, editor)
         editor.load_page(output)
         editor._text_input.setPlainText("保留修改")
         editor.set_watermark_enabled(True)
@@ -184,15 +189,16 @@ class WatermarkTests(unittest.TestCase):
     def test_saving_settings_updates_editor_without_reloading_models(self):
         with patch.object(MainWindow, "_start_warmup"):
             window = MainWindow()
-        self.addCleanup(window.close)
+        self.addCleanup(destroy_widget, window)
         pipeline = _BlankPipeline()
         window.pipeline = pipeline
         window.pipeline_fingerprint = app_config.config_fingerprint(window.config)
-        window.api_config_page._watermark_check.setChecked(True)
-        window._save_api_config()
-        self.assertTrue(app_config.load_ai_config()["watermark_enabled"])
-        self.assertTrue(window.editor_page.config["watermark_enabled"])
-        self.assertIs(window.pipeline, pipeline)
+        for enabled in (False, True):
+            window.api_config_page._watermark_check.setChecked(enabled)
+            window._save_api_config()
+            self.assertEqual(app_config.load_ai_config()["watermark_enabled"], enabled)
+            self.assertEqual(window.editor_page.config["watermark_enabled"], enabled)
+            self.assertIs(window.pipeline, pipeline)
 
 
 if __name__ == "__main__":

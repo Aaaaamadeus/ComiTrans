@@ -31,7 +31,7 @@ def _wordmark(width: int) -> Image.Image:
     return layer.resize((width, height), Image.Resampling.LANCZOS)
 
 
-def apply_watermark(image: Image.Image, *, enabled: bool = False) -> Image.Image:
+def apply_watermark(image: Image.Image, *, enabled: bool = True) -> Image.Image:
     """Return a marked copy; disabled output is the original image without any I/O.
 
     The signature spans 14% of the page width, inset from the lower-right edge.

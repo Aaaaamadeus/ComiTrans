@@ -1,0 +1,43 @@
+{
+  "scale": "2",
+  "checks": [
+    {
+      "window": [
+        1440,
+        900
+      ],
+      "tab": 0,
+      "control_visible": true,
+      "screenshot": "manual-lettering-text-1440-scale-2.png"
+    },
+    {
+      "window": [
+        1440,
+        900
+      ],
+      "tab": 1,
+      "control_visible": true,
+      "screenshot": "manual-lettering-effects-1440-scale-2.png"
+    },
+    {
+      "window": [
+        820,
+        480
+      ],
+      "tab": 0,
+      "control_visible": true,
+      "screenshot": "manual-lettering-text-820-scale-2.png"
+    },
+    {
+      "window": [
+        820,
+        480
+      ],
+      "tab": 1,
+      "control_visible": true,
+      "screenshot": "manual-lettering-effects-820-scale-2.png"
+    }
+  ],
+  "saved_image_matches_preview": true,
+  "hard_breaks_saved": true
+}

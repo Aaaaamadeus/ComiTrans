@@ -77,6 +77,8 @@ class Diagnostics:
                 f"- 检测模型: {config.get('detector_model', '')}",
                 f"- OCR 后端: {config.get('ocr_backend', 'auto')}",
                 f"- 被翻译语言: {config.get('source_language', 'ja')}",
+                f"- 译文简繁: {config.get('target_language', 'zh-Hans')}",
+                f"- 竖排列对齐: {config.get('vertical_alignment', 'center')}",
                 f"- 自定义源语言: {config.get('custom_source_language', '')}",
                 f"- 自定义 OCR 协议: {config.get('custom_ocr_protocol', 'http')}",
                 f"- 韩语 OCR: {config.get('korean_ocr_model', '')}",

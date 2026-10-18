@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
 from ..config import AI_ROOT, ICON_PATH
+from ..i18n import ui_language
 
 COLORS = dict(paper='#FFFFFF', workspace='#F8F8F8', muted='#EFEFEF', ink='#171717', black='#000000', secondary='#595959', disabled='#777777', rule='#DEDEDE', canvas='#F3F3F3')
 SPACING = (4, 8, 12, 16, 24, 32)
@@ -11,7 +12,7 @@ JP_FAMILIES = ['Source Han Sans JP', 'Noto Sans CJK JP', 'Yu Gothic', 'Meiryo']
 
 def ui_font(size=14, weight=QFont.Normal, *, mono=False, japanese=False):
     available = set(QFontDatabase.families())
-    preferred = (['JetBrains Mono', 'Consolas'] if mono else []) + (JP_FAMILIES if japanese else []) + UI_FAMILIES
+    preferred = (['JetBrains Mono', 'Consolas'] if mono else []) + (JP_FAMILIES if japanese or ui_language() == 'ja' else []) + UI_FAMILIES
     # A bundled display-only Heavy face must not become the body-text fallback.
     families = [name for name in preferred if name in available and
                 QFontDatabase.styles(name) != ['Heavy']]
@@ -86,6 +87,7 @@ QLabel#sectionTitle { font-size: 17px; font-weight: 700; }
 QLabel#emptyPreviewTitle { font-size: 28px; font-weight: 800; }
 QLabel[muted="true"], QLabel#brandSubtitle, QLabel#dropHint { color: @secondary; font-size: 12px; }
 QLabel#fieldCaption { font-size: 13px; font-weight: 700; padding-top: 6px; }
+QLabel#fontChoiceName { color: @secondary; font-size: 12px; padding: 2px 0 4px 0; }
 QLabel#statusPill { padding: 6px 10px; border: none; background: transparent; font-size: 12px; color: @secondary; }
 QLabel#statusPill[state="running"], QLabel#statusPill[state="warming"] { color: @ink; font-weight: 700; }
 QLabel#statusPill[state="error"], QLabel#statusPill[state="warning"] { color: @ink; font-weight: 700; }
@@ -123,6 +125,10 @@ QFrame#inspectorActions { background: @workspace; border: none; }
 QLabel#editorStatus { background: @workspace; padding: 8px 12px; color: @secondary; font-size: 12px; }
 QFrame#queuePanel { background: @workspace; border: none; }
 QFrame#controlCard { background: @paper; border: none; }
+QFrame#starPrompt { background: @paper; border: 1px solid @rule; border-radius: 14px; }
+QFrame#starPrompt QLabel { background: transparent; border: none; }
+QLabel#starPromptTitle { font-weight: 700; font-size: 15px; }
+QFrame#starPrompt QToolButton { padding: 0; min-width: 24px; min-height: 24px; font-size: 20px; }
 QFrame#logPanel { background: @paper; border-top: 1px solid @rule; }
 QTabWidget::pane { border: none; background: @paper; }
 QTabBar::tab { padding: 7px 14px; min-height: 24px; border: none; border-bottom: 2px solid transparent; background: transparent; color: @secondary; font-weight: 500; }

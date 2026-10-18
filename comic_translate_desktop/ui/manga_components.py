@@ -1,5 +1,6 @@
 """Reusable manga composition in Qt logical coordinates, without overlay input."""
 from __future__ import annotations
+from ..i18n import tr
 
 from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QPainter
@@ -9,7 +10,7 @@ from .theme import ui_font
 from .halftone import COMPACT_BREAKPOINT, draw_tone
 
 def label(parent, text, size, *, weight=QFont.Bold):
-    result = QLabel(text, parent)
+    result = QLabel(tr(text), parent)
     result.setFont(ui_font(size, weight))
     result.setStyleSheet('QLabel { color: #111111; background: transparent; }')
     result.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -63,16 +64,16 @@ class StageFocus(QWidget):
         self.setFixedHeight(32)
         self._number = label(self, '—', 14, weight=QFont.Bold)
         self._number.setAlignment(Qt.AlignCenter)
-        self._title = label(self, '等待任务', 14, weight=QFont.Bold)
-        self._detail = label(self, '添加漫画后，开始自动处理', 12, weight=QFont.Normal)
+        self._title = label(self, tr('等待任务'), 14, weight=QFont.Bold)
+        self._detail = label(self, tr('添加漫画后，开始自动处理'), 12, weight=QFont.Normal)
         self._detail.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self._detail.setStyleSheet('QLabel { color: #595959; background: transparent; }')
 
     def set_stage(self, number, title, detail):
-        self._number.setText(number)
-        self._title.setText(title)
-        self._detail.setText(detail)
-        self.setToolTip(detail)
+        self._number.setText(tr(number))
+        self._title.setText(tr(title))
+        self._detail.setText(tr(detail))
+        self.setToolTip(tr(detail))
         self.setAccessibleName(f'{title}，{detail}')
         self._place()
         self.update()

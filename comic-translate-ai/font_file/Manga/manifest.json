@@ -1,0 +1,151 @@
+{
+  "collected_on": "2026-10-16",
+  "selection": "Approximate SC/TC companions for the supplied manga lettering styles; not identification of the original fonts.",
+  "sample_text": "快给我写进去！祝你新年快乐！快給我寫進去！祝你新年快樂！喵～轰！轟！「」？！……——",
+  "families": [
+    {
+      "name": "狮尾B2黑体",
+      "id": "SweiB2Sans",
+      "source": "https://github.com/max32002/swei-b2-sans",
+      "commit": "772b947d99ef510e87dfbc30d9cc79b517024def",
+      "license": "SIL Open Font License 1.1",
+      "fonts": [
+        {
+          "file": "SweiB2Sans/SweiB2SansCJKsc-Black.ttf",
+          "upstream_path": "CJK SC/SweiB2SansCJKsc-Black.ttf",
+          "download_url": "https://raw.githubusercontent.com/max32002/swei-b2-sans/772b947d99ef510e87dfbc30d9cc79b517024def/CJK%20SC/SweiB2SansCJKsc-Black.ttf",
+          "bytes": 18123280,
+          "sha256": "e9c47b08ace6e0d024fcabdfefb9d67a8e61c55475f412300816f470ef183b2d",
+          "family": "Swei B2 Sans CJK SC",
+          "style": "Black",
+          "version": "Version 2.128 ",
+          "sample_missing": ""
+        },
+        {
+          "file": "SweiB2Sans/SweiB2SansCJKtc-Black.ttf",
+          "upstream_path": "CJK TC/SweiB2SansCJKtc-Black.ttf",
+          "download_url": "https://raw.githubusercontent.com/max32002/swei-b2-sans/772b947d99ef510e87dfbc30d9cc79b517024def/CJK%20TC/SweiB2SansCJKtc-Black.ttf",
+          "bytes": 18162588,
+          "sha256": "8fcca2f8f6b20c50047f3011c60a41b7f85565a098a1f7ee51df0bfcb6401e31",
+          "family": "Swei B2 Sans CJK TC",
+          "style": "Black",
+          "version": "Version 2.128 ",
+          "sample_missing": ""
+        }
+      ]
+    },
+    {
+      "name": "狮尾牙膏圆体",
+      "id": "SweiToothpaste",
+      "source": "https://github.com/max32002/swei-toothpaste",
+      "commit": "85d02f71083ff95be3621d7fa7b12a6b1fca88e9",
+      "license": "SIL Open Font License 1.1",
+      "fonts": [
+        {
+          "file": "SweiToothpaste/SweiToothpasteCJKsc-Black.ttf",
+          "upstream_path": "CJK SC/SweiToothpasteCJKsc-Black.ttf",
+          "download_url": "https://raw.githubusercontent.com/max32002/swei-toothpaste/85d02f71083ff95be3621d7fa7b12a6b1fca88e9/CJK%20SC/SweiToothpasteCJKsc-Black.ttf",
+          "bytes": 12569568,
+          "sha256": "d64863c1fb663425be26fb132b81829180d7756300ec5438fd3012864c754331",
+          "family": "Swei Toothpaste CJK SC",
+          "style": "Black",
+          "version": "Version 2.071 ",
+          "sample_missing": ""
+        },
+        {
+          "file": "SweiToothpaste/SweiToothpasteCJKtc-Black.ttf",
+          "upstream_path": "CJK TC/SweiToothpasteCJKtc-Black.ttf",
+          "download_url": "https://raw.githubusercontent.com/max32002/swei-toothpaste/85d02f71083ff95be3621d7fa7b12a6b1fca88e9/CJK%20TC/SweiToothpasteCJKtc-Black.ttf",
+          "bytes": 12582016,
+          "sha256": "56a96f1a4decaf3bc6d5ef34bfcd26a17996b5ada4845d5ca1372ba08a67fd6f",
+          "family": "Swei Toothpaste CJK TC",
+          "style": "Black",
+          "version": "Version 1.0",
+          "sample_missing": ""
+        }
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "file": "SweiB2Sans/README.md",
+      "upstream_path": "README.md",
+      "download_url": "https://raw.githubusercontent.com/max32002/swei-b2-sans/772b947d99ef510e87dfbc30d9cc79b517024def/README.md",
+      "bytes": 11748,
+      "sha256": "2a13a0f4c62d2d089802f09e5822ab61876129650dd6b3309ead5bb5f9c70cee"
+    },
+    {
+      "file": "SweiB2Sans/SIL_Open_Font_License_1.1.txt",
+      "upstream_path": "SIL_Open_Font_License_1.1.txt",
+      "download_url": "https://raw.githubusercontent.com/max32002/swei-b2-sans/772b947d99ef510e87dfbc30d9cc79b517024def/SIL_Open_Font_License_1.1.txt",
+      "bytes": 4302,
+      "sha256": "e564f06d018e7b95bc3594c96a17f1d41865af4038c375e7aa974dd69df38602"
+    },
+    {
+      "file": "SweiB2Sans/SweiB2SansCJKsc-Black.ttf",
+      "upstream_path": "CJK SC/SweiB2SansCJKsc-Black.ttf",
+      "download_url": "https://raw.githubusercontent.com/max32002/swei-b2-sans/772b947d99ef510e87dfbc30d9cc79b517024def/CJK%20SC/SweiB2SansCJKsc-Black.ttf",
+      "bytes": 18123280,
+      "sha256": "e9c47b08ace6e0d024fcabdfefb9d67a8e61c55475f412300816f470ef183b2d"
+    },
+    {
+      "file": "SweiB2Sans/SweiB2SansCJKsc-Black-EMBEDDED-NOTICES.txt",
+      "bytes": 8919,
+      "sha256": "6cb1544dccec76c7a6fc19993111059cc0fe985fcb0ee4555d151efb43ce0a9f",
+      "source": "font name table"
+    },
+    {
+      "file": "SweiB2Sans/SweiB2SansCJKtc-Black.ttf",
+      "upstream_path": "CJK TC/SweiB2SansCJKtc-Black.ttf",
+      "download_url": "https://raw.githubusercontent.com/max32002/swei-b2-sans/772b947d99ef510e87dfbc30d9cc79b517024def/CJK%20TC/SweiB2SansCJKtc-Black.ttf",
+      "bytes": 18162588,
+      "sha256": "8fcca2f8f6b20c50047f3011c60a41b7f85565a098a1f7ee51df0bfcb6401e31"
+    },
+    {
+      "file": "SweiB2Sans/SweiB2SansCJKtc-Black-EMBEDDED-NOTICES.txt",
+      "bytes": 8893,
+      "sha256": "99904b3778350c58fd91d3f5f0d4846ef3d3f3011147706e343d32d888692046",
+      "source": "font name table"
+    },
+    {
+      "file": "SweiToothpaste/README.md",
+      "upstream_path": "README.md",
+      "download_url": "https://raw.githubusercontent.com/max32002/swei-toothpaste/85d02f71083ff95be3621d7fa7b12a6b1fca88e9/README.md",
+      "bytes": 12196,
+      "sha256": "35aa9f763f2c4f984179b0123415a56b6f383b94cd769249f8494b813f2487d0"
+    },
+    {
+      "file": "SweiToothpaste/SIL_Open_Font_License_1.1.txt",
+      "upstream_path": "SIL_Open_Font_License_1.1.txt",
+      "download_url": "https://raw.githubusercontent.com/max32002/swei-toothpaste/85d02f71083ff95be3621d7fa7b12a6b1fca88e9/SIL_Open_Font_License_1.1.txt",
+      "bytes": 4302,
+      "sha256": "e564f06d018e7b95bc3594c96a17f1d41865af4038c375e7aa974dd69df38602"
+    },
+    {
+      "file": "SweiToothpaste/SweiToothpasteCJKsc-Black.ttf",
+      "upstream_path": "CJK SC/SweiToothpasteCJKsc-Black.ttf",
+      "download_url": "https://raw.githubusercontent.com/max32002/swei-toothpaste/85d02f71083ff95be3621d7fa7b12a6b1fca88e9/CJK%20SC/SweiToothpasteCJKsc-Black.ttf",
+      "bytes": 12569568,
+      "sha256": "d64863c1fb663425be26fb132b81829180d7756300ec5438fd3012864c754331"
+    },
+    {
+      "file": "SweiToothpaste/SweiToothpasteCJKsc-Black-EMBEDDED-NOTICES.txt",
+      "bytes": 8919,
+      "sha256": "6cb1544dccec76c7a6fc19993111059cc0fe985fcb0ee4555d151efb43ce0a9f",
+      "source": "font name table"
+    },
+    {
+      "file": "SweiToothpaste/SweiToothpasteCJKtc-Black.ttf",
+      "upstream_path": "CJK TC/SweiToothpasteCJKtc-Black.ttf",
+      "download_url": "https://raw.githubusercontent.com/max32002/swei-toothpaste/85d02f71083ff95be3621d7fa7b12a6b1fca88e9/CJK%20TC/SweiToothpasteCJKtc-Black.ttf",
+      "bytes": 12582016,
+      "sha256": "56a96f1a4decaf3bc6d5ef34bfcd26a17996b5ada4845d5ca1372ba08a67fd6f"
+    },
+    {
+      "file": "SweiToothpaste/SweiToothpasteCJKtc-Black-EMBEDDED-NOTICES.txt",
+      "bytes": 8893,
+      "sha256": "99904b3778350c58fd91d3f5f0d4846ef3d3f3011147706e343d32d888692046",
+      "source": "font name table"
+    }
+  ]
+}

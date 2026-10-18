@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+from tests.qt_utils import destroy_widget
 from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
@@ -60,7 +61,7 @@ class FontCatalogTests(unittest.TestCase):
 
     def dialog(self):
         dialog = FontLibraryDialog(config.load_ai_config())
-        self.addCleanup(dialog.close)
+        self.addCleanup(destroy_widget, dialog)
         return dialog
 
     def wait_download(self, dialog):
@@ -161,7 +162,7 @@ class FontCatalogTests(unittest.TestCase):
 
     def test_local_font_search_is_contains_case_insensitive_and_does_not_add_values(self):
         combo = SearchableFontCombo()
-        self.addCleanup(combo.close)
+        self.addCleanup(destroy_widget, combo)
         combo.addItem('普通对话', 'dialogue')
         combo.addItem('霞鹜文楷 · LXGW WenKai', 'wenkai')
         combo.addItem('思源宋体 · Noto Serif SC', 'serif')

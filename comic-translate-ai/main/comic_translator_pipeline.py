@@ -13,7 +13,11 @@ from openai import OpenAI
 from manga_lama import MangaLama
 from vertical_typesetter import VerticalTypesetter
 from comic_translate_core.languages import source_language, source_language_name
+from comic_translate_core.chinese import (
+    ChineseConversionError, convert_chinese, normalize_target_language, target_language_name,
+)
 from comic_translate_core.ocr import create_ocr, recognize_regions
+from comic_translate_core.layout_options import normalize_vertical_alignment
 from comic_translate_core.watermark import apply_watermark
 from onnx_text_detector import OnnxTextDetector
 import font_probe
@@ -123,13 +127,17 @@ class ComicTranslatorPipeline:
                  progress_callback=None,
                  cancel_callback=None,
                  ocr_config=None,
-                 watermark_enabled=False,
-                 fallback_fonts=None):
+                 watermark_enabled=True,
+                 fallback_fonts=None,
+                 target_language="zh-Hans",
+                 vertical_alignment="center"):
         self.device = 'cuda' if use_gpu else 'cpu'
         self.translation_model = translation_model
         self.api_key = api_key
         self.api_base_url = api_base_url
         self.translation_prompt = translation_prompt or ""
+        self.target_language = normalize_target_language(target_language)
+        self.vertical_alignment = normalize_vertical_alignment(vertical_alignment)
         self.chinese_names = chinese_names or ""
         self.multimodal = bool(multimodal)
         # 实验功能：AI 参与字体族判别。默认关闭——实测在真实漫画页上判定不稳定且每块
@@ -167,7 +175,7 @@ class ComicTranslatorPipeline:
         self.ocr_backend_active = self.ocr_engine.name
         self.ocr = getattr(self.ocr_engine, "recognizer", None)
         self.manga_ocr = self.ocr if self.ocr_backend_active == "manga-ocr" else None
-        print(f"[INFO] 源语言: {self.source_language_name} → 中文；OCR: {self.ocr_backend_active}")
+        print(f"[INFO] 源语言: {self.source_language_name} → {target_language_name(self.target_language)}；OCR: {self.ocr_backend_active}")
 
         # 3. 图像修补
         print("[INFO] 加载 Manga-lama...")
@@ -519,7 +527,9 @@ class ComicTranslatorPipeline:
 
         # 3. 构造 Prompt
         language_name = getattr(self, "source_language_name", "日语")
-        system_prompt = """你是专业的漫画翻译助手，将源语言文本翻译成简体中文。输入是按漫画阅读顺序排列的 OCR 文本。
+        target = normalize_target_language(getattr(self, "target_language", "zh-Hans"))
+        target_name = target_language_name(target)
+        system_prompt = f"你是专业的漫画翻译助手，将源语言文本翻译成{target_name}。" + """输入是按漫画阅读顺序排列的 OCR 文本。
 
 输入示例：
 [0] 原文条目一
@@ -557,7 +567,8 @@ class ComicTranslatorPipeline:
         if custom_context:
             system_prompt += "\n\n" + "\n\n".join(custom_context)
 
-        system_prompt += f"\n本次源语言：{language_name}；目标语言：简体中文。"
+        system_prompt += (f"\n本次源语言：{language_name}；目标语言：{target_name}。"
+                          f"译文中的中文、人名与术语统一使用{target_name}字形，非中文字符保持原样。")
 
         try:
             client = OpenAI(
@@ -594,7 +605,7 @@ class ComicTranslatorPipeline:
                     f"[{start_index + i}] {text}" for i, text in enumerate(remaining)
                 )
                 user_prompt = (
-                    f"请严格按顺序将以下 {len(remaining)} 条{language_name}文本译成简体中文，返回 "
+                    f"请严格按顺序将以下 {len(remaining)} 条{language_name}文本译成{target_name}，返回 "
                     f'{{"translations": [...]}}，数组只能包含本次列出的 {len(remaining)} 条译文：\n'
                     f"{text_list_str}"
                 )
@@ -665,7 +676,7 @@ class ComicTranslatorPipeline:
                         "translate",
                         f"翻译 API 返回 {len(translations)} 条结果，耗时 {time.time() - _t0:.1f}s",
                     )
-                    return translations
+                    return [convert_chinese(text, target) for text in translations]
 
                 reason = f"，finish_reason={last_finish_reason}" if last_finish_reason else ""
                 status = "JSON 被截断" if not json_complete else "返回数量不足"
@@ -694,6 +705,8 @@ class ComicTranslatorPipeline:
 
         except TranslationError:
             raise
+        except ChineseConversionError as exc:
+            raise TranslationError(str(exc), fatal=True) from exc
         except Exception as exc:
             status_code = getattr(exc, "status_code", None)
             if status_code in (401, 403):
@@ -1026,6 +1039,7 @@ class ComicTranslatorPipeline:
                 "non_bubble": bool(item["non_bubble"]),
                 "emphasis": item.get("emphasis", 0.0),
                 "rendered_font_size": None,
+                "vertical_alignment": normalize_vertical_alignment(getattr(self, 'vertical_alignment', 'center')),
                 "offset_x": 0,
                 "offset_y": 0,
             })
@@ -1047,6 +1061,7 @@ class ComicTranslatorPipeline:
                         direction=item['direction'],
                         target_font_size=item['target_font_size'],
                         non_bubble=item['non_bubble'],
+                        vertical_alignment=layout_items[idx]['vertical_alignment'],
                     )
                     rendered_sizes[idx] = getattr(self.typesetter, "last_font_size", None)
                     region = getattr(self.typesetter, "last_layout_box", None)
@@ -1064,7 +1079,7 @@ class ComicTranslatorPipeline:
         # 6. 保存
         self._check_cancelled()
         self._report_progress("typeset", "排版完成")
-        final_canvas = apply_watermark(final_canvas, enabled=getattr(self, "watermark_enabled", False))
+        final_canvas = apply_watermark(final_canvas, enabled=getattr(self, "watermark_enabled", True))
         final_canvas.save(output_path)
         self._report_progress("save", f"已保存: {os.path.basename(output_path)}")
         print(f"处理完成！已保存至: {output_path}")

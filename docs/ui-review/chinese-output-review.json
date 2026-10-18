@@ -1,0 +1,138 @@
+{
+  "reviewed_on": "2026-10-15T12:28:14.664284+00:00",
+  "feature": "Translation output switch: zh-Hans / zh-Hant",
+  "regression": {
+    "command": ".venv/Scripts/python.exe -m unittest discover -s tests",
+    "passed": 191,
+    "seconds": 36.771
+  },
+  "layout_checks": [
+    [
+      {
+        "requested_size": [
+          1440,
+          900
+        ],
+        "actual_size": [
+          1440,
+          900
+        ],
+        "target": "繁體中文",
+        "target_saved": true,
+        "source_target_start_visible": true,
+        "screenshot": "chinese-output-1440-scale-1.png"
+      },
+      {
+        "requested_size": [
+          1180,
+          760
+        ],
+        "actual_size": [
+          1180,
+          760
+        ],
+        "target": "繁體中文",
+        "target_saved": true,
+        "source_target_start_visible": true,
+        "screenshot": "chinese-output-1180-scale-1.png"
+      },
+      {
+        "requested_size": [
+          820,
+          480
+        ],
+        "actual_size": [
+          820,
+          480
+        ],
+        "target": "繁體中文",
+        "target_saved": true,
+        "source_target_start_visible": true,
+        "screenshot": "chinese-output-820-scale-1.png"
+      }
+    ],
+    [
+      {
+        "requested_size": [
+          1440,
+          900
+        ],
+        "actual_size": [
+          1440,
+          900
+        ],
+        "target": "繁體中文",
+        "target_saved": true,
+        "source_target_start_visible": true,
+        "screenshot": "chinese-output-1440-scale-2.png"
+      },
+      {
+        "requested_size": [
+          1180,
+          760
+        ],
+        "actual_size": [
+          1180,
+          760
+        ],
+        "target": "繁體中文",
+        "target_saved": true,
+        "source_target_start_visible": true,
+        "screenshot": "chinese-output-1180-scale-2.png"
+      },
+      {
+        "requested_size": [
+          820,
+          480
+        ],
+        "actual_size": [
+          820,
+          480
+        ],
+        "target": "繁體中文",
+        "target_saved": true,
+        "source_target_start_visible": true,
+        "screenshot": "chinese-output-820-scale-2.png"
+      }
+    ]
+  ],
+  "visual_review": {
+    "compact_100_percent": "passed",
+    "full_200_percent": "passed"
+  },
+  "frozen_windows_smoke": {
+    "version": "2.4.0",
+    "frozen": true,
+    "pipeline_ready": true,
+    "brand_font": "Skribble",
+    "log_font": "Aa今日花晴 春懒猫困",
+    "missing_glyphs": [],
+    "svg_valid": true,
+    "window_visible": true,
+    "traditional_conversion": true,
+    "simplified_conversion": true,
+    "target_language_persisted": true,
+    "target_language_models_reused": true,
+    "font_imported": true,
+    "font_choice_persisted": true,
+    "font_pipeline_updated": true,
+    "font_models_reused": true,
+    "font_editor_updated": true,
+    "screenshot_saved": true,
+    "catalog_families": 2056,
+    "font_search_enabled": true,
+    "catalog_search_results": 1,
+    "font_library_screenshot_saved": true,
+    "success": true
+  },
+  "packaged_resources": {
+    "required_resources_valid": true,
+    "packaged_app_files": 976,
+    "font_assets_verified": 48,
+    "opencc_files": 26,
+    "opencc_bytes": 1117609,
+    "opencc_license_present": true
+  },
+  "local_executable": "tmp/chinese-output-build/dist/ComiTrans/ComiTrans.exe",
+  "translation_api_called": false
+}

@@ -1,3 +1,7 @@
 # Preserve checksum-related metadata bytes on Windows and other platforms.
 docs/releases/**/baseline.json text eol=lf
 docs/releases/**/SHA256SUMS.txt text eol=lf
+
+# Preserve original font/license bytes referenced by the bundled SHA256 manifest.
+comic-translate-ai/font_file/TC/** -text
+comic-translate-ai/font_file/Manga/** -text

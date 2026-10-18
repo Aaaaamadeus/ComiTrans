@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .i18n import tr
 
 import contextlib
 import io
@@ -15,6 +16,8 @@ from PySide6.QtCore import QThread, Signal
 from . import config as app_config
 from .pdf_utils import build_pdf_from_images, render_pdf_pages
 from comic_translate_core.languages import OCR_CONFIG_KEYS
+from comic_translate_core.chinese import normalize_target_language
+from comic_translate_core.layout_options import normalize_vertical_alignment
 
 
 @dataclass
@@ -105,7 +108,9 @@ class BatchWorker(QThread):
             self._page_event(stage, state, message)
         if stage == "start" and self._current_index > 0:
             message = f"{self._files[self._current_index - 1].name}: 开始处理"
-        self.stage_changed.emit(self._current_index, stage, message)
+        display_message = (tr('{_0}: 开始处理', _0=self._files[self._current_index - 1].name)
+                           if stage == 'start' and self._current_index > 0 else tr(message))
+        self.stage_changed.emit(self._current_index, stage, display_message)
         self.log.emit(message)
 
     def _page_event(self, stage, state, message):
@@ -133,7 +138,7 @@ class BatchWorker(QThread):
     def _configure_pipeline(self, pipeline) -> None:
         pipeline.cancel_callback = self._is_stopped
         pipeline.progress_callback = self._emit_stage
-        pipeline.watermark_enabled = bool(self._config.get("watermark_enabled", False))
+        pipeline.watermark_enabled = bool(self._config.get("watermark_enabled", True))
         fonts = self._config.get('font_map')
         typesetter = getattr(pipeline, 'typesetter', None)
         fallbacks = tuple(self._config.get('font_fallbacks') or ())
@@ -184,6 +189,8 @@ class BatchWorker(QThread):
                 api_key=self._config["api_key"],
                 api_base_url=self._config["api_base_url"],
                 translation_prompt=self._config.get("translation_prompt", ""),
+                target_language=self._config.get("target_language", "zh-Hans"),
+                vertical_alignment=self._config.get("vertical_alignment", "center"),
                 chinese_names=self._config.get("chinese_names", ""),
                 multimodal=self._config.get("multimodal", False),
                 multimodal_font_probe=(self._config.get("multimodal_font_probe", False)
@@ -248,7 +255,8 @@ class BatchWorker(QThread):
     @staticmethod
     def _page_label(page: _PageJob) -> str:
         if page.document.is_pdf:
-            return f"{page.document.source_path.name} 第 {page.page_number}/{len(page.document.pages)} 页"
+            return tr('{_0} 第 {_1}/{_2} 页', _0=page.document.source_path.name,
+                      _1=page.page_number, _2=len(page.document.pages))
         return page.document.source_path.name
 
     @staticmethod
@@ -267,6 +275,8 @@ class BatchWorker(QThread):
         pipeline.api_base_url = config["api_base_url"]
         pipeline.translation_model = config["translation_model"]
         pipeline.translation_prompt = config.get("translation_prompt", "")
+        pipeline.target_language = normalize_target_language(config.get("target_language"))
+        pipeline.vertical_alignment = normalize_vertical_alignment(config.get("vertical_alignment"))
         pipeline.chinese_names = config.get("chinese_names", "")
         pipeline.multimodal = bool(config.get("multimodal", False))
         pipeline.multimodal_font_probe = bool(config.get("multimodal_font_probe", False)
@@ -333,7 +343,7 @@ class BatchWorker(QThread):
                         self._stage_context.page = page
                         self._stage_context.blank = False
                         label = self._page_label(page)
-                        self.stage_changed.emit(page.document.index, "start", f"{label}: 准备中")
+                        self.stage_changed.emit(page.document.index, "start", tr('{_0}: 准备中', _0=label))
                         try:
                             with self._capture_pipeline_output():
                                 prepared = self._pipeline.prepare_comic_page(str(page.input_path))
@@ -341,7 +351,7 @@ class BatchWorker(QThread):
                         except TaskCancelledError:
                             self._stop = True
                             self._page_event("cancelled", "cancelled", "已取消")
-                            self.stage_changed.emit(page.document.index, "cancelled", f"{label}: 已取消")
+                            self.stage_changed.emit(page.document.index, "cancelled", tr('{_0}: 已取消', _0=label))
                             break
                         except Exception as exc:
                             self._set_document_error(page.document, exc)
@@ -354,7 +364,7 @@ class BatchWorker(QThread):
                         if not page.document.error
                     ]
                     if translatable and not self._stop:
-                        self.stage_changed.emit(0, "translate", f"并行翻译 {len(translatable)} 页")
+                        self.stage_changed.emit(0, "translate", tr('并行翻译 {_0} 页', _0=len(translatable)))
                         with self._capture_pipeline_output(), ThreadPoolExecutor(max_workers=min(max_workers, len(translatable))) as executor:
                             futures = {
                                 executor.submit(
@@ -403,7 +413,7 @@ class BatchWorker(QThread):
                         except TaskCancelledError:
                             self._stop = True
                             self._page_event("cancelled", "cancelled", "已取消")
-                            self.stage_changed.emit(page.document.index, "cancelled", f"{label}: 已取消")
+                            self.stage_changed.emit(page.document.index, "cancelled", tr('{_0}: 已取消', _0=label))
                             break
                         except Exception as exc:
                             self._set_document_error(page.document, exc)
@@ -434,11 +444,11 @@ class BatchWorker(QThread):
                         self.log.emit(f"[失败] {document.source_path.name}: {document.error}")
                         if document.error_stack:
                             self.log.emit(f"[失败堆栈]\n{document.error_stack}")
-                        self.progress.emit(completed, total, f"{document.source_path.name}: 失败")
+                        self.progress.emit(completed, total, tr('{_0}: 失败', _0=document.source_path.name))
                     else:
                         success_count += 1
                         self.image_done.emit(str(document.source_path), str(document.output_path))
-                        self.progress.emit(completed, total, f"{document.source_path.name}: 完成")
+                        self.progress.emit(completed, total, tr('{_0}: 完成', _0=document.source_path.name))
         except Exception as exc:
             failed_count = max(failed_count, total - success_count)
             stack = traceback.format_exc().strip()

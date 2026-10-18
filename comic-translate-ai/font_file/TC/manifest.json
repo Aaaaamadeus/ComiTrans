@@ -1,0 +1,858 @@
+{
+  "collected_on": "2026-10-15",
+  "selection": "常見漫畫嵌字用途的開源繁體字型精選，非使用率排名",
+  "sample_text": "你剛才說什麼？！別鬧了，這傢伙還沒回來……「這裡」才對——喵～轟！",
+  "challenge_text": "妳裏裡著着為爲麼麽說説臺灣嗚噗欸嘖囉嗯鬱龜「」『』？！……——～",
+  "families": [
+    {
+      "id": "01-GenSenRounded",
+      "name": "源泉圓體 TW",
+      "source": "https://github.com/ButTaiwan/gensen-font",
+      "commit": "d347d3fffcb45e08857052433a0b432ed4f7ace8",
+      "license": "SIL Open Font License 1.1",
+      "suggested_use": "日常對白、加重語氣",
+      "notes": "TW 月版，現代台灣通俗字形；另有 TC 丹版傳承字形可選。",
+      "fonts": [
+        {
+          "file": "01-GenSenRounded/GenSenRounded2TW-R.otf",
+          "upstream_path": "otf/TW/GenSenRounded2TW-R.otf",
+          "download_url": "https://raw.githubusercontent.com/ButTaiwan/gensen-font/d347d3fffcb45e08857052433a0b432ed4f7ace8/otf/TW/GenSenRounded2TW-R.otf",
+          "bytes": 16177104,
+          "git_blob_sha1": "186c5cc15a45676c9c6024db3189e3e413e16151",
+          "sha256": "092285878f1d9441c790e5d6a98e806bd508602ad0a8a55511b6fb0a71a25fed",
+          "family": "GenSenRounded2 TW",
+          "style": "R",
+          "version": "Version 2.100;PS 2.1;hotconv 16.6.51;makeotf.lib2.5.65220 DEVELOPMENT",
+          "unicode_cmap_entries": 35382,
+          "sample_missing": "",
+          "challenge_missing": "",
+          "has_vert": true,
+          "has_vrt2": false,
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        },
+        {
+          "file": "01-GenSenRounded/GenSenRounded2TW-B.otf",
+          "upstream_path": "otf/TW/GenSenRounded2TW-B.otf",
+          "download_url": "https://raw.githubusercontent.com/ButTaiwan/gensen-font/d347d3fffcb45e08857052433a0b432ed4f7ace8/otf/TW/GenSenRounded2TW-B.otf",
+          "bytes": 15807568,
+          "git_blob_sha1": "76404630bc313190aaa85b09d8d7a41abdf000de",
+          "sha256": "050f9ebf394faab3c0ba59092ae3e4b6686b349eadb3018d76d385c5829a1267",
+          "family": "GenSenRounded2 TW",
+          "style": "B",
+          "version": "Version 2.100;PS 2.1;hotconv 16.6.51;makeotf.lib2.5.65220 DEVELOPMENT",
+          "unicode_cmap_entries": 35382,
+          "sample_missing": "",
+          "challenge_missing": "",
+          "has_vert": true,
+          "has_vrt2": false,
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        }
+      ],
+      "upstream_notices": [
+        {
+          "file": "01-GenSenRounded/README.md",
+          "upstream_path": "README.md",
+          "download_url": "https://raw.githubusercontent.com/ButTaiwan/gensen-font/d347d3fffcb45e08857052433a0b432ed4f7ace8/README.md",
+          "bytes": 6293,
+          "git_blob_sha1": "8762439fc2a18fd4da3dbb36aacd97a72dddf08e",
+          "sha256": "e7d1b3ad9806a43e361042e75e67047b92664634552fb4cb046364668b99c478"
+        },
+        {
+          "file": "01-GenSenRounded/SIL_Open_Font_License_1.1.txt",
+          "upstream_path": "SIL_Open_Font_License_1.1.txt",
+          "download_url": "https://raw.githubusercontent.com/ButTaiwan/gensen-font/d347d3fffcb45e08857052433a0b432ed4f7ace8/SIL_Open_Font_License_1.1.txt",
+          "bytes": 4464,
+          "git_blob_sha1": "1dfc6870a1d0f927fdec9b7e3190f61e9682f8cf",
+          "sha256": "d84b652ca46586043946969a33c1dbf5a43028440825ae744a325965bec4c8fb"
+        }
+      ]
+    },
+    {
+      "id": "02-Huninn",
+      "name": "jf open 粉圓",
+      "source": "https://github.com/justfont/open-huninn-font",
+      "commit": "f240f9071a78298f379bc087cae2010df11cf477",
+      "license": "SIL Open Font License 1.1",
+      "suggested_use": "輕鬆對白、可愛語氣",
+      "notes": "針對台灣繁體用字設計的圓體。",
+      "fonts": [
+        {
+          "file": "02-Huninn/jf-openhuninn-2.1.ttf",
+          "upstream_path": "font/jf-openhuninn-2.1.ttf",
+          "download_url": "https://raw.githubusercontent.com/justfont/open-huninn-font/f240f9071a78298f379bc087cae2010df11cf477/font/jf-openhuninn-2.1.ttf",
+          "bytes": 4911464,
+          "git_blob_sha1": "49ce714ce7fcb394e89ab74de62d80f22ea41771",
+          "sha256": "9d5bf4932d31fe94c18cd8cfddc98bc1b14ce10f4e354c682179db290a99c825",
+          "family": "jf-openhuninn-2.1",
+          "style": "Regular",
+          "version": "2.1",
+          "unicode_cmap_entries": 11988,
+          "sample_missing": "",
+          "challenge_missing": "麽",
+          "has_vert": true,
+          "has_vrt2": true,
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        }
+      ],
+      "upstream_notices": [
+        {
+          "file": "02-Huninn/LICENSE",
+          "upstream_path": "LICENSE",
+          "download_url": "https://raw.githubusercontent.com/justfont/open-huninn-font/f240f9071a78298f379bc087cae2010df11cf477/LICENSE",
+          "bytes": 4860,
+          "git_blob_sha1": "7058b6acd1dd73013e2301a5a32fe51fd732f4fb",
+          "sha256": "5df6de36ba2fe26119ac161edbed97c62a9da3c1493f6930b9d9af7f5c93004b"
+        },
+        {
+          "file": "02-Huninn/README.md",
+          "upstream_path": "README.md",
+          "download_url": "https://raw.githubusercontent.com/justfont/open-huninn-font/f240f9071a78298f379bc087cae2010df11cf477/README.md",
+          "bytes": 15792,
+          "git_blob_sha1": "2c23fdde0a20c640f805a5cc372e73cab93ec6a1",
+          "sha256": "5984b261c3823760eec7867c5080fc3498a26e9da948f1f212d04ec9cbcfadad"
+        }
+      ]
+    },
+    {
+      "id": "03-Iansui",
+      "name": "芫荽",
+      "source": "https://github.com/ButTaiwan/iansui",
+      "commit": "9d9a8e68bf1e138dd91e562eeff28d95bca33196",
+      "license": "SIL Open Font License 1.1",
+      "suggested_use": "柔和對白、內心獨白",
+      "notes": "接近台灣教育部標準字形；官方說明未涵蓋完整 Big5。",
+      "fonts": [
+        {
+          "file": "03-Iansui/Iansui-Regular.ttf",
+          "upstream_path": "Iansui-Regular.ttf",
+          "download_url": "https://github.com/ButTaiwan/iansui/releases/download/v1.020/iansui.zip",
+          "bytes": 9447424,
+          "sha256": "7f1aa62e9dcbf40d0ce41a5d3f1e5ea602e66c295778ac6fefb6b84d8ed08bd5",
+          "family": "Iansui",
+          "style": "Regular",
+          "version": "Version 1.012",
+          "unicode_cmap_entries": 12666,
+          "sample_missing": "",
+          "challenge_missing": "麽",
+          "has_vert": true,
+          "has_vrt2": false,
+          "source_archive": {
+            "url": "https://github.com/ButTaiwan/iansui/releases/download/v1.020/iansui.zip",
+            "bytes": 4803795,
+            "sha256": "28d58aef9b7a21c137945a4fd14138d6284a8573c0c1b123f6e5b708423348a6"
+          },
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        }
+      ],
+      "upstream_notices": [
+        {
+          "file": "03-Iansui/AUTHORS.txt",
+          "upstream_path": "AUTHORS.txt",
+          "download_url": "https://raw.githubusercontent.com/ButTaiwan/iansui/9d9a8e68bf1e138dd91e562eeff28d95bca33196/AUTHORS.txt",
+          "bytes": 445,
+          "git_blob_sha1": "935d06be9d25603c99a926e82510e906a64d0ca4",
+          "sha256": "2b81d289f91bd0c87b8439408f4e80b37204985525e1490b89bec341b12f6d21"
+        },
+        {
+          "file": "03-Iansui/OFL.txt",
+          "upstream_path": "OFL.txt",
+          "download_url": "https://github.com/ButTaiwan/iansui/releases/download/v1.020/iansui.zip",
+          "bytes": 4479,
+          "sha256": "5d6d9d02d598daa2f178d0b577c55594892c5cf9c38566e2343cea049a371ac3",
+          "source_archive": {
+            "url": "https://github.com/ButTaiwan/iansui/releases/download/v1.020/iansui.zip",
+            "bytes": 4803795,
+            "sha256": "28d58aef9b7a21c137945a4fd14138d6284a8573c0c1b123f6e5b708423348a6"
+          }
+        },
+        {
+          "file": "03-Iansui/README.md",
+          "upstream_path": "README.md",
+          "download_url": "https://raw.githubusercontent.com/ButTaiwan/iansui/9d9a8e68bf1e138dd91e562eeff28d95bca33196/README.md",
+          "bytes": 6820,
+          "git_blob_sha1": "9dca049b105b7dca149b0dca33f586a5d977a136",
+          "sha256": "c25e22cf71ce77679cde41f050b7835d24e95428c60295ca0bc0c76778a1d0a1"
+        }
+      ],
+      "source_release_tag": "v1.020",
+      "source_archive": {
+        "url": "https://github.com/ButTaiwan/iansui/releases/download/v1.020/iansui.zip",
+        "bytes": 4803795,
+        "sha256": "28d58aef9b7a21c137945a4fd14138d6284a8573c0c1b123f6e5b708423348a6"
+      }
+    },
+    {
+      "id": "04-WenKaiTC",
+      "name": "霞鶩文楷 TC",
+      "source": "https://github.com/lxgw/LxgwWenkaiTC",
+      "commit": "db4a991a69d799345cfe29c4f9e2759929df093b",
+      "license": "SIL Open Font License 1.1",
+      "suggested_use": "自然對白、敘述文字",
+      "notes": "採傳承字形，與台灣教育部標準字形有別。",
+      "fonts": [
+        {
+          "file": "04-WenKaiTC/LXGWWenKaiTC-Regular.ttf",
+          "upstream_path": "fonts/TTF/LXGWWenKaiTC-Regular.ttf",
+          "download_url": "https://raw.githubusercontent.com/lxgw/LxgwWenkaiTC/db4a991a69d799345cfe29c4f9e2759929df093b/fonts/TTF/LXGWWenKaiTC-Regular.ttf",
+          "bytes": 15341148,
+          "git_blob_sha1": "badae37821982559892cd32082e139b248f8490a",
+          "sha256": "6662480a3f95b4a90c80b189c679617a48adce3a505118a6af63ce5a482b83fa",
+          "family": "LXGW WenKai TC",
+          "style": "Regular",
+          "version": "Version 1.530; October 13, 2026",
+          "unicode_cmap_entries": 25694,
+          "sample_missing": "",
+          "challenge_missing": "",
+          "has_vert": true,
+          "has_vrt2": false,
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        }
+      ],
+      "upstream_notices": [
+        {
+          "file": "04-WenKaiTC/AUTHORS.txt",
+          "upstream_path": "AUTHORS.txt",
+          "download_url": "https://raw.githubusercontent.com/lxgw/LxgwWenkaiTC/db4a991a69d799345cfe29c4f9e2759929df093b/AUTHORS.txt",
+          "bytes": 283,
+          "git_blob_sha1": "d5bc264b78b67f47768c7f944819152e78c42d56",
+          "sha256": "157b2216549168552db7f30ae1b42fcbcc39faf589c3112a59eaac43a9de11c9"
+        },
+        {
+          "file": "04-WenKaiTC/OFL.txt",
+          "upstream_path": "OFL.txt",
+          "download_url": "https://raw.githubusercontent.com/lxgw/LxgwWenkaiTC/db4a991a69d799345cfe29c4f9e2759929df093b/OFL.txt",
+          "bytes": 4395,
+          "git_blob_sha1": "72694770c120925ea3d0940c2cbf635c85d1dae4",
+          "sha256": "1a13783bf4337242834b60309cdcdbeb566ae3f923576fdbba8b78db9d174def"
+        },
+        {
+          "file": "04-WenKaiTC/README.md",
+          "upstream_path": "README.md",
+          "download_url": "https://raw.githubusercontent.com/lxgw/LxgwWenkaiTC/db4a991a69d799345cfe29c4f9e2759929df093b/README.md",
+          "bytes": 18149,
+          "git_blob_sha1": "c11dee47e1fbcd4d2fdbc9163bc770dab7e8fddd",
+          "sha256": "ff579102bb34e9d3dabbeed53a30300a6e6350e35e3c3561dab6379f4d235740"
+        }
+      ]
+    },
+    {
+      "id": "05-Naikai",
+      "name": "內海字體 TW",
+      "source": "https://github.com/max32002/naikaifont",
+      "commit": "7baa43a6adad4a82eab6fd27c9612b316f69d7c9",
+      "license": "SIL Open Font License 1.1",
+      "suggested_use": "手寫對白、氣泡外的小字",
+      "notes": "瀨戶字體繁體補字衍生，部分補字筆形和日文字形仍有差異。",
+      "fonts": [
+        {
+          "file": "05-Naikai/NaikaiFont-Regular.ttf",
+          "upstream_path": "tw/NaikaiFont-Regular.ttf",
+          "download_url": "https://raw.githubusercontent.com/max32002/naikaifont/7baa43a6adad4a82eab6fd27c9612b316f69d7c9/tw/NaikaiFont-Regular.ttf",
+          "bytes": 26254192,
+          "git_blob_sha1": "a9ec799c805c8fe1616c78b305b54332706c62f8",
+          "sha256": "d3320b822131540d5e3cc9737f7b458aeb1c0ca76fe89aeaa1b76001f54e503e",
+          "family": "內海字體",
+          "style": "Regular",
+          "version": "Version 1.89",
+          "unicode_cmap_entries": 49611,
+          "sample_missing": "",
+          "challenge_missing": "",
+          "has_vert": false,
+          "has_vrt2": false,
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        }
+      ],
+      "upstream_notices": [
+        {
+          "file": "05-Naikai/README.md",
+          "upstream_path": "README.md",
+          "download_url": "https://raw.githubusercontent.com/max32002/naikaifont/7baa43a6adad4a82eab6fd27c9612b316f69d7c9/README.md",
+          "bytes": 24432,
+          "git_blob_sha1": "dd93e312767a3c0863ba82309ae7b578582c420f",
+          "sha256": "8f4e89c2edfafe8e7195ad3d99d50d936fa95e308b43b3f00f81fcb529f9d08e"
+        },
+        {
+          "file": "05-Naikai/SIL_Open_Font_License_1.1.txt",
+          "upstream_path": "SIL_Open_Font_License_1.1.txt",
+          "download_url": "https://raw.githubusercontent.com/max32002/naikaifont/7baa43a6adad4a82eab6fd27c9612b316f69d7c9/SIL_Open_Font_License_1.1.txt",
+          "bytes": 4302,
+          "git_blob_sha1": "77b17316cf1e8ab216bd6743996dfc67cc86216a",
+          "sha256": "e564f06d018e7b95bc3594c96a17f1d41865af4038c375e7aa974dd69df38602"
+        }
+      ]
+    },
+    {
+      "id": "06-Jason3",
+      "name": "清松手寫體 3",
+      "source": "https://github.com/jasonhandwriting/JasonHandwriting",
+      "commit": "e488583c07077850aa4a2a6280baa20374cccde2",
+      "license": "SIL Open Font License 1.1",
+      "suggested_use": "吐槽、呆萌語氣、手寫註記",
+      "notes": "作者將第 3 款描述為「呆萌」；保留原字型內嵌授權與版權聲明。",
+      "fonts": [
+        {
+          "file": "06-Jason3/JasonHandwriting3.ttf",
+          "upstream_path": "JasonHandwriting3.ttf",
+          "download_url": "https://raw.githubusercontent.com/jasonhandwriting/JasonHandwriting/e488583c07077850aa4a2a6280baa20374cccde2/JasonHandwriting3.ttf",
+          "bytes": 6089404,
+          "git_blob_sha1": "25e200de7ba271aae456fe7f30db356f84e85561",
+          "sha256": "7747c276f3b16306c7ab7d52465647c566d01f91faeefa70c271a3890ed35fb0",
+          "family": "JasonHandwriting3",
+          "style": "Regular",
+          "version": "Version 1.25",
+          "unicode_cmap_entries": 8399,
+          "sample_missing": "",
+          "challenge_missing": "麽",
+          "has_vert": false,
+          "has_vrt2": false,
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        }
+      ],
+      "upstream_notices": [
+        {
+          "file": "06-Jason3/README.md",
+          "upstream_path": "README.md",
+          "download_url": "https://raw.githubusercontent.com/jasonhandwriting/JasonHandwriting/e488583c07077850aa4a2a6280baa20374cccde2/README.md",
+          "bytes": 1012,
+          "git_blob_sha1": "9383b69e259f44281c0e62365573d08e3a29622b",
+          "sha256": "11996d4e9f85c58af598b7dc7992681f8ac11f51122ca3d6997f45b8b2927423"
+        }
+      ]
+    },
+    {
+      "id": "08-SourceHanSansTC",
+      "name": "思源黑體 TC",
+      "source": "https://github.com/adobe-fonts/source-han-sans",
+      "commit": "a4f7cf94edfb9d7ffbdfc4841de276358bd7e0f2",
+      "license": "SIL Open Font License 1.1",
+      "suggested_use": "中粗對白、喊叫、強烈語氣",
+      "notes": "繁體中文台灣版本；香港字形另有 HC 版本。",
+      "fonts": [
+        {
+          "file": "08-SourceHanSansTC/SourceHanSansTC-Medium.otf",
+          "upstream_path": "OTF/TraditionalChinese/SourceHanSansTC-Medium.otf",
+          "download_url": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/a4f7cf94edfb9d7ffbdfc4841de276358bd7e0f2/OTF/TraditionalChinese/SourceHanSansTC-Medium.otf",
+          "bytes": 16544772,
+          "git_blob_sha1": "20226c852fe9571b70095e8828e47d3ad480d997",
+          "sha256": "bd70262de8795ffd38f7f8320efca63c7b6c3a0b8b5cc559bbc961b6f6e92750",
+          "family": "Source Han Sans TC",
+          "style": "Medium",
+          "version": "Version 2.005;addfeatures 5.0.0b21",
+          "unicode_cmap_entries": 44853,
+          "sample_missing": "",
+          "challenge_missing": "",
+          "has_vert": true,
+          "has_vrt2": true,
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        },
+        {
+          "file": "08-SourceHanSansTC/SourceHanSansTC-Heavy.otf",
+          "upstream_path": "OTF/TraditionalChinese/SourceHanSansTC-Heavy.otf",
+          "download_url": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/a4f7cf94edfb9d7ffbdfc4841de276358bd7e0f2/OTF/TraditionalChinese/SourceHanSansTC-Heavy.otf",
+          "bytes": 17612928,
+          "git_blob_sha1": "8b7704e68b544f07471791f71ffef6ac122ddcca",
+          "sha256": "86288498159861553276885013ae104cd0e2a9fd34de2e13533a958ce893f953",
+          "family": "Source Han Sans TC",
+          "style": "Heavy",
+          "version": "Version 2.005;addfeatures 5.0.0b21",
+          "unicode_cmap_entries": 44853,
+          "sample_missing": "",
+          "challenge_missing": "",
+          "has_vert": true,
+          "has_vrt2": true,
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        }
+      ],
+      "upstream_notices": [
+        {
+          "file": "08-SourceHanSansTC/LICENSE.txt",
+          "upstream_path": "LICENSE.txt",
+          "download_url": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/a4f7cf94edfb9d7ffbdfc4841de276358bd7e0f2/LICENSE.txt",
+          "bytes": 4463,
+          "git_blob_sha1": "3ff0ccaba06857bf292ade9a50f16a0f02b3b8d4",
+          "sha256": "fcac737e761ec63dbfbdce11030a1780161920d80315edba9c8beff1c2bac5a2"
+        },
+        {
+          "file": "08-SourceHanSansTC/README.md",
+          "upstream_path": "README.md",
+          "download_url": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/a4f7cf94edfb9d7ffbdfc4841de276358bd7e0f2/README.md",
+          "bytes": 15620,
+          "git_blob_sha1": "27c6dc12439772cd2aa58a7b7e1b7ff4e6092e02",
+          "sha256": "3b836748d548feefcde1e0a5cc760e6ef39b36a2433e4a4f00c06119fe60ac20"
+        }
+      ]
+    },
+    {
+      "id": "09-SourceHanSerifTC",
+      "name": "思源宋體 TC",
+      "source": "https://github.com/adobe-fonts/source-han-serif",
+      "commit": "7889f11bf31170b5d092a083b357c8c8130f89e0",
+      "license": "SIL Open Font License 1.1",
+      "suggested_use": "旁白、正式敘述、嚴肅氣氛",
+      "notes": "取中等字重，避免小圖下細橫筆畫過弱。",
+      "fonts": [
+        {
+          "file": "09-SourceHanSerifTC/SourceHanSerifTC-Medium.otf",
+          "upstream_path": "OTF/TraditionalChinese/SourceHanSerifTC-Medium.otf",
+          "download_url": "https://raw.githubusercontent.com/adobe-fonts/source-han-serif/7889f11bf31170b5d092a083b357c8c8130f89e0/OTF/TraditionalChinese/SourceHanSerifTC-Medium.otf",
+          "bytes": 24804396,
+          "git_blob_sha1": "cd53067e2071c2dd6d3b314e6e5f0d17e263200b",
+          "sha256": "8025c5b5747d56e0359b076a27958ea07e24d1189fca3e4f48ff51e47a3ba272",
+          "family": "Source Han Serif TC",
+          "style": "Medium",
+          "version": "Version 2.003;hotconv 1.1.1;makeotfexe 2.6.0",
+          "unicode_cmap_entries": 44779,
+          "sample_missing": "",
+          "challenge_missing": "",
+          "has_vert": true,
+          "has_vrt2": true,
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        }
+      ],
+      "upstream_notices": [
+        {
+          "file": "09-SourceHanSerifTC/LICENSE.txt",
+          "upstream_path": "LICENSE.txt",
+          "download_url": "https://raw.githubusercontent.com/adobe-fonts/source-han-serif/7889f11bf31170b5d092a083b357c8c8130f89e0/LICENSE.txt",
+          "bytes": 4463,
+          "git_blob_sha1": "07235a78b936958799812313565ba0d03e7cd7dd",
+          "sha256": "9ff5bb567e1b92c801fc1069e5fbf992ff8efccacb9db94e5959a5b3ba9bb903"
+        },
+        {
+          "file": "09-SourceHanSerifTC/README.md",
+          "upstream_path": "README.md",
+          "download_url": "https://raw.githubusercontent.com/adobe-fonts/source-han-serif/7889f11bf31170b5d092a083b357c8c8130f89e0/README.md",
+          "bytes": 12084,
+          "git_blob_sha1": "168517b6eb0be6121200ca654e2da7865685b2e5",
+          "sha256": "19dbf00db4fc73663966f83fc8c5a2fa783f803e205aee50fdff7f84aed3fe29"
+        }
+      ]
+    },
+    {
+      "id": "10-SweiSugar",
+      "name": "獅尾加糖宋體 TC",
+      "source": "https://github.com/max32002/swei-sugar",
+      "commit": "0d0a9e1146d44d3d18ace54055e328a814dc49ef",
+      "license": "SIL Open Font License 1.1",
+      "suggested_use": "驚叫、恐怖氣氛、擬聲大字",
+      "notes": "思源宋體橫筆加粗衍生；原作者提醒可能缺少部分符號或罕用字。",
+      "fonts": [
+        {
+          "file": "10-SweiSugar/SweiSugarCJKtc-Black.ttf",
+          "upstream_path": "CJK TC/SweiSugarCJKtc-Black.ttf",
+          "download_url": "https://raw.githubusercontent.com/max32002/swei-sugar/0d0a9e1146d44d3d18ace54055e328a814dc49ef/CJK%20TC/SweiSugarCJKtc-Black.ttf",
+          "bytes": 29001120,
+          "git_blob_sha1": "3fb6f9f0656490b2a0c543fbcd96fbe3d103db3d",
+          "sha256": "f39f956fc4a7f9f6729c62047da0c9376c56653ff7d6912a3b7032c490b449e3",
+          "family": "獅尾加糖宋體",
+          "style": "Black",
+          "version": "Version 1.0",
+          "unicode_cmap_entries": 42775,
+          "sample_missing": "",
+          "challenge_missing": "",
+          "has_vert": true,
+          "has_vrt2": false,
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        }
+      ],
+      "upstream_notices": [
+        {
+          "file": "10-SweiSugar/README.md",
+          "upstream_path": "README.md",
+          "download_url": "https://raw.githubusercontent.com/max32002/swei-sugar/0d0a9e1146d44d3d18ace54055e328a814dc49ef/README.md",
+          "bytes": 10916,
+          "git_blob_sha1": "8fda07917d01403a74a8979dd6da10b21c11ffb4",
+          "sha256": "dde7159c3f5913b1c6016ef946ca394877ae13251e895366be45003de565b0a5"
+        },
+        {
+          "file": "10-SweiSugar/SIL_Open_Font_License_1.1.txt",
+          "upstream_path": "SIL_Open_Font_License_1.1.txt",
+          "download_url": "https://raw.githubusercontent.com/max32002/swei-sugar/0d0a9e1146d44d3d18ace54055e328a814dc49ef/SIL_Open_Font_License_1.1.txt",
+          "bytes": 4302,
+          "git_blob_sha1": "77b17316cf1e8ab216bd6743996dfc67cc86216a",
+          "sha256": "e564f06d018e7b95bc3594c96a17f1d41865af4038c375e7aa974dd69df38602"
+        }
+      ]
+    },
+    {
+      "id": "11-PopGothic",
+      "name": "大波浪圓體 TC",
+      "source": "https://github.com/max32002/pop-gothic",
+      "commit": "45bf2dd76fbbded2c69cfcc0e6279ef4773711ce",
+      "license": "SIL Open Font License 1.1",
+      "suggested_use": "撒嬌、搞笑、可愛擬聲字",
+      "notes": "手寫 POP 風；補字外形可能不一致，適合少量表情文字。",
+      "fonts": [
+        {
+          "file": "11-PopGothic/PopGothicCjkTc-Bold.ttf",
+          "upstream_path": "CJK TC/PopGothicCjkTc-Bold.ttf",
+          "download_url": "https://raw.githubusercontent.com/max32002/pop-gothic/45bf2dd76fbbded2c69cfcc0e6279ef4773711ce/CJK%20TC/PopGothicCjkTc-Bold.ttf",
+          "bytes": 10298960,
+          "git_blob_sha1": "861404b01cdccfc648cfa1bb966efa74b7c5d3a1",
+          "sha256": "6f40a3fcfed7128bebca12b0b27c5cf4a0982e4312143df1390d1645fa4e12e7",
+          "family": "Pop Gothic CJK TC",
+          "style": "Bold",
+          "version": "Version 2.145; ttfautohint (v1.8.3)",
+          "unicode_cmap_entries": 19779,
+          "sample_missing": "",
+          "challenge_missing": "麽",
+          "has_vert": true,
+          "has_vrt2": true,
+          "render_test_sizes_px": [
+            14,
+            24,
+            34,
+            52,
+            72
+          ]
+        }
+      ],
+      "upstream_notices": [
+        {
+          "file": "11-PopGothic/README.md",
+          "upstream_path": "README.md",
+          "download_url": "https://raw.githubusercontent.com/max32002/pop-gothic/45bf2dd76fbbded2c69cfcc0e6279ef4773711ce/README.md",
+          "bytes": 32920,
+          "git_blob_sha1": "abaa9bb32ff495b3898d89510c32498515d44243",
+          "sha256": "8daeb54c3157277becd193b0ed32d031b97441adbec554c44010cfad28982304"
+        },
+        {
+          "file": "11-PopGothic/SIL_Open_Font_License_1.1.txt",
+          "upstream_path": "SIL_Open_Font_License_1.1.txt",
+          "download_url": "https://raw.githubusercontent.com/max32002/pop-gothic/45bf2dd76fbbded2c69cfcc0e6279ef4773711ce/SIL_Open_Font_License_1.1.txt",
+          "bytes": 4302,
+          "git_blob_sha1": "77b17316cf1e8ab216bd6743996dfc67cc86216a",
+          "sha256": "e564f06d018e7b95bc3594c96a17f1d41865af4038c375e7aa974dd69df38602"
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "family_count": 10,
+  "font_file_count": 12,
+  "font_bytes": 192290480,
+  "validation_scope": "上游字节校验（芫荽正式附件记录 SHA256）、FontTools cmap、Pillow/FreeType 加载和测试句渲染；不代表全字集或应用竖排排版回归。",
+  "excluded_candidates": [
+    {
+      "name": "辰宇落雁體",
+      "source": "https://github.com/Chenyu-otf/chenyuluoyan_thin",
+      "tested_2_0_repository_file": "Pillow/FreeType OSError: too many function definitions",
+      "tested_1_0_monospaced": {
+        "sample_missing": "喵",
+        "challenge_missing": "裏着爲麽説欸"
+      },
+      "decision": "本次可直接導入字體包不包含此系列，保留官方參考連結。"
+    }
+  ],
+  "schema": 1,
+  "bundled": true,
+  "directory": "font_file/TC",
+  "assets": [
+    {
+      "file": "01-GenSenRounded/GenSenRounded2TW-B-EMBEDDED-NOTICES.txt",
+      "bytes": 385,
+      "sha256": "642afc7448fcf4628da42e9f59c45c0d84b951b42f6462cd465ad7673a0a4578"
+    },
+    {
+      "file": "01-GenSenRounded/GenSenRounded2TW-B.otf",
+      "bytes": 15807568,
+      "sha256": "050f9ebf394faab3c0ba59092ae3e4b6686b349eadb3018d76d385c5829a1267"
+    },
+    {
+      "file": "01-GenSenRounded/GenSenRounded2TW-R-EMBEDDED-NOTICES.txt",
+      "bytes": 385,
+      "sha256": "642afc7448fcf4628da42e9f59c45c0d84b951b42f6462cd465ad7673a0a4578"
+    },
+    {
+      "file": "01-GenSenRounded/GenSenRounded2TW-R.otf",
+      "bytes": 16177104,
+      "sha256": "092285878f1d9441c790e5d6a98e806bd508602ad0a8a55511b6fb0a71a25fed"
+    },
+    {
+      "file": "01-GenSenRounded/README.md",
+      "bytes": 6293,
+      "sha256": "e7d1b3ad9806a43e361042e75e67047b92664634552fb4cb046364668b99c478"
+    },
+    {
+      "file": "01-GenSenRounded/SIL_Open_Font_License_1.1.txt",
+      "bytes": 4464,
+      "sha256": "d84b652ca46586043946969a33c1dbf5a43028440825ae744a325965bec4c8fb"
+    },
+    {
+      "file": "02-Huninn/jf-openhuninn-2.1-EMBEDDED-NOTICES.txt",
+      "bytes": 1971,
+      "sha256": "062eca671562b14115e1cd5d2e993de0273c27e6d4ca9d3936ce5018bd1b7a5f"
+    },
+    {
+      "file": "02-Huninn/jf-openhuninn-2.1.ttf",
+      "bytes": 4911464,
+      "sha256": "9d5bf4932d31fe94c18cd8cfddc98bc1b14ce10f4e354c682179db290a99c825"
+    },
+    {
+      "file": "02-Huninn/LICENSE",
+      "bytes": 4860,
+      "sha256": "5df6de36ba2fe26119ac161edbed97c62a9da3c1493f6930b9d9af7f5c93004b"
+    },
+    {
+      "file": "02-Huninn/README.md",
+      "bytes": 15792,
+      "sha256": "5984b261c3823760eec7867c5080fc3498a26e9da948f1f212d04ec9cbcfadad"
+    },
+    {
+      "file": "03-Iansui/AUTHORS.txt",
+      "bytes": 445,
+      "sha256": "2b81d289f91bd0c87b8439408f4e80b37204985525e1490b89bec341b12f6d21"
+    },
+    {
+      "file": "03-Iansui/Iansui-Regular-EMBEDDED-NOTICES.txt",
+      "bytes": 370,
+      "sha256": "06376a22110060208c5d99a00d5fd3a4161228662d99f0cbb1e39a35286298cc"
+    },
+    {
+      "file": "03-Iansui/Iansui-Regular.ttf",
+      "bytes": 9447424,
+      "sha256": "7f1aa62e9dcbf40d0ce41a5d3f1e5ea602e66c295778ac6fefb6b84d8ed08bd5"
+    },
+    {
+      "file": "03-Iansui/OFL.txt",
+      "bytes": 4479,
+      "sha256": "5d6d9d02d598daa2f178d0b577c55594892c5cf9c38566e2343cea049a371ac3"
+    },
+    {
+      "file": "03-Iansui/README.md",
+      "bytes": 6820,
+      "sha256": "c25e22cf71ce77679cde41f050b7835d24e95428c60295ca0bc0c76778a1d0a1"
+    },
+    {
+      "file": "04-WenKaiTC/AUTHORS.txt",
+      "bytes": 283,
+      "sha256": "157b2216549168552db7f30ae1b42fcbcc39faf589c3112a59eaac43a9de11c9"
+    },
+    {
+      "file": "04-WenKaiTC/LXGWWenKaiTC-Regular-EMBEDDED-NOTICES.txt",
+      "bytes": 430,
+      "sha256": "952af5bf01bab196949199a9f7f4f2dacb10f6df08422bc3f2953abb97e036cc"
+    },
+    {
+      "file": "04-WenKaiTC/LXGWWenKaiTC-Regular.ttf",
+      "bytes": 15341148,
+      "sha256": "6662480a3f95b4a90c80b189c679617a48adce3a505118a6af63ce5a482b83fa"
+    },
+    {
+      "file": "04-WenKaiTC/OFL.txt",
+      "bytes": 4395,
+      "sha256": "1a13783bf4337242834b60309cdcdbeb566ae3f923576fdbba8b78db9d174def"
+    },
+    {
+      "file": "04-WenKaiTC/README.md",
+      "bytes": 18149,
+      "sha256": "ff579102bb34e9d3dabbeed53a30300a6e6350e35e3c3561dab6379f4d235740"
+    },
+    {
+      "file": "05-Naikai/NaikaiFont-Regular-EMBEDDED-NOTICES.txt",
+      "bytes": 4636,
+      "sha256": "d7cda3f16c6f84ef09121d4c50bd6886649ceadc165ec9ce2fc475c43553878f"
+    },
+    {
+      "file": "05-Naikai/NaikaiFont-Regular.ttf",
+      "bytes": 26254192,
+      "sha256": "d3320b822131540d5e3cc9737f7b458aeb1c0ca76fe89aeaa1b76001f54e503e"
+    },
+    {
+      "file": "05-Naikai/README.md",
+      "bytes": 24432,
+      "sha256": "8f4e89c2edfafe8e7195ad3d99d50d936fa95e308b43b3f00f81fcb529f9d08e"
+    },
+    {
+      "file": "05-Naikai/SIL_Open_Font_License_1.1.txt",
+      "bytes": 4302,
+      "sha256": "e564f06d018e7b95bc3594c96a17f1d41865af4038c375e7aa974dd69df38602"
+    },
+    {
+      "file": "06-Jason3/JasonHandwriting3-EMBEDDED-NOTICES.txt",
+      "bytes": 227,
+      "sha256": "472c520ac3e8e998941f5ff1441cd10252d4d6ccd9c843103131129a68d9897a"
+    },
+    {
+      "file": "06-Jason3/JasonHandwriting3.ttf",
+      "bytes": 6089404,
+      "sha256": "7747c276f3b16306c7ab7d52465647c566d01f91faeefa70c271a3890ed35fb0"
+    },
+    {
+      "file": "06-Jason3/LICENSE-NOTE.txt",
+      "bytes": 596,
+      "sha256": "15b486ab3b32691d2d2b12087fd83e20bd9c45fba8fb8379ec757185d170afc7"
+    },
+    {
+      "file": "06-Jason3/OFL-1.1-REFERENCE.txt",
+      "bytes": 4599,
+      "sha256": "1d361a8f8e8ce6e68457dcd93fb56e162e6baa3bbb7e7573a290d44399f6b57e"
+    },
+    {
+      "file": "06-Jason3/README.md",
+      "bytes": 1012,
+      "sha256": "11996d4e9f85c58af598b7dc7992681f8ac11f51122ca3d6997f45b8b2927423"
+    },
+    {
+      "file": "08-SourceHanSansTC/LICENSE.txt",
+      "bytes": 4463,
+      "sha256": "fcac737e761ec63dbfbdce11030a1780161920d80315edba9c8beff1c2bac5a2"
+    },
+    {
+      "file": "08-SourceHanSansTC/README.md",
+      "bytes": 15620,
+      "sha256": "3b836748d548feefcde1e0a5cc760e6ef39b36a2433e4a4f00c06119fe60ac20"
+    },
+    {
+      "file": "08-SourceHanSansTC/SourceHanSansTC-Heavy-EMBEDDED-NOTICES.txt",
+      "bytes": 836,
+      "sha256": "8cba2aa4ef3948ec14688cf2e70f0aa228f01694c16325bbfe169e883228ff5f"
+    },
+    {
+      "file": "08-SourceHanSansTC/SourceHanSansTC-Heavy.otf",
+      "bytes": 17612928,
+      "sha256": "86288498159861553276885013ae104cd0e2a9fd34de2e13533a958ce893f953"
+    },
+    {
+      "file": "08-SourceHanSansTC/SourceHanSansTC-Medium-EMBEDDED-NOTICES.txt",
+      "bytes": 836,
+      "sha256": "8cba2aa4ef3948ec14688cf2e70f0aa228f01694c16325bbfe169e883228ff5f"
+    },
+    {
+      "file": "08-SourceHanSansTC/SourceHanSansTC-Medium.otf",
+      "bytes": 16544772,
+      "sha256": "bd70262de8795ffd38f7f8320efca63c7b6c3a0b8b5cc559bbc961b6f6e92750"
+    },
+    {
+      "file": "09-SourceHanSerifTC/LICENSE.txt",
+      "bytes": 4463,
+      "sha256": "9ff5bb567e1b92c801fc1069e5fbf992ff8efccacb9db94e5959a5b3ba9bb903"
+    },
+    {
+      "file": "09-SourceHanSerifTC/README.md",
+      "bytes": 12084,
+      "sha256": "19dbf00db4fc73663966f83fc8c5a2fa783f803e205aee50fdff7f84aed3fe29"
+    },
+    {
+      "file": "09-SourceHanSerifTC/SourceHanSerifTC-Medium-EMBEDDED-NOTICES.txt",
+      "bytes": 885,
+      "sha256": "0aa3a3e5dbbbeae77399e40d3d4df77da2884642e55ba80985e3623466e71858"
+    },
+    {
+      "file": "09-SourceHanSerifTC/SourceHanSerifTC-Medium.otf",
+      "bytes": 24804396,
+      "sha256": "8025c5b5747d56e0359b076a27958ea07e24d1189fca3e4f48ff51e47a3ba272"
+    },
+    {
+      "file": "10-SweiSugar/README.md",
+      "bytes": 10916,
+      "sha256": "dde7159c3f5913b1c6016ef946ca394877ae13251e895366be45003de565b0a5"
+    },
+    {
+      "file": "10-SweiSugar/SIL_Open_Font_License_1.1.txt",
+      "bytes": 4302,
+      "sha256": "e564f06d018e7b95bc3594c96a17f1d41865af4038c375e7aa974dd69df38602"
+    },
+    {
+      "file": "10-SweiSugar/SweiSugarCJKtc-Black-EMBEDDED-NOTICES.txt",
+      "bytes": 2,
+      "sha256": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6"
+    },
+    {
+      "file": "10-SweiSugar/SweiSugarCJKtc-Black.ttf",
+      "bytes": 29001120,
+      "sha256": "f39f956fc4a7f9f6729c62047da0c9376c56653ff7d6912a3b7032c490b449e3"
+    },
+    {
+      "file": "11-PopGothic/PopGothicCjkTc-Bold-EMBEDDED-NOTICES.txt",
+      "bytes": 346,
+      "sha256": "f134c0ca21e6d0521c4705b8cf184d35e9aca48f41aaa48c8f52a78041caab1a"
+    },
+    {
+      "file": "11-PopGothic/PopGothicCjkTc-Bold.ttf",
+      "bytes": 10298960,
+      "sha256": "6f40a3fcfed7128bebca12b0b27c5cf4a0982e4312143df1390d1645fa4e12e7"
+    },
+    {
+      "file": "11-PopGothic/README.md",
+      "bytes": 32920,
+      "sha256": "8daeb54c3157277becd193b0ed32d031b97441adbec554c44010cfad28982304"
+    },
+    {
+      "file": "11-PopGothic/SIL_Open_Font_License_1.1.txt",
+      "bytes": 4302,
+      "sha256": "e564f06d018e7b95bc3594c96a17f1d41865af4038c375e7aa974dd69df38602"
+    },
+    {
+      "file": "README.md",
+      "bytes": 1535,
+      "sha256": "c6929d6fecb460c2eaa52a017e7cc54baf22dd8106b0910d24dce0cc00a85983"
+    }
+  ]
+}

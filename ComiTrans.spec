@@ -5,6 +5,7 @@ from pathlib import Path
 
 import PySide6
 import shiboken6
+from PyInstaller.utils.hooks import collect_data_files, copy_metadata
 
 # Resolve DLLs from this Python/Qt installation and Windows, not unrelated
 # tools on PATH (e.g. Poppler's ICU exports do not match Qt's Windows ICU ABI).
@@ -46,8 +47,14 @@ datas = [
     ("comic-translate-ai/main/comic_text_detector/README.md", "licenses/comic-text-detector"),
     ("assets/ComiTrans.ico", "assets"),
     ("assets/font_catalog.json", "assets"),
+    ("assets/i18n", "assets/i18n"),
     ("assets/ui", "assets/ui"),
 ]
+datas += collect_data_files('opencc')
+datas += copy_metadata('opencc-python-reimplemented')
+for language in ('zh_CN', 'ja'):
+    datas.append((str(Path(PySide6.__file__).parent / 'translations' / f'qtbase_{language}.qm'),
+                  'PySide6/translations'))
 
 a = Analysis(
     ["run.py"],

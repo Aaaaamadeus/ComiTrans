@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from comic_translate_core.chinese import normalize_target_language
+from comic_translate_core.layout_options import normalize_vertical_alignment
+from .i18n import normalize_ui_language
 from comic_translate_core.languages import (
     OCR_DEFAULTS, OCR_CONFIG_KEYS, effective_ocr_backend, source_language, validate_ocr_config,
 )
@@ -120,9 +123,13 @@ def load_ai_config() -> dict[str, Any]:
 
     return {
         **ocr_config,
+        "ui_language": normalize_ui_language(raw.get("ui_language")),
+        "ui_language_selected": bool(raw.get("ui_language_selected", False)),
         "api_key": _clean_text(raw.get("api_key")),
         "api_base_url": _clean_text(raw.get("api_base_url")),
         "translation_model": _clean_text(raw.get("translation_model")) or "gemini-2.5-flash",
+        "target_language": normalize_target_language(raw.get("target_language")),
+        "vertical_alignment": normalize_vertical_alignment(raw.get("vertical_alignment")),
         "translation_prompt": str(raw.get("translation_prompt") or ""),
         "chinese_names": str(raw.get("chinese_names") or ""),
         "font_size": int(raw.get("font_size") or 16),
@@ -132,7 +139,7 @@ def load_ai_config() -> dict[str, Any]:
         # 关闭思考模式可显著省 token（翻译 completion 214→51，见 §4.15），默认开启
         "disable_thinking": bool(raw.get("disable_thinking", True)),
         "font_probe_samples": int(raw.get("font_probe_samples") or 3),
-        "watermark_enabled": bool(raw.get("watermark_enabled", False)),
+        "watermark_enabled": bool(raw.get("watermark_enabled", True)),
         "max_workers": int(raw.get("max_workers") or 4),
         "pdf_dpi": int(raw.get("pdf_dpi") or 200),
         "issue_url": str(raw.get("issue_url") or ""),

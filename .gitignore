@@ -62,5 +62,6 @@ app/
 !docs/watermark-review/runtime-manga.png
 # Local UI verification outputs (the review screenshots live in docs/ui-review).
 /tmp/
+/output/
 *.lnk
 comic-translate-ai/page/

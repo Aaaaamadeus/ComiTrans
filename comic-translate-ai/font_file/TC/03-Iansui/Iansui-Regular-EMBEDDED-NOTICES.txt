@@ -1,0 +1,9 @@
+nameID 0: Copyright 2025 The Iansui Project Authors (https://github.com/ButTaiwan/iansui)
+
+nameID 8: zi-hi.com / Fontworks Inc.
+
+nameID 9: But Ko / Fontworks Inc.
+
+nameID 13: This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://scripts.sil.org/OFL
+
+nameID 14: https://scripts.sil.org/OFL

@@ -1,0 +1,44 @@
+[
+  {
+    "requested_size": [
+      1440,
+      900
+    ],
+    "actual_size": [
+      1440,
+      900
+    ],
+    "target": "繁體中文",
+    "target_saved": true,
+    "source_target_start_visible": true,
+    "screenshot": "chinese-output-1440-scale-2.png"
+  },
+  {
+    "requested_size": [
+      1180,
+      760
+    ],
+    "actual_size": [
+      1180,
+      760
+    ],
+    "target": "繁體中文",
+    "target_saved": true,
+    "source_target_start_visible": true,
+    "screenshot": "chinese-output-1180-scale-2.png"
+  },
+  {
+    "requested_size": [
+      820,
+      480
+    ],
+    "actual_size": [
+      820,
+      480
+    ],
+    "target": "繁體中文",
+    "target_saved": true,
+    "source_target_start_visible": true,
+    "screenshot": "chinese-output-820-scale-2.png"
+  }
+]

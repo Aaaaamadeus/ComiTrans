@@ -1,0 +1,38 @@
+{
+  "scale": "1",
+  "checks": [
+    {
+      "size": [
+        1440,
+        900
+      ],
+      "alignment": "top",
+      "columns_aligned": true,
+      "control_visible": true,
+      "saved_matches_preview": true,
+      "screenshot": "vertical-alignment-top-1440-scale-1.png"
+    },
+    {
+      "size": [
+        1440,
+        900
+      ],
+      "alignment": "bottom",
+      "columns_aligned": true,
+      "control_visible": true,
+      "saved_matches_preview": true,
+      "screenshot": "vertical-alignment-bottom-1440-scale-1.png"
+    },
+    {
+      "size": [
+        820,
+        480
+      ],
+      "alignment": "top",
+      "columns_aligned": true,
+      "control_visible": true,
+      "saved_matches_preview": true,
+      "screenshot": "vertical-alignment-top-820-scale-1.png"
+    }
+  ]
+}

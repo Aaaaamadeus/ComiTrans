@@ -1,0 +1,10 @@
+nameID 0: Copyright 2022-2026 LXGW (https://github.com/lxgw/LxgwWenkaiTC)
+Copyright 2020 The Klee Project Authors (https://github.com/fontworks-fonts/Klee)
+
+nameID 8: LXGW / Fontworks Inc.
+
+nameID 9: LXGW / Fontworks Inc.
+
+nameID 13: This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://openfontlicense.org
+
+nameID 14: https://openfontlicense.org

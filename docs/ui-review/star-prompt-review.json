@@ -1,0 +1,30 @@
+{
+  "reviewed_on": "2026-10-16",
+  "feature": "Bottom-right repository Star prompt",
+  "source_only": true,
+  "packaging": "Paused at user request; existing archives do not include this feature.",
+  "trigger": "One 15% draw per fully successful, non-cancelled translation batch",
+  "idle_timeout_ms": 8000,
+  "interaction": "Pointer or keyboard interaction restarts the idle timer; X dismisses immediately; the repository opens only on button click.",
+  "focus": "Non-modal child overlay preserves the existing keyboard focus",
+  "regression": {
+    "passed": 223,
+    "seconds": 35.389,
+    "process_exit_code": 0,
+    "star_prompt_tests": 11
+  },
+  "test_cleanup": "Explicitly destroy owned fixture windows before interpreter shutdown, without enumerating Qt-owned popup windows.",
+  "ui": {
+    "logical_sizes": [[1440, 900], [820, 480]],
+    "scale_factors": [1, 2],
+    "inside_window": true,
+    "buttons_visible": true,
+    "layout_reports": ["star-prompt-layout-scale-1.json", "star-prompt-layout-scale-2.json"],
+    "screenshots": [
+      "star-prompt-1440-scale-1.png",
+      "star-prompt-820-scale-1.png",
+      "star-prompt-1440-scale-2.png",
+      "star-prompt-820-scale-2.png"
+    ]
+  }
+}

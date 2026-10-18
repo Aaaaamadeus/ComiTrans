@@ -21,7 +21,7 @@ ComiTrans is a manga translation desktop client. Detection, built-in Japanese/Ko
 Since v2.2.1, detection, OCR, and inpainting are powered entirely by **ONNX Runtime**, removing PyTorch / torchvision / transformers dependencies. The app and models are released as separate packages: model updates no longer require re-downloading the program.
 
 > [!NOTE]
-> v2.4.0 adds a searchable font catalog with on-demand downloads and live mask editing. Download the [new app and model packages](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.4.0), or run the source with `start.bat`. See the [changelog](#changelog).
+> v2.4.1 adds Simplified/Traditional Chinese output, bundled manga fonts, manual line breaks and vertical column alignment. Translation font and default alignment choices are grouped inside Translation Preferences. This release provides the full app archive and reuses existing models. [Update guide](docs/RELEASE-v2.4.1.md) · [Changelog](CHANGELOG.md).
 
 ## Manga workbench
 
@@ -98,9 +98,13 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 
 ## Quick Start
 
+The interface supports **中文 / English / 日本語**, with Chinese as the default. Choose a language on first launch, or change it under **Settings → Translation service → Interface language** and save; settings changes apply on the next launch. This does not change the manga translation language. [Interface language guide](docs/UI_LANGUAGES.md).
+
+A fully successful translation batch has a 15% chance of showing a small repository support prompt in the bottom-right corner. It closes after eight idle seconds or via its X button; GitHub opens only when its action button is clicked.
+
 ### Release users (recommended)
 
-1. Download `ComiTrans-v2.4.0-app.zip` (program) and `ComiTrans-v2.4.0-models.zip` (models) from the [v2.4.0 release](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.4.0).
+1. Download `ComiTrans-v2.4.1-app.zip` from [Releases](https://github.com/Aaaaamadeus/ComiTrans/releases) and reuse `ComiTrans-v2.4.0-models.zip`. Existing installations can migrate their settings and models using the steps below.
 2. Extract the app archive into a `ComiTrans` folder.
 3. Extract both archives into the same parent directory, merging their top-level `ComiTrans` folders. The final model path is `ComiTrans\comic-translate-ai\models\`.
 4. Double-click `ComiTrans.exe` and enter your translation API key and model on the "Settings" page.
@@ -109,7 +113,7 @@ Upgrading from v2.3.0: reuse your existing models. From v2.2.2, existing Japanes
 
 Release users do not need to install Python, PyTorch, pip, or the CUDA Toolkit. GPU acceleration only requires an existing NVIDIA driver.
 
-v2.4.0 includes a patch baseline and Windows update launcher. For future minor releases, run `Update-ComiTrans.bat` in the app folder and select the corresponding small patch ZIP. See the [patch guide](docs/PATCH_UPDATES.md).
+To upgrade to v2.4.1, close the app and extract `ComiTrans-v2.4.1-app.zip` into a new folder. Copy `config.yaml`, `user_fonts/` and `comic-translate-ai/models/` from the old installation to the same relative locations. Keep output images and their companion `_cleaned` and `_layout` folders together. Keep the old installation until the new one works. This version uses the full app archive; see the [update guide](docs/RELEASE-v2.4.1.md).
 
 ### Run from source (developers)
 
@@ -147,13 +151,25 @@ You can also double-click `start.bat`. The AI pipeline warms up automatically af
 
 ### Translation fonts
 
-Choose a default in the translation page's “译文字体” dropdown. A specific font applies to all translated text; “自动匹配漫画风格” restores the existing style fonts. “＋ 导入字体” imports multiple TTF, OTF, TTC, or OTC files and selects the last successful import. Font collections use their first face.
+In the editor, “排版与位置 → 竖排列对齐” selects top, center, or bottom alignment for vertical columns. Top and bottom use the longest column as their reference while keeping the text group centered. Each block retains its choice in saved layouts and live previews.
+
+Press **Enter** or click “插入换行” in the editor to insert a hard break: horizontal text continues on the next row, vertical text in the next column to the left. Consecutive breaks preserve blank rows or columns. Preview, saved images, and restored layouts retain these breaks. “排版与位置 → 文字效果” offers black text with white outlines and white text with black outlines. [Editor guide](docs/EDITOR_LIVE_PREVIEW.md).
+
+Vertical ellipsis and em-dash runs stay together across automatic column breaks, including common alternate glyphs. Ellipsis dots are evenly spaced and dashes form continuous vertical lines; explicit line breaks retain their positions.
+
+Swei B2 Sans and Swei Toothpaste are bundled in separate SC and TC Black faces (four fonts, approximately 58.6 MiB) for bold emphasis and rounded outline lettering. They are visual alternatives rather than identification of the original Japanese reference fonts. [Sources and licenses](comic-translate-ai/font_file/Manga/README.md).
+
+Use the “译文” selector on the translation page to switch between **Simplified and Traditional Chinese**. The choice saves automatically and applies to subsequent image and PDF translations, including continuation requests and local output normalization. Existing results, editor drafts, and font choices are preserved. [Chinese output guide](docs/CHINESE_OUTPUT.md).
+
+Expand “翻译偏好” on the translation page to choose the default font and vertical column alignment. Both controls start collapsed and save their choices automatically. A specific font applies to all translated text; “自动匹配漫画风格” restores the existing style fonts. “＋ 导入字体” imports multiple TTF, OTF, TTC, or OTC files and selects the last successful import. Font collections use their first face. Default alignment is recorded in newly translated layouts; existing editor drafts retain their own choices.
 
 Both pages support name search in their font selectors. Open “字体库” to filter Google Fonts by name, language, or style, choose a face, and click “下载并使用”. The full catalog is searchable offline, and downloaded fonts remain available without a connection. Ten families in the snapshot lack a license attachment and are currently view-only. See the [font library guide](docs/FONT_LIBRARY.md).
 
+The application also bundles **10 Traditional Chinese manga font families in 12 faces**, available offline on first use, including GenSen Rounded, Huninn, Iansui, LXGW WenKai TC, Naikai, Jason Handwriting 3, Source Han Sans/Serif TC, Swei Sugar and Pop Gothic. Original font files total approximately 183.4 MiB, with upstream notices and provenance included. [Full list](docs/TRADITIONAL_MANGA_FONTS.md). Font selectors show concise Chinese names and localized weights while keeping original English names searchable. The editor gives the selector a full row, shows a wrapping full-name label, and widens popup lists.
+
 Choices save automatically and apply to the next translation. The editor refreshes its preview while retaining drafts and explicit per-block font choices; Save Image writes the updated output. Select “跟随翻译默认字体” to restore the default for a block. Imported and downloaded fonts are stored in the app's `user_fonts` folder without system installation. Duplicate files are reused and missing glyphs fall back per character. Keep the entire `user_fonts` folder when moving or updating the app. See the [font guide](docs/CUSTOM_FONTS.md).
 
-The optional `@ComiTrans` watermark is disabled by default. Toggle it under Settings → Runtime Settings → Output Watermark and save the configuration. Subsequent image translations and every PDF page receive a small, translucent Skribble wordmark in the lower-right corner when enabled. The current editor page also updates its preview; click Save Image to write it. Repeated saves do not accumulate the watermark, and the clean background remains unmarked.
+The `@ComiTrans` watermark is enabled by default. To disable it, uncheck Add @ComiTrans Watermark on the first Settings tab (Translation Service) and save the configuration. Previously saved off settings are preserved. Subsequent image translations and every PDF page receive a small, translucent Skribble wordmark in the lower-right corner when enabled. The current editor page also updates its preview; click Save Image to write it. Repeated saves do not accumulate the watermark, and the clean background remains unmarked.
 
 A PDF is shown as one file task and processed internally in page-sized batches. On success, ComiTrans writes `<original_name>_translated.pdf`, preserving page count, order, and page sizes while rasterizing page content. Password-protected PDFs are not supported, and PDF pages cannot yet be adjusted block-by-block in the Typesetting Editor.
 
@@ -260,12 +276,15 @@ By default the app is built without models. For local testing with models:
 python package_release.py
 ```
 
-The Release provides two archives:
+This Release provides the full app archive; models are reused from v2.4.0:
 
-- `ComiTrans-v2.4.0-app.zip`: program only, no models
-- `ComiTrans-v2.4.0-models.zip`: ONNX models including Japanese, Korean, and English OCR
+- `ComiTrans-v2.4.1-app.zip`: program only, no models
+- [ComiTrans-v2.4.0-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.4.0/ComiTrans-v2.4.0-models.zip): ONNX models including Japanese, Korean, and English OCR
 
 Version metadata is stored and committed in the source repository:
+
+- [docs/releases/v2.4.1/baseline.json](docs/releases/v2.4.1/baseline.json): v2.4.1 target build fingerprint
+- [docs/releases/v2.4.1/SHA256SUMS.txt](docs/releases/v2.4.1/SHA256SUMS.txt): v2.4.1 app and target baseline checksums
 
 - [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json): file hashes and build fingerprint for generating future patches
 - [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt): checksums for the app, models and baseline
@@ -302,6 +321,17 @@ ComiTrans
 ```
 
 ## Changelog
+
+### v2.4.1 (2026-10-18)
+
+- English and Japanese interfaces, a first-launch language chooser and a Settings language option; Chinese remains the default.
+- Continuous vertical ellipses and dashes with consistent preview and output.
+- A 15% Star prompt after successful batches, with an X button and eight-second idle dismissal.
+- Simplified/Traditional Chinese output with local normalization and bundled manga fonts.
+- Translation font and default vertical alignment choices grouped inside collapsible Translation Preferences.
+- Manual hard line breaks, outline lettering, top/center/bottom column alignment and persistent live editor previews.
+- Default watermark with an off switch on the first Settings tab; prior off choices remain honored.
+- Full app archive for this release; existing models remain reusable. [Update guide](docs/RELEASE-v2.4.1.md).
 
 ### v2.4.0 (2026-10-13)
 

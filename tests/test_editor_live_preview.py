@@ -10,7 +10,8 @@ from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from PIL import Image, ImageChops
-from PySide6.QtCore import QSettings, Qt, QPointF
+from PySide6.QtCore import QSettings, Qt, QPointF, QCoreApplication, QEvent
+from PySide6.QtGui import QTextCursor
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -38,6 +39,8 @@ class EditorLivePreviewTests(unittest.TestCase):
         setting = patch.object(config, 'CONFIG_PATH', self.root / 'config.yaml')
         setting.start()
         self.addCleanup(setting.stop)
+        # These tests compare typeset glyph pixels independently of output branding.
+        config.save_ai_config({'watermark_enabled': False})
 
     def page(self, name='page', *, legacy=False, two_blocks=False):
         output = self.root / 'output' / f'{name}.png'
@@ -64,8 +67,14 @@ class EditorLivePreviewTests(unittest.TestCase):
     def editor(self, output):
         editor = EditorPage()
         editor.load_page(output)
-        self.addCleanup(editor.close)
+        self.addCleanup(self.destroy_editor, editor)
         return editor
+
+    @staticmethod
+    def destroy_editor(editor):
+        editor.close()
+        editor.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
     def wait_preview(self, editor):
         QTest.qWait(100)
@@ -76,6 +85,130 @@ class EditorLivePreviewTests(unittest.TestCase):
     @staticmethod
     def ink_box(image):
         return ImageChops.difference(image, Image.new('RGB', image.size, '#ffeedd')).getbbox()
+
+    def test_enter_line_breaks_preview_save_and_reload_in_both_directions(self):
+        for direction in (0, 1):
+            with self.subTest(direction=direction):
+                output, layout = self.page(f'break-{direction}')
+                editor = self.editor(output)
+                editor._direction_combo.setCurrentIndex(editor._direction_combo.findData(direction))
+                editor._text_input.setPlainText('甲乙丙丁')
+                self.wait_preview(editor)
+                before = editor._rendered.copy()
+                cursor = editor._text_input.textCursor()
+                cursor.setPosition(2)
+                editor._text_input.setTextCursor(cursor)
+                QTest.keyClick(editor._text_input, Qt.Key_Return)
+                self.wait_preview(editor)
+                self.assertEqual(editor.items[0]['text'], '甲乙\n丙丁')
+                self.assertIsNotNone(ImageChops.difference(before, editor._rendered).getbbox())
+                expected = editor._rendered.tobytes()
+                self.assertTrue(editor.save_image())
+                self.assertEqual(json.loads(layout.read_text(encoding='utf-8'))[0]['text'], '甲乙\n丙丁')
+                restored = self.editor(output)
+                restored.apply_changes()
+                self.assertEqual(restored._text_input.toPlainText(), '甲乙\n丙丁')
+                self.assertEqual(restored._rendered.tobytes(), expected)
+
+    def test_vertical_punctuation_runs_preview_save_and_reload_without_splitting(self):
+        output, layout = self.page('punctuation-runs')
+        editor = self.editor(output)
+        editor._direction_combo.setCurrentIndex(editor._direction_combo.findData(1))
+        editor._text_input.setPlainText('等等…………\n真的—―︱吗')
+        editor._size_spin.setValue(28)
+        self.wait_preview(editor)
+        cells = editor.typesetter.last_layout_debug
+        for run in ('…………', '—―︱'):
+            run_cells = [cell for cell in cells if cell['char'] in run]
+            self.assertEqual(len(run_cells), len(run))
+            self.assertEqual(len({cell['column'] for cell in run_cells}), 1)
+        expected = editor._rendered.tobytes()
+        self.assertTrue(editor.save_image())
+        with Image.open(output) as saved:
+            self.assertEqual(saved.tobytes(), expected)
+        self.assertEqual(json.loads(layout.read_text(encoding='utf-8'))[0]['text'], '等等…………\n真的—―︱吗')
+        restored = self.editor(output)
+        restored.apply_changes()
+        self.assertEqual(restored._rendered.tobytes(), expected)
+
+    def test_insert_break_button_replaces_selection_and_preserves_blank_lines(self):
+        output, _ = self.page()
+        editor = self.editor(output)
+        editor._text_input.setPlainText('甲乙丙')
+        cursor = editor._text_input.textCursor()
+        cursor.setPosition(1)
+        cursor.setPosition(2, QTextCursor.MoveMode.KeepAnchor)
+        editor._text_input.setTextCursor(cursor)
+        editor._line_break_btn.click()
+        editor._line_break_btn.click()
+        self.wait_preview(editor)
+        self.assertEqual(editor.items[0]['text'], '甲\n\n丙')
+
+    def test_hollow_effect_changes_cached_layer_and_survives_save(self):
+        output, layout = self.page()
+        editor = self.editor(output)
+        editor._text_input.setPlainText('新年\n快乐？！——')
+        self.wait_preview(editor)
+        original = editor._rendered.tobytes()
+        for direction in (0, 1):
+            editor._direction_combo.setCurrentIndex(editor._direction_combo.findData(direction))
+            editor._effect_combo.setCurrentIndex(editor._effect_combo.findData('hollow'))
+            self.wait_preview(editor)
+            hollow = editor._rendered.tobytes()
+            self.assertNotEqual(hollow, original)
+            self.assertTrue(editor.save_image())
+            self.assertEqual(json.loads(layout.read_text(encoding='utf-8'))[0]['text_effect'], 'hollow')
+            restored = self.editor(output)
+            restored.apply_changes()
+            self.assertEqual(restored._rendered.tobytes(), hollow)
+            editor._effect_combo.setCurrentIndex(editor._effect_combo.findData('auto'))
+            self.wait_preview(editor)
+            self.assertNotEqual(editor._rendered.tobytes(), hollow)
+
+    def test_vertical_alignment_preview_cache_save_reload_and_per_block_choice(self):
+        output, layout = self.page(two_blocks=True)
+        editor = self.editor(output)
+        editor._direction_combo.setCurrentIndex(editor._direction_combo.findData(1))
+        editor._text_input.setPlainText('甲乙\n丙丁戊己')
+        self.wait_preview(editor)
+        self.assertEqual(editor._vertical_alignment_combo.currentData(), 'center')
+        centered = editor._rendered.tobytes()
+        images = []
+        for alignment in ('top', 'bottom', 'center'):
+            editor._vertical_alignment_combo.setCurrentIndex(editor._vertical_alignment_combo.findData(alignment))
+            self.wait_preview(editor)
+            images.append(editor._rendered.tobytes())
+        self.assertNotEqual(images[0], centered)
+        self.assertNotEqual(images[1], centered)
+        self.assertNotEqual(images[0], images[1])
+        self.assertEqual(images[2], centered)
+        editor._vertical_alignment_combo.setCurrentIndex(editor._vertical_alignment_combo.findData('top'))
+        # Saving must flush a still-pending preview and persist only this block.
+        self.assertTrue(editor.save_image())
+        saved = json.loads(layout.read_text(encoding='utf-8'))
+        self.assertEqual(saved[0]['vertical_alignment'], 'top')
+        self.assertNotIn('vertical_alignment', saved[1])
+        expected = editor._rendered.tobytes()
+        restored = self.editor(output)
+        restored.apply_changes()
+        self.assertEqual(restored._vertical_alignment_combo.currentData(), 'top')
+        self.assertEqual(restored._rendered.tobytes(), expected)
+        restored.block_list.setCurrentRow(1)
+        self.assertEqual(restored._vertical_alignment_combo.currentData(), 'center')
+
+    def test_vertical_alignment_disabled_for_horizontal_and_kept_when_switching_back(self):
+        output, _ = self.page()
+        editor = self.editor(output)
+        self.assertFalse(editor._vertical_alignment_combo.isEnabled())
+        editor._direction_combo.setCurrentIndex(editor._direction_combo.findData(1))
+        self.assertTrue(editor._vertical_alignment_combo.isEnabled())
+        editor._vertical_alignment_combo.setCurrentIndex(editor._vertical_alignment_combo.findData('bottom'))
+        editor._direction_combo.setCurrentIndex(editor._direction_combo.findData(0))
+        self.assertFalse(editor._vertical_alignment_combo.isEnabled())
+        self.assertEqual(editor._vertical_alignment_combo.currentData(), 'bottom')
+        editor._direction_combo.setCurrentIndex(editor._direction_combo.findData(-1))
+        self.assertTrue(editor._vertical_alignment_combo.isEnabled())
+        self.assertEqual(editor._vertical_alignment_combo.currentData(), 'bottom')
 
     def test_font_size_updates_pixels_automatically_and_honors_single_pixel_changes(self):
         output, layout = self.page()
@@ -206,6 +339,25 @@ class EditorLivePreviewTests(unittest.TestCase):
         self.wait_preview(editor)
         self.assertEqual(editor.items[0]['font_reference'], reference)
         self.assertNotIn('font_reference', editor.items[1])
+
+    def test_bundled_font_full_name_preview_and_reference_survive_save(self):
+        output, layout = self.page()
+        editor = self.editor(output)
+        source = config.AI_ROOT / 'font_file/TC/10-SweiSugar/SweiSugarCJKtc-Black.ttf'
+        reference = font_reference(source)
+        index = editor._style_combo.findData(reference)
+        self.assertGreaterEqual(index, 0)
+        editor._style_combo.setCurrentIndex(index)
+        self.wait_preview(editor)
+        self.assertIn('狮尾加糖宋体（繁体） · 特黑', editor._font_name_label.text())
+        self.assertTrue(editor._font_name_label.wordWrap())
+        self.assertIn('SweiSugarCJKtc-Black.ttf', editor._font_name_label.toolTip())
+        self.assertEqual(editor._typesetter_for_item(editor.items[0]).font_map['dialogue'], str(source))
+        self.assertTrue(editor.save_image())
+        self.assertEqual(json.loads(layout.read_text(encoding='utf-8'))[0]['font_reference'], reference)
+        restored = self.editor(output)
+        self.assertEqual(restored._style_combo.currentData(), reference)
+        self.assertEqual(restored._font_name_label.text(), editor._font_name_label.text())
 
     def test_xy_offsets_move_preview_by_the_exact_number_of_pixels(self):
         output, _ = self.page()
@@ -344,6 +496,37 @@ class EditorLivePreviewTests(unittest.TestCase):
         self.assertTrue(editor.save_image())
         self.assertIn('mask_box', json.loads(layout.read_text(encoding='utf-8'))[0])
 
+    def test_translation_default_alignment_is_drawn_and_restored_in_editor(self):
+        import numpy as np
+        from comic_translator_pipeline import ComicTranslatorPipeline
+        for alignment in ('top', 'bottom'):
+            output, layout = self.page(f'default-{alignment}')
+            image = Image.new('RGB', (600, 700), '#ffeedd')
+            pipeline = ComicTranslatorPipeline.__new__(ComicTranslatorPipeline)
+            pipeline.source_language = 'ja'
+            pipeline.multimodal = pipeline.watermark_enabled = False
+            pipeline.progress_callback = pipeline.cancel_callback = None
+            pipeline.vertical_alignment = alignment
+            pipeline.current_mask_image = Image.new('L', image.size, 0)
+            probe = self.editor(output)
+            pipeline.typesetter = probe.typesetter
+            pipeline.inpaint_bubbles = lambda *_: image.copy()
+            prepared = dict(img_cv=np.asarray(image)[:, :, ::-1],
+                bubbles_data=[(100, 90, 290, 340, 1, 'dialogue', 24, 0)],
+                bubble_metadata=[dict(raw='Beginning', box=[100, 90, 290, 340],style='dialogue',
+                    direction=1,target_font_size=24,non_bubble=False,source_language='ja')],ocr_texts=['Beginning'])
+            pipeline.finish_comic_page(output, prepared, ['甲乙\n丙丁戊己'])
+            item = json.loads(layout.read_text(encoding='utf-8'))[0]
+            self.assertEqual(item['vertical_alignment'], alignment)
+            cells = pipeline.typesetter.last_layout_debug
+            columns = [[v for v in cells if v['column'] == col] for col in (0, 1)]
+            ends = [column[0 if alignment == 'top' else -1]['center_y'] for column in columns]
+            self.assertEqual(ends[0], ends[1])
+            restored = self.editor(output)
+            restored.apply_changes()
+            self.assertEqual(restored._vertical_alignment_combo.currentData(), alignment)
+            self.assertEqual(restored._rendered.tobytes(), Image.open(output).tobytes())
+
     def test_new_pipeline_region_reproduces_original_typesetting_in_editor(self):
         import numpy as np
         from comic_translator_pipeline import ComicTranslatorPipeline
@@ -354,7 +537,7 @@ class EditorLivePreviewTests(unittest.TestCase):
         pipeline.multimodal = pipeline.watermark_enabled = False
         pipeline.progress_callback = pipeline.cancel_callback = None
         probe = EditorPage()
-        self.addCleanup(probe.close)
+        self.addCleanup(self.destroy_editor, probe)
         pipeline.typesetter = probe.typesetter
         pipeline.inpaint_bubbles = lambda *_: image.copy()
         mask = Image.new('L', image.size, 0)

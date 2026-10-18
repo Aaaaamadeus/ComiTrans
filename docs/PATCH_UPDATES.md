@@ -14,7 +14,9 @@ v2.4.0 是后续小版本补丁的基线。主程序 ZIP 包含 `release-manifes
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Apply-Update.ps1 -Patch D:\Downloads\ComiTrans-patch.zip -InstallDir D:\ComiTrans
 ```
 
-更新器只修改程序管理的文件。配置、字体、模型、日志和漫画文件不纳入补丁。原程序文件与要求的基线不符时会停止；写入失败时自动恢复。备份和状态记录保存在安装目录 `.comitrans-update`，确认新程序正常后可以清理。
+更新器只修改程序管理的文件。配置、用户导入/下载的 `user_fonts`、模型、日志和漫画文件不纳入补丁。内置字体属于程序资源，会随补丁新增或更新。原程序文件与要求的基线不符时会停止；写入失败时自动恢复。备份和状态记录保存在安装目录 `.comitrans-update`，确认新程序正常后可以清理。
+
+v2.4.1 使用完整程序包发布，模型继续复用，见[版本说明](RELEASE-v2.4.1.md)。本页的补丁流程仅适用于另行提供补丁的版本。
 
 `build_id` 根据版本、平台和逐文件大小及 SHA256 生成，标识补丁适用的确切程序构建。
 
@@ -27,8 +29,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Apply-Update.ps1 -Patc
 .\build_app.ps1
 .\.venv\Scripts\python.exe package_release.py
 
-# 以下以未来的 2.4.1 为例。
-.\.venv\Scripts\python.exe scripts/create_patch.py --base docs/releases/v2.4.0/baseline.json --target release/ComiTrans-v2.4.1-app.zip --output release/ComiTrans-v2.4.0-to-v2.4.1-patch.zip
+# 示例：为将来版本生成补丁，替换 vNext 为实际目标版本。
+.\.venv\Scripts\python.exe scripts/create_patch.py --base docs/releases/v2.4.0/baseline.json --target release/ComiTrans-vNext-app.zip --output release/ComiTrans-v2.4.0-to-vNext-patch.zip
 ```
 
 `--base` 也可使用包含基线的上一版完整程序 ZIP。目标 ZIP 必须包含基线。补丁按 SHA256 比较，只携带新增或修改文件及删除清单；生成前校验目标包与其清单一致。

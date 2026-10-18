@@ -1,5 +1,6 @@
 """Bounded logical records, incremental rendering, and explicit follow control."""
 from __future__ import annotations
+from ..i18n import tr
 
 from collections import deque
 from dataclasses import dataclass
@@ -48,38 +49,38 @@ class LogPanel(QFrame):
         layout.setContentsMargins(0, 8, 0, 0)
         layout.setSpacing(6)
         bar = QHBoxLayout()
-        self.heading = PanelHeading('03', '详细日志')
+        self.heading = PanelHeading('03', tr('详细日志'))
         self.heading.setFixedWidth(240)
         bar.addWidget(self.heading)
         self.level = QComboBox()
-        self.level.addItems(['全部级别', 'INFO', 'WARN', 'ERROR'])
-        self.level.setAccessibleName('日志级别筛选')
+        self.level.addItems([tr('全部级别'), 'INFO', 'WARN', 'ERROR'])
+        self.level.setAccessibleName(tr('日志级别筛选'))
         self.search = QLineEdit()
-        self.search.setPlaceholderText('搜索日志')
+        self.search.setPlaceholderText(tr('搜索日志'))
         self.search.setClearButtonEnabled(True)
         self.search.setMinimumWidth(80)
-        self.search.setAccessibleName('搜索日志')
-        self.follow = QPushButton('暂停跟随')
+        self.search.setAccessibleName(tr('搜索日志'))
+        self.follow = QPushButton(tr('暂停跟随'))
         self.follow.setProperty('compact', True)
         self.follow.clicked.connect(self.toggle_follow)
-        more = QPushButton('更多')
+        more = QPushButton(tr('更多'))
         more.setProperty('compact', True)
         menu = QMenu(more)
-        menu.addAction('复制选中 / 当前筛选日志', self.copy_logs)
-        menu.addAction('导出当前筛选日志（最多 5,000 条）', self.export_view)
-        menu.addAction('导出磁盘完整日志', self.export_file)
+        menu.addAction(tr('复制选中 / 当前筛选日志'), self.copy_logs)
+        menu.addAction(tr('导出当前筛选日志（最多 5,000 条）'), self.export_view)
+        menu.addAction(tr('导出磁盘完整日志'), self.export_file)
         more.setMenu(menu)
         self.font_size = QSpinBox()
         self.font_size.setRange(12, 20)
         self.font_size.setSuffix(' px')
         self.font_size.setFixedWidth(86)
         self.font_size.setValue(int(QSettings().value('ui/logFontSize', 18)))
-        self.font_size.setToolTip('日志字号 · 正文使用 Aa今日花晴 春懒猫困')
-        self.font_size.setAccessibleName('日志字号')
-        level_menu = menu.addMenu('日志级别')
-        for index, name in enumerate(('全部级别', 'INFO', 'WARN', 'ERROR')):
+        self.font_size.setToolTip(tr('日志字号 · 正文使用 Aa今日花晴 春懒猫困'))
+        self.font_size.setAccessibleName(tr('日志字号'))
+        level_menu = menu.addMenu(tr('日志级别'))
+        for index, name in enumerate((tr('全部级别'), 'INFO', 'WARN', 'ERROR')):
             level_menu.addAction(name, lambda checked=False, value=index: self.level.setCurrentIndex(value))
-        font_menu = menu.addMenu('日志字号')
+        font_menu = menu.addMenu(tr('日志字号'))
         for size in range(12, 21):
             font_menu.addAction(f'{size} px', lambda checked=False, value=size: self.font_size.setValue(value))
         for widget in (self.level, self.search, self.follow, more, self.font_size):
@@ -91,9 +92,9 @@ class LogPanel(QFrame):
         # Each event is one Qt block; embedded newlines use Unicode line separators.
         self.view.setMaximumBlockCount(self.LIMIT)
         self.view.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
-        self.view.setPlaceholderText('详细日志 · 等待后台输出')
+        self.view.setPlaceholderText(tr('详细日志 · 等待后台输出'))
         self.view.setMinimumHeight(70)
-        self.view.setAccessibleName('实时详细日志')
+        self.view.setAccessibleName(tr('实时详细日志'))
         layout.addWidget(self.view, 1)
         self._set_font(self.font_size.value())
         self.font_size.valueChanged.connect(self._set_font)
@@ -115,7 +116,7 @@ class LogPanel(QFrame):
         self.heading.setFixedWidth(160 if self.width() < 920 else 240)
         self.font_size.setVisible(self.width() >= 920)
         self.level.setVisible(self.width() >= 750)
-        self.search.setPlaceholderText('搜索日志' if self.width() >= 750 else '搜索')
+        self.search.setPlaceholderText(tr('搜索日志') if self.width() >= 750 else tr('搜索'))
 
     def _set_font(self, size):
         self._metadata_font = ui_font(size, mono=True)
@@ -172,7 +173,7 @@ class LogPanel(QFrame):
         self._prune_view()
         if not self.following and incoming:
             self.unseen += incoming
-            self.follow.setText(f'{self.unseen} 条新日志 · 回到最新')
+            self.follow.setText(tr('{_0} 条新日志 · 回到最新', _0=self.unseen))
         immediate = force or has_error or not self.following or not self.isVisible()
         # Normal pace is 250 code points/s; larger backlogs accelerate the reveal.
         # Callbacks stay bounded rather than running one timer per glyph.
@@ -283,7 +284,7 @@ class LogPanel(QFrame):
 
     def pause_follow(self):
         self.following = False
-        self.follow.setText('回到最新')
+        self.follow.setText(tr('回到最新'))
 
     def toggle_follow(self):
         if self.following:
@@ -291,7 +292,7 @@ class LogPanel(QFrame):
         else:
             self.following = True
             self.unseen = 0
-            self.follow.setText('暂停跟随')
+            self.follow.setText(tr('暂停跟随'))
             self.view.verticalScrollBar().setValue(self.view.verticalScrollBar().maximum())
 
     def _scrolled(self, value):
@@ -318,7 +319,7 @@ class LogPanel(QFrame):
     def copy_logs(self):
         self.flush_all()
         selected = self.view.textCursor().selectedText().replace('\u2029', '\n').replace('\u2028', '\n')
-        QApplication.clipboard().setText(selected or self.filtered_text())
+        QApplication.clipboard().setText(tr(selected or self.filtered_text()))
 
     def export_view(self):
         self._export(False)
@@ -328,7 +329,7 @@ class LogPanel(QFrame):
 
     def _export(self, full):
         self.flush_all()
-        path, _ = QFileDialog.getSaveFileName(self, '导出日志', 'ComiTrans.log', '文本日志 (*.log *.txt)')
+        path, _ = QFileDialog.getSaveFileName(self, tr('导出日志'), 'ComiTrans.log', tr('文本日志 (*.log *.txt)'))
         if not path:
             return
         try:
@@ -337,6 +338,6 @@ class LogPanel(QFrame):
             else:
                 Path(path).write_text(self.filtered_text(), encoding='utf-8')
         except OSError as exc:
-            QMessageBox.warning(self, '日志导出失败', str(exc))
+            QMessageBox.warning(self, tr('日志导出失败'), str(exc))
         else:
-            QMessageBox.information(self, '日志已导出', path)
+            QMessageBox.information(self, tr('日志已导出'), path)

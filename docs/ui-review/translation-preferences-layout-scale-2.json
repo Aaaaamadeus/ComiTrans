@@ -1,0 +1,42 @@
+[
+  {
+    "size": [
+      1440,
+      900
+    ],
+    "expanded": false,
+    "font_and_alignment_visible": false,
+    "start_visible": true,
+    "screenshot": "translation-preferences-1440-closed-scale-2.png"
+  },
+  {
+    "size": [
+      1440,
+      900
+    ],
+    "expanded": true,
+    "font_and_alignment_visible": true,
+    "start_visible": true,
+    "screenshot": "translation-preferences-1440-open-scale-2.png"
+  },
+  {
+    "size": [
+      820,
+      480
+    ],
+    "expanded": false,
+    "font_and_alignment_visible": false,
+    "start_visible": true,
+    "screenshot": "translation-preferences-820-closed-scale-2.png"
+  },
+  {
+    "size": [
+      820,
+      480
+    ],
+    "expanded": true,
+    "font_and_alignment_visible": true,
+    "start_visible": true,
+    "screenshot": "translation-preferences-820-open-scale-2.png"
+  }
+]

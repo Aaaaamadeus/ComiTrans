@@ -5,6 +5,7 @@ import os
 import tempfile
 import threading
 import unittest
+from tests.qt_utils import destroy_widget
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -43,7 +44,7 @@ class DesktopUiTests(unittest.TestCase):
         panel.resize(900, 250)
         panel.show()
         self.app.processEvents()
-        self.addCleanup(panel.close)
+        self.addCleanup(destroy_widget, panel)
         return panel
 
     def test_live_log_retains_selection_and_only_resumes_on_request(self):
@@ -182,7 +183,7 @@ class DesktopUiTests(unittest.TestCase):
         panel = StepPanel()
         panel.resize(700, 76)
         panel.show()
-        self.addCleanup(panel.close)
+        self.addCleanup(destroy_widget, panel)
 
         def event(stage, state):
             panel.consume_event(dict(page_id='1:1', page_label='第 1 页', stage=stage, state=state, message=stage))
@@ -247,7 +248,7 @@ class DesktopUiTests(unittest.TestCase):
              patch.object(config, 'PROJECT_ROOT', self.root), \
              patch.object(MainWindow, '_start_warmup'):
             window = MainWindow()
-            self.addCleanup(window.close)
+            self.addCleanup(destroy_widget, window)
             page = window.api_config_page
             window._show_api_config()
             page._model_input.setText('draft-translation-model')
@@ -278,7 +279,7 @@ class DesktopUiTests(unittest.TestCase):
              patch.object(config, 'PROJECT_ROOT', self.root), \
              patch.object(MainWindow, '_start_warmup'):
             window = MainWindow()
-            self.addCleanup(window.close)
+            self.addCleanup(destroy_widget, window)
             window.resize(820, 480)
             window.show()
             for page, button in ((window.api_config_page, window.api_config_page._save_btn),
@@ -305,7 +306,7 @@ class DesktopUiTests(unittest.TestCase):
     def test_canvas_focus_preserves_draft_and_restores_sidebar_preferences(self):
         output, layout = self.fixture_page()
         editor = EditorPage()
-        self.addCleanup(editor.close)
+        self.addCleanup(destroy_widget, editor)
         editor.load_page(output)
         editor._pages_toggle.setChecked(True)
         editor._properties_toggle.setChecked(True)

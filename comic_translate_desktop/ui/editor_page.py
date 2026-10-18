@@ -1,4 +1,5 @@
 from __future__ import annotations
+from ..i18n import tr
 import json
 import sys
 from pathlib import Path
@@ -6,8 +7,9 @@ from PySide6.QtCore import Qt, QSize, QSettings, QTimer
 from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QGroupBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox)
 from ..config import load_ai_config, MAIN_DIR
-from ..font_library import available_fonts, font_display_name, font_reference, inspect_font, resolve_font_reference
+from ..font_library import available_fonts, font_description, font_display_name, font_reference, inspect_font, resolve_font_reference
 from comic_translate_core.watermark import apply_watermark
+from comic_translate_core.layout_options import VERTICAL_ALIGNMENTS
 from .preview import ImagePreview
 from .theme import ui_font
 from .manga_components import PanelHeading
@@ -87,16 +89,16 @@ class EditorPage(QWidget):
         self._style_combo.blockSignals(True)
         try:
             self._style_combo.clear()
-            self._style_combo.addItem('跟随翻译默认字体', '')
+            self._style_combo.addItem(tr('跟随翻译默认字体'), '')
             for style, label in STYLE_LABELS.items():
-                self._style_combo.addItem(label, style)
+                self._style_combo.addItem(tr(label), style)
                 path = self.config.get('style_font_map', self.config['font_map']).get(style)
                 self._style_combo.setItemData(self._style_combo.count() - 1, path, Qt.ToolTipRole)
             for font in available_fonts(self.config):
                 reference = font_reference(font.path)
-                label = font_display_name(font) + ('（本地）' if reference.startswith('user_fonts/') else '')
-                self._style_combo.addItem(label, reference)
-                self._style_combo.setItemData(self._style_combo.count() - 1, str(font.path), Qt.ToolTipRole)
+                label = font_display_name(font) + (tr('（本地）') if reference.startswith('user_fonts/') else '')
+                self._style_combo.addItem(tr(label), reference)
+                self._style_combo.setItemData(self._style_combo.count() - 1, font_description(font), Qt.ToolTipRole)
             self._select_font_choice(self.items[self._loaded_row] if 0 <= self._loaded_row < len(self.items) else {})
         finally:
             self._style_combo.blockSignals(False)
@@ -109,12 +111,32 @@ class EditorPage(QWidget):
         matching_style = reference and not missing and style_path and reference == font_reference(style_path)
         index = self._style_combo.findData(style if matching_style else reference)
         if index < 0:
-            self._style_combo.addItem(f'不可用：{Path(reference).name}', reference)
+            self._style_combo.addItem(tr('不可用：{_0}', _0=Path(reference).name), reference)
             index = self._style_combo.count() - 1
             self._style_combo.model().item(index).setEnabled(False)
         self._style_combo.setCurrentIndex(index)
-        self._style_combo.setToolTip('所选字体不可用，当前回退到翻译默认字体；请选择其它字体。' if missing else
-                                    '仅修改当前文本块；手动选择优先于翻译默认字体，缺字自动回退。')
+        self._style_combo.setToolTip(tr('所选字体不可用，当前回退到翻译默认字体；请选择其它字体。') if missing else tr('仅修改当前文本块；手动选择优先于翻译默认字体，缺字自动回退。'))
+        self._update_font_name()
+
+    def _update_font_name(self):
+        choice = self._style_combo.currentData()
+        item = self.items[self._loaded_row] if 0 <= self._loaded_row < len(self.items) else {}
+        try:
+            if choice in STYLE_LABELS:
+                path = self.config.get('style_font_map', self.config['font_map'])[choice]
+            elif choice:
+                path = resolve_font_reference(choice)
+            else:
+                path = self.config['font_map'][item.get('style', 'dialogue')]
+            font = inspect_font(path)
+            name, description = font_display_name(font), font_description(font)
+        except Exception:
+            name = self._style_combo.itemText(self._style_combo.currentIndex())
+            description = self._style_combo.toolTip()
+        self._font_name_label.setText(tr(tr('当前字体：') + name))
+        self._font_name_label.setToolTip(tr(description))
+        self._style_combo.lineEdit().setToolTip(tr(description))
+        self._style_combo.lineEdit().setCursorPosition(0)
 
     @staticmethod
     def _font_reference_available(reference):
@@ -125,10 +147,11 @@ class EditorPage(QWidget):
             return False
 
     def _font_selection_changed(self):
+        self._update_font_name()
         if self._loading or self._loaded_row < 0:
             return
         self._font_choice_dirty = True
-        self._style_combo.setToolTip('仅修改当前文本块；手动选择优先于翻译默认字体，缺字自动回退。')
+        self._style_combo.setToolTip(tr('仅修改当前文本块；手动选择优先于翻译默认字体，缺字自动回退。'))
         self._schedule_preview()
 
     def _build_ui(self):
@@ -146,31 +169,31 @@ class EditorPage(QWidget):
         toolbar = QHBoxLayout(toolbar_frame)
         toolbar.setContentsMargins(0, 0, 0, 10)
         toolbar.setSpacing(8)
-        self._pages_toggle = QPushButton('页面')
-        self._properties_toggle = QPushButton('编辑面板')
+        self._pages_toggle = QPushButton(tr('页面'))
+        self._properties_toggle = QPushButton(tr('编辑面板'))
         for button in (self._pages_toggle, self._properties_toggle):
             button.setCheckable(True)
             button.setChecked(True)
             button.setProperty('compact', True)
             button.setProperty('role', 'utility')
             toolbar.addWidget(button)
-        self._focus_btn = QPushButton('专注画布')
+        self._focus_btn = QPushButton(tr('专注画布'))
         self._focus_btn.setCheckable(True)
         self._focus_btn.setProperty('role', 'utility')
         self._focus_btn.setProperty('compact', True)
-        self._focus_btn.setToolTip('收起侧栏与辅助信息，专注查看作品 · Ctrl+Shift+F')
+        self._focus_btn.setToolTip(tr('收起侧栏与辅助信息，专注查看作品 · Ctrl+Shift+F'))
         toolbar.addWidget(self._focus_btn)
         self._zoom = QComboBox()
-        for name, value in [('适应页面', None), ('50%', .5), ('100%', 1.), ('150%', 1.5), ('200%', 2.)]:
-            self._zoom.addItem(name, value)
-        self._zoom.setToolTip('缩放预览；放大后可使用滚动条浏览')
+        for name, value in [(tr('适应页面'), None), ('50%', .5), ('100%', 1.), ('150%', 1.5), ('200%', 2.)]:
+            self._zoom.addItem(tr(name), value)
+        self._zoom.setToolTip(tr('缩放预览；放大后可使用滚动条浏览'))
         toolbar.addWidget(self._zoom)
         toolbar.addStretch()
-        self._save_btn = QPushButton('保存图片')
+        self._save_btn = QPushButton(tr('保存图片'))
         self._save_btn.setProperty('role', 'primary')
         toolbar.addWidget(self._save_btn)
         root.addWidget(toolbar_frame)
-        self._status = QLabel('导入带布局数据的已翻译图片，或从自动处理结果进入精修。')
+        self._status = QLabel(tr('导入带布局数据的已翻译图片，或从自动处理结果进入精修。'))
         self._status.setWordWrap(True)
         self._status.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._status.setObjectName('editorStatus')
@@ -185,9 +208,9 @@ class EditorPage(QWidget):
         left = QVBoxLayout(self._pages_panel)
         left.setContentsMargins(8, 0, 12, 0)
         left.setSpacing(12)
-        heading = PanelHeading('01', '页面', sidebar=True)
+        heading = PanelHeading('01', tr('页面'), sidebar=True)
         left.addWidget(heading)
-        add = QPushButton('＋ 导入已翻译图片')
+        add = QPushButton(tr('＋ 导入已翻译图片'))
         add.clicked.connect(self._import_pages)
         left.addWidget(add)
         self.page_list = QListWidget()
@@ -202,12 +225,12 @@ class EditorPage(QWidget):
         canvas_layout = QVBoxLayout(canvas)
         canvas_layout.setContentsMargins(0, 0, 0, 0)
         canvas_layout.setSpacing(8)
-        self._canvas_heading = PanelHeading('02', '页面预览')
+        self._canvas_heading = PanelHeading('02', tr('页面预览'))
         canvas_layout.addWidget(self._canvas_heading)
         self.preview = ImagePreview(import_action=True, illustration='studio-editor-v1.png')
-        self.preview.clear('选择一页，开始精修')
-        self.preview._hint.setText('从自动处理结果进入，或导入已翻译图片')
-        self.preview.import_button.setText('导入已翻译图片')
+        self.preview.clear(tr('选择一页，开始精修'))
+        self.preview._hint.setText(tr('从自动处理结果进入，或导入已翻译图片'))
+        self.preview.import_button.setText(tr('导入已翻译图片'))
         self.preview.import_requested.connect(self._import_pages)
         self.preview.region_edited.connect(self._resize_region_from_canvas)
         self.preview.region_edit_finished.connect(self.apply_changes)
@@ -229,7 +252,7 @@ class EditorPage(QWidget):
         inspector_layout.addWidget(self._properties_scroll, 1)
         props = QVBoxLayout(content)
         props.setContentsMargins(12, 12, 12, 12)
-        heading = PanelHeading('03', '文本与排版', sidebar=True)
+        heading = PanelHeading('03', tr('文本与排版'), sidebar=True)
         props.addWidget(heading)
         self.block_list = QListWidget()
         self.block_list.setFixedHeight(96)
@@ -242,14 +265,14 @@ class EditorPage(QWidget):
         text_props = QVBoxLayout(text_panel)
         text_props.setContentsMargins(0, 8, 0, 0)
         text_props.setSpacing(8)
-        self._inspector_tabs.addTab(text_panel, '译文编辑')
+        self._inspector_tabs.addTab(text_panel, tr('译文编辑'))
         layout_panel = QWidget()
         layout_props = QVBoxLayout(layout_panel)
         layout_props.setContentsMargins(0, 8, 0, 0)
         layout_props.setSpacing(12)
-        self._inspector_tabs.addTab(layout_panel, '排版与位置')
+        self._inspector_tabs.addTab(layout_panel, tr('排版与位置'))
         props = text_props
-        source_label = QLabel('原文')
+        source_label = QLabel(tr('原文'))
         source_label.setObjectName('fieldCaption')
         props.addWidget(source_label)
         self._source_text = QPlainTextEdit()
@@ -257,39 +280,78 @@ class EditorPage(QWidget):
         self._source_text.setFixedHeight(76)
         self._source_text.setFont(ui_font(japanese=True))
         props.addWidget(self._source_text)
-        target_label = QLabel('译文')
+        target_label = QLabel(tr('译文'))
         target_label.setObjectName('fieldCaption')
-        props.addWidget(target_label)
+        break_row = QHBoxLayout()
+        break_row.addWidget(target_label, 1)
+        self._line_break_btn = QPushButton(tr('插入换行'))
+        self._line_break_btn.setProperty('compact', True)
+        self._line_break_btn.setToolTip(tr('在光标处插入换行，与 Enter 相同'))
+        self._line_break_btn.clicked.connect(self._insert_line_break)
+        break_row.addWidget(self._line_break_btn)
+        props.addLayout(break_row)
+        break_hint = QLabel(tr('Enter 换行 · 竖排时换到左列'))
+        break_hint.setWordWrap(True)
+        break_hint.setProperty('muted', True)
+        props.addWidget(break_hint)
         self._text_input = QPlainTextEdit()
         self._text_input.setMinimumHeight(96)
+        self._text_input.setMaximumHeight(180)
+        self._text_input.setAccessibleName(tr('译文与手动换行'))
+        self._text_input.setPlaceholderText(tr('输入译文，按 Enter 手动换行'))
+        self._text_input.setToolTip(tr('Enter 插入硬换行：横排换到下一行，竖排换到左侧下一列；连续回车保留空行或空列。'))
         props.addWidget(self._text_input)
+        props.addStretch(1)
         props = layout_props
-        group = QGroupBox('字体与排版')
+        group = QGroupBox(tr('字体与排版'))
         form = QFormLayout(group)
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self._style_combo = SearchableFontCombo()
-        self._style_combo.setAccessibleName('当前文本块字体')
+        self._style_combo.setAccessibleName(tr('当前文本块字体'))
+        self._style_combo.setFont(ui_font(13))
+        self._font_name_label = QLabel()
+        self._font_name_label.setObjectName('fontChoiceName')
+        self._font_name_label.setAccessibleName(tr('当前字体完整名称'))
+        self._font_name_label.setWordWrap(True)
+        self._font_name_label.setTextFormat(Qt.PlainText)
+        self._font_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._font_name_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self._refresh_font_choices()
         self._size_spin = QSpinBox()
         self._size_spin.setRange(0, 200)
-        self._size_spin.setSpecialValueText('自动')
-        self._size_spin.setToolTip('手动字号按实际像素绘制；0 为自动适配蒙版')
+        self._size_spin.setSpecialValueText(tr('自动'))
+        self._size_spin.setToolTip(tr('手动字号按实际像素绘制；0 为自动适配蒙版'))
         self._direction_combo = QComboBox()
-        for label, value in [('自动判断', -1), ('竖排', 1), ('横排', 0)]:
-            self._direction_combo.addItem(label, value)
+        for label, value in [(tr('自动判断'), -1), (tr('竖排'), 1), (tr('横排'), 0)]:
+            self._direction_combo.addItem(tr(label), value)
+        self._vertical_alignment_combo = QComboBox()
+        self._vertical_alignment_combo.setAccessibleName(tr('竖排各列对齐方式'))
+        for value, label in VERTICAL_ALIGNMENTS:
+            self._vertical_alignment_combo.addItem(tr(label), value)
+        self._vertical_alignment_combo.setCurrentIndex(1)
+        self._vertical_alignment_combo.setToolTip(tr('竖排各列按最长列的顶部或底部对齐，整组文字仍在蒙版中居中。横排时不生效。'))
+        self._effect_combo = QComboBox()
+        self._effect_combo.setAccessibleName(tr('文字描边效果'))
+        for label, value in [(tr('默认效果'), 'auto'), (tr('黑字白边'), 'outlined'), (tr('白字黑边（空心）'), 'hollow')]:
+            self._effect_combo.addItem(tr(label), value)
         font_row = QHBoxLayout()
         font_row.setSpacing(6)
-        font_row.addWidget(self._style_combo, 1)
-        self._font_library_btn = QPushButton('字体库')
+        font_row.addWidget(QLabel(tr('字体')))
+        font_row.addStretch(1)
+        self._font_library_btn = QPushButton(tr('字体库'))
         self._font_library_btn.setProperty('compact', True)
         self._font_library_btn.setProperty('role', 'quiet')
         self._font_library_btn.clicked.connect(self._open_font_library)
         font_row.addWidget(self._font_library_btn)
-        form.addRow('字体', font_row)
-        form.addRow('字号', self._size_spin)
-        form.addRow('排版方向', self._direction_combo)
+        form.addRow(tr(font_row))
+        form.addRow(tr(self._style_combo))
+        form.addRow(tr(self._font_name_label))
+        form.addRow(tr('字号'), self._size_spin)
+        form.addRow(tr('排版方向'), self._direction_combo)
+        form.addRow(tr('竖排列对齐'), self._vertical_alignment_combo)
+        form.addRow(tr('文字效果'), self._effect_combo)
         props.addWidget(group)
-        group = QGroupBox('位置与蒙版')
+        group = QGroupBox(tr('位置与蒙版'))
         form = QFormLayout(group)
         self._offset_x, self._offset_y = QSpinBox(), QSpinBox()
         for spin in (self._offset_x, self._offset_y):
@@ -299,32 +361,32 @@ class EditorPage(QWidget):
         for spin in (self._mask_width, self._mask_height):
             spin.setRange(1, 100000)
             spin.setSuffix(' px')
-            spin.setToolTip('调整译文排版蒙版，以当前中心向两侧改变大小')
-        self._show_mask = QCheckBox('显示蒙版范围')
+            spin.setToolTip(tr('调整译文排版蒙版，以当前中心向两侧改变大小'))
+        self._show_mask = QCheckBox(tr('显示蒙版范围'))
         self._show_mask.setChecked(True)
-        self._show_mask.setToolTip('画布辅助线仅用于精修，不写入导出图片')
-        self._box_label = QLabel('选择文本块后显示坐标')
+        self._show_mask.setToolTip(tr('画布辅助线仅用于精修，不写入导出图片'))
+        self._box_label = QLabel(tr('选择文本块后显示坐标'))
         self._box_label.setWordWrap(True)
         self._box_label.setProperty('muted', True)
-        form.addRow('X 偏移', self._offset_x)
-        form.addRow('Y 偏移', self._offset_y)
-        form.addRow('蒙版宽度', self._mask_width)
-        form.addRow('蒙版高度', self._mask_height)
-        form.addRow(self._show_mask)
-        form.addRow(self._box_label)
-        drag_hint = QLabel('拖动蒙版边角调整大小，框内拖动位置')
+        form.addRow(tr('X 偏移'), self._offset_x)
+        form.addRow(tr('Y 偏移'), self._offset_y)
+        form.addRow(tr('蒙版宽度'), self._mask_width)
+        form.addRow(tr('蒙版高度'), self._mask_height)
+        form.addRow(tr(self._show_mask))
+        form.addRow(tr(self._box_label))
+        drag_hint = QLabel(tr('拖动蒙版边角调整大小，框内拖动位置'))
         drag_hint.setWordWrap(True)
         drag_hint.setProperty('muted', True)
-        form.addRow(drag_hint)
+        form.addRow(tr(drag_hint))
         props.addWidget(group)
-        self._apply_btn = QPushButton('刷新预览')
+        self._apply_btn = QPushButton(tr('刷新预览'))
         props.addStretch()
         inspector_actions = QFrame()
         inspector_actions.setObjectName('inspectorActions')
         actions_layout = QVBoxLayout(inspector_actions)
         actions_layout.setContentsMargins(12, 10, 12, 10)
         actions_layout.addWidget(self._apply_btn)
-        hint = QLabel('修改实时预览 · Ctrl+S 保存图片')
+        hint = QLabel(tr('修改实时预览 · Ctrl+S 保存图片'))
         hint.setProperty('muted', True)
         actions_layout.addWidget(hint)
         inspector_layout.addWidget(inspector_actions)
@@ -344,6 +406,9 @@ class EditorPage(QWidget):
         self._text_input.textChanged.connect(self._schedule_preview)
         self._style_combo.currentIndexChanged.connect(self._font_selection_changed)
         self._direction_combo.currentIndexChanged.connect(self._schedule_preview)
+        self._direction_combo.currentIndexChanged.connect(self._update_vertical_alignment_enabled)
+        self._vertical_alignment_combo.currentIndexChanged.connect(self._schedule_preview)
+        self._effect_combo.currentIndexChanged.connect(self._schedule_preview)
         for spin in self._layout_spins():
             spin.valueChanged.connect(self._schedule_preview)
         self._show_mask.toggled.connect(self._update_region_guide)
@@ -382,11 +447,16 @@ class EditorPage(QWidget):
             self.splitter.restoreState(self._focus_splitter_state)
         for widget in (self._canvas_heading, self._status, self._pages_toggle, self._properties_toggle):
             widget.setVisible(not focused)
-        self._focus_btn.setText('退出专注' if focused else '专注画布')
+        self._focus_btn.setText(tr('退出专注') if focused else tr('专注画布'))
 
     def _set_editable(self, enabled):
-        for widget in (self._text_input, self._style_combo, self._font_library_btn, self._direction_combo, *self._layout_spins(), self._show_mask, self._apply_btn, self._save_btn):
+        for widget in (self._text_input, self._line_break_btn, self._style_combo, self._font_library_btn, self._direction_combo, self._vertical_alignment_combo, self._effect_combo, *self._layout_spins(), self._show_mask, self._apply_btn, self._save_btn):
             widget.setEnabled(enabled)
+        self._update_vertical_alignment_enabled()
+
+    def _update_vertical_alignment_enabled(self):
+        self._vertical_alignment_combo.setEnabled(self._text_input.isEnabled()
+                                                 and self._direction_combo.currentData() != 0)
 
     def _open_font_library(self):
         from .font_library_dialog import FontLibraryDialog
@@ -397,10 +467,10 @@ class EditorPage(QWidget):
                 self._refresh_font_choices()
                 self._style_combo.setCurrentIndex(self._style_combo.findData(dialog.reference))
         except Exception as exc:
-            self._status.setText(f'字体库未能打开：{exc}')
+            self._status.setText(tr('字体库未能打开：{_0}', _0=exc))
 
     def _import_pages(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, '导入已翻译图片', str(self.config.get('page_output_dir', '')), '图片 (*.png *.jpg *.jpeg *.webp *.bmp)')
+        paths, _ = QFileDialog.getOpenFileNames(self, tr('导入已翻译图片'), str(self.config.get('page_output_dir', '')), tr('图片 (*.png *.jpg *.jpeg *.webp *.bmp)'))
         for path in paths:
             self._add_page(Path(path).resolve())
         if paths:
@@ -427,7 +497,7 @@ class EditorPage(QWidget):
     def confirm_discard(self):
         if not self._dirty:
             return True
-        choice = QMessageBox.question(self, '页面有未保存修改', '保存当前页面的修改后继续？', QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save)
+        choice = QMessageBox.question(self, tr('页面有未保存修改'), tr('保存当前页面的修改后继续？'), QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save)
         if choice == QMessageBox.Save:
             return self.save_image()
         if choice == QMessageBox.Discard:
@@ -466,10 +536,10 @@ class EditorPage(QWidget):
         self.preview.set_image(path)
         try:
             if not self.cleaned_path.is_file() or not self.layout_path.is_file():
-                raise ValueError('缺少配套清理底图或布局 JSON，请在自动处理中重新生成。')
+                raise ValueError(tr('缺少配套清理底图或布局 JSON，请在自动处理中重新生成。'))
             data = json.loads(self.layout_path.read_text(encoding='utf-8'))
             if not isinstance(data, list) or any(not isinstance(item, dict) or len(item.get('box', [])) < 4 for item in data):
-                raise ValueError('布局数据格式不正确。')
+                raise ValueError(tr('布局数据格式不正确。'))
             self.items = data
             from PIL import Image
             with Image.open(self.cleaned_path) as cleaned:
@@ -478,15 +548,15 @@ class EditorPage(QWidget):
             for index, item in enumerate(self.items):
                 block = QListWidgetItem(f"{index + 1:02d}  {str(item.get('text', ''))[:28]}")
                 block.setToolTip(str(item.get('text', '')))
-                self.block_list.addItem(block)
-            self._status.setText(f'{path.name} · {len(self.items)} 个文本块')
+                self.block_list.addItem(tr(block))
+            self._status.setText(tr('{_0} · {_1} 个文本块', _0=path.name, _1=len(self.items)))
             if self.items:
                 self.block_list.setCurrentRow(0)
             else:
-                self._status.setText(f'{path.name} · 没有可编辑文本块')
+                self._status.setText(tr('{_0} · 没有可编辑文本块', _0=path.name))
         except (OSError, ValueError, TypeError) as exc:
-            self._status.setText(f'无法精修：{exc}')
-            page_item.setText(f'⊠ 无布局数据\n{path.name}')
+            self._status.setText(tr('无法精修：{_0}', _0=exc))
+            page_item.setText(tr('⊠ 无布局数据\n{_0}', _0=path.name))
         finally:
             self._loading = False
         self._dirty = False
@@ -498,11 +568,17 @@ class EditorPage(QWidget):
         self._dirty = True
         self._row_dirty = True
         self._preview_dirty = True
-        self._status.setText(f'● 未保存修改 · {self.output_path.name}')
+        self._status.setText(tr('● 未保存修改 · {_0}', _0=self.output_path.name))
         for index in range(self.page_list.count()):
             item = self.page_list.item(index)
             if item.data(Qt.UserRole) == str(self.output_path):
-                item.setText(f'● 未保存\n{self.output_path.name}')
+                item.setText(tr('● 未保存\n{_0}', _0=self.output_path.name))
+
+    def _insert_line_break(self):
+        if self._loaded_row < 0:
+            return
+        self._text_input.insertPlainText('\n')
+        self._text_input.setFocus()
 
     def _layout_spins(self):
         return (self._size_spin, self._offset_x, self._offset_y, self._mask_width, self._mask_height)
@@ -547,7 +623,7 @@ class EditorPage(QWidget):
             box = self._mask_box(self.items[self._loaded_row], width=self._mask_width.value(),
                                  height=self._mask_height.value(), offset_x=self._offset_x.value(),
                                  offset_y=self._offset_y.value())
-            self._box_label.setText('蒙版区域：' + ', '.join(map(str, box)))
+            self._box_label.setText(tr(tr('蒙版区域：') + ', '.join(map(str, box))))
         self.preview.set_region(box if self._show_mask.isChecked() else None, editable=box is not None)
 
     def _resize_region_from_canvas(self, box):
@@ -583,7 +659,10 @@ class EditorPage(QWidget):
                 item.pop('font_reference', None)
             self._font_choice_dirty = False
         item.update(text=self._text_input.toPlainText(), font_size=self._size_spin.value(), direction=int(self._direction_combo.currentData()), offset_x=self._offset_x.value(), offset_y=self._offset_y.value(), mask_width=self._mask_width.value(), mask_height=self._mask_height.value(), manual_layout=True)
-        self.block_list.item(self._loaded_row).setText(f"{self._loaded_row + 1:02d}  {item['text'][:28]}")
+        item['text_effect'] = self._effect_combo.currentData()
+        item['vertical_alignment'] = self._vertical_alignment_combo.currentData()
+        summary = item['text'].replace('\n', ' ↵ ')[:28]
+        self.block_list.item(self._loaded_row).setText(f'{self._loaded_row + 1:02d}  {summary}')
         self._row_dirty = False
 
     def _load_properties(self, row):
@@ -607,6 +686,9 @@ class EditorPage(QWidget):
         size = item.get('font_size') if item.get('manual_layout') else item.get('rendered_font_size') or item.get('font_size')
         self._size_spin.setValue(int(size or 0))
         self._direction_combo.setCurrentIndex(max(0, self._direction_combo.findData(int(item.get('direction', -1)))))
+        self._effect_combo.setCurrentIndex(max(0, self._effect_combo.findData(item.get('text_effect', 'auto'))))
+        alignment_index = self._vertical_alignment_combo.findData(item.get('vertical_alignment', 'center'))
+        self._vertical_alignment_combo.setCurrentIndex(alignment_index if alignment_index >= 0 else 1)
         self._offset_x.setValue(int(item.get('offset_x', 0)))
         self._offset_y.setValue(int(item.get('offset_y', 0)))
         box = self._mask_box(item)
@@ -627,13 +709,13 @@ class EditorPage(QWidget):
         try:
             self.render()
         except Exception as exc:
-            self._status.setText(f'预览失败：{exc}')
+            self._status.setText(tr('预览失败：{_0}', _0=exc))
             return False
         self._preview_dirty = False
         return True
 
     def set_watermark_enabled(self, enabled: bool) -> None:
-        if bool(self.config.get('watermark_enabled', False)) == enabled:
+        if bool(self.config.get('watermark_enabled', True)) == enabled:
             return
         self.config['watermark_enabled'] = enabled
         if self.items and self.cleaned_path is not None and self.cleaned_path.is_file():
@@ -657,7 +739,7 @@ class EditorPage(QWidget):
 
     def render(self) -> None:
         if self._cleaned_image is None:
-            raise ValueError('缺少配套清理底图，请重新导入页面')
+            raise ValueError(tr('缺少配套清理底图，请重新导入页面'))
         image = self._cleaned_image.copy()
         for index, item in enumerate(self.items):
             text = item.get("text", "")
@@ -670,7 +752,8 @@ class EditorPage(QWidget):
             typesetter = self._typesetter_for_item(item)
             key = (tuple(box), text, item.get('style', 'dialogue'), int(item.get('direction', 1)),
                    size, bool(item.get('non_bubble', False)),
-                   typesetter.font_map.get(item.get('style', 'dialogue')))
+                   typesetter.font_map.get(item.get('style', 'dialogue')), item.get('text_effect', 'auto'),
+                   item.get('vertical_alignment', 'center'))
             cached = self._layer_cache.get(index)
             if cached is not None and cached[0] == key:
                 _, surface, left, top, actual_size = cached
@@ -686,6 +769,8 @@ class EditorPage(QWidget):
                 target_font_size=size if size > 0 else None,
                 non_bubble=bool(item.get("non_bubble", False)),
                 manual_layout=True,
+                text_effect=item.get('text_effect', 'auto'),
+                vertical_alignment=item.get('vertical_alignment', 'center'),
             )
             item['rendered_font_size'] = typesetter.last_font_size
             layer = typesetter.last_render_layer
@@ -696,7 +781,7 @@ class EditorPage(QWidget):
                 # Bound the cached RGBA layers to about 64 MB even on very large pages.
                 while sum(entry[1].width * entry[1].height for entry in self._layer_cache.values()) > 16_000_000:
                     self._layer_cache.pop(next(iter(self._layer_cache)))
-        image = apply_watermark(image, enabled=bool(self.config.get('watermark_enabled', False)))
+        image = apply_watermark(image, enabled=bool(self.config.get('watermark_enabled', True)))
         self._rendered = image
         from PIL.ImageQt import ImageQt
         self.preview.set_pixmap(QPixmap.fromImage(ImageQt(image)))
@@ -714,14 +799,14 @@ class EditorPage(QWidget):
             self._rendered.save(self.output_path)
             self.layout_path.write_text(json.dumps(self.items, ensure_ascii=False, indent=2), encoding='utf-8')
         except Exception as exc:
-            self._status.setText(f'保存失败：{exc}。修改仍保留，请检查输出目录后重试。')
+            self._status.setText(tr('保存失败：{_0}。修改仍保留，请检查输出目录后重试。', _0=exc))
             return False
         self._dirty = False
-        self._status.setText(f'✓ 已保存图片与布局 · {self.output_path.name}')
+        self._status.setText(tr('✓ 已保存图片与布局 · {_0}', _0=self.output_path.name))
         for index in range(self.page_list.count()):
             item = self.page_list.item(index)
             if item.data(Qt.UserRole) == str(self.output_path):
-                item.setText(self.output_path.name)
+                item.setText(tr(self.output_path.name))
         return True
 
     def resizeEvent(self, event):

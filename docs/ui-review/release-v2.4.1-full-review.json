@@ -1,0 +1,89 @@
+{
+  "reviewed_on": "2026-10-18",
+  "version": "2.4.1",
+  "regression": {
+    "passed": 246,
+    "seconds": 47.739,
+    "process_exit_code": 0
+  },
+  "ui_review": "ui-languages-review.json",
+  "package": {
+    "version": "2.4.1",
+    "format": "full-app-only",
+    "app_bytes": 645842614,
+    "app_sha256": "5759ad31671f89a88a7676c2ea3a953043016008da4ba07adc0cda37b857f339",
+    "target_build_id": "f4c6ef5c454f25beb6fb7f5f73368a727b1fd1a374ed2a423a273031d9732b70",
+    "managed_files": 992,
+    "models_reused_from": "v2.4.0",
+    "patch_asset": null
+  },
+  "archive_verification": {
+    "archive": "ComiTrans-v2.4.1-app.zip",
+    "managed_files_verified": 992,
+    "build_id": "f4c6ef5c454f25beb6fb7f5f73368a727b1fd1a374ed2a423a273031d9732b70",
+    "all_hashes_match": true,
+    "no_models_or_user_data": true
+  },
+  "frozen_executable": {
+    "process_exit_code": 0,
+    "checks": {
+      "version": "2.4.1",
+      "frozen": true,
+      "pipeline_ready": true,
+      "brand_font": "Skribble",
+      "log_font": "Aa今日花晴 春懒猫困",
+      "missing_glyphs": [],
+      "svg_valid": true,
+      "window_visible": true,
+      "translation_preferences_collapsed": true,
+      "translation_preferences_expand": true,
+      "default_alignment_persisted": true,
+      "default_alignment_models_reused": true,
+      "traditional_conversion": true,
+      "simplified_conversion": true,
+      "target_language_persisted": true,
+      "target_language_models_reused": true,
+      "font_imported": true,
+      "font_choice_persisted": true,
+      "font_pipeline_updated": true,
+      "font_models_reused": true,
+      "font_editor_updated": true,
+      "manga_font_pairs_bundled": true,
+      "manual_line_breaks": true,
+      "hollow_lettering": true,
+      "vertical_top_alignment": true,
+      "vertical_bottom_alignment": true,
+      "screenshot_saved": true,
+      "catalog_families": 2056,
+      "font_search_enabled": true,
+      "catalog_search_results": 1,
+      "font_library_screenshot_saved": true,
+      "star_probability": 0.15,
+      "star_idle_ms": 8000,
+      "star_prompt_behavior": true,
+      "onboarding_default_chinese": true,
+      "onboarding_japanese_preview": true,
+      "en_catalog_bundled": true,
+      "en_navigation_translated": true,
+      "en_settings_language": true,
+      "en_star_prompt_visible": true,
+      "en_screenshot_saved": true,
+      "en_star_prompt_closed": true,
+      "ja_catalog_bundled": true,
+      "ja_navigation_translated": true,
+      "ja_settings_language": true,
+      "ja_star_prompt_visible": true,
+      "ja_screenshot_saved": true,
+      "ja_star_prompt_closed": true,
+      "success": true
+    }
+  },
+  "release_assets": [
+    "ComiTrans-v2.4.1-app.zip"
+  ],
+  "metadata": [
+    "docs/releases/v2.4.1/baseline.json",
+    "docs/releases/v2.4.1/SHA256SUMS.txt"
+  ],
+  "original_font_notices": "Preserved byte for byte, including original whitespace and line endings."
+}

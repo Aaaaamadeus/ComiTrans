@@ -206,6 +206,7 @@ class PipelineLanguageTests(unittest.TestCase):
             ImageDraw.Draw(image).rectangle((20, 20, 70, 40), fill="black")
             image.save(path)
             pipeline = bare_pipeline()
+            pipeline.watermark_enabled = False
             box = (10, 10, 80, 60, 0, "dialogue", 16, 0, "eng")
             pipeline.detect_bubbles = Mock(return_value=[box])
             pipeline.run_ocr = Mock(return_value="HELLO WORLD")

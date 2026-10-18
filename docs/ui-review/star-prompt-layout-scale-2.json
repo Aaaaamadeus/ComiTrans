@@ -1,0 +1,34 @@
+[
+  {
+    "size": [
+      1440,
+      900
+    ],
+    "popup": [
+      1080,
+      667,
+      344,
+      217
+    ],
+    "inside_window": true,
+    "buttons_visible": true,
+    "idle_ms": 8000,
+    "screenshot": "star-prompt-1440-scale-2.png"
+  },
+  {
+    "size": [
+      820,
+      480
+    ],
+    "popup": [
+      460,
+      247,
+      344,
+      217
+    ],
+    "inside_window": true,
+    "buttons_visible": true,
+    "idle_ms": 8000,
+    "screenshot": "star-prompt-820-scale-2.png"
+  }
+]

@@ -5,7 +5,7 @@ import argparse
 
 from PySide6.QtWidgets import QApplication
 
-from .ui.main_window import MainWindow
+from .i18n import initialize_ui_language
 from .ui.theme import APP_STYLESHEET, install_ui_font
 
 
@@ -22,6 +22,9 @@ def main() -> int:
     if args.smoke_test:
         from .smoke_test import run_smoke_test
         return run_smoke_test(app, args.smoke_test)
+    initialize_ui_language(app)
+    install_ui_font(app)
+    from .ui.main_window import MainWindow
     window = MainWindow()
     window.show()
     return app.exec()

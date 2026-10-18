@@ -1,0 +1,127 @@
+{
+  "reviewed_at": "2026-10-16T14:04:56.727014+00:00",
+  "feature": "Per-block vertical column alignment: top / center / bottom",
+  "reference": "Longest column, group remains centered in the layout mask",
+  "regression": {
+    "passed": 205,
+    "seconds": 31.781,
+    "process_exit_code": 0
+  },
+  "test_cleanup": "Editor fixture explicitly destroys owned Qt windows before interpreter shutdown.",
+  "ui": [
+    {
+      "scale": "1",
+      "checks": [
+        {
+          "size": [
+            1440,
+            900
+          ],
+          "alignment": "top",
+          "columns_aligned": true,
+          "control_visible": true,
+          "saved_matches_preview": true,
+          "screenshot": "vertical-alignment-top-1440-scale-1.png"
+        },
+        {
+          "size": [
+            1440,
+            900
+          ],
+          "alignment": "bottom",
+          "columns_aligned": true,
+          "control_visible": true,
+          "saved_matches_preview": true,
+          "screenshot": "vertical-alignment-bottom-1440-scale-1.png"
+        },
+        {
+          "size": [
+            820,
+            480
+          ],
+          "alignment": "top",
+          "columns_aligned": true,
+          "control_visible": true,
+          "saved_matches_preview": true,
+          "screenshot": "vertical-alignment-top-820-scale-1.png"
+        }
+      ]
+    },
+    {
+      "scale": "2",
+      "checks": [
+        {
+          "size": [
+            1440,
+            900
+          ],
+          "alignment": "top",
+          "columns_aligned": true,
+          "control_visible": true,
+          "saved_matches_preview": true,
+          "screenshot": "vertical-alignment-top-1440-scale-2.png"
+        },
+        {
+          "size": [
+            1440,
+            900
+          ],
+          "alignment": "bottom",
+          "columns_aligned": true,
+          "control_visible": true,
+          "saved_matches_preview": true,
+          "screenshot": "vertical-alignment-bottom-1440-scale-2.png"
+        },
+        {
+          "size": [
+            820,
+            480
+          ],
+          "alignment": "top",
+          "columns_aligned": true,
+          "control_visible": true,
+          "saved_matches_preview": true,
+          "screenshot": "vertical-alignment-top-820-scale-2.png"
+        }
+      ]
+    }
+  ],
+  "native_windows_smoke": {
+    "version": "2.4.0",
+    "frozen": true,
+    "pipeline_ready": true,
+    "brand_font": "Skribble",
+    "log_font": "Aa今日花晴 春懒猫困",
+    "missing_glyphs": [],
+    "svg_valid": true,
+    "window_visible": true,
+    "traditional_conversion": true,
+    "simplified_conversion": true,
+    "target_language_persisted": true,
+    "target_language_models_reused": true,
+    "font_imported": true,
+    "font_choice_persisted": true,
+    "font_pipeline_updated": true,
+    "font_models_reused": true,
+    "font_editor_updated": true,
+    "manga_font_pairs_bundled": true,
+    "manual_line_breaks": true,
+    "hollow_lettering": true,
+    "vertical_top_alignment": true,
+    "vertical_bottom_alignment": true,
+    "screenshot_saved": true,
+    "catalog_families": 2056,
+    "font_search_enabled": true,
+    "catalog_search_results": 1,
+    "font_library_screenshot_saved": true,
+    "success": true
+  },
+  "native_process_exit_code": 0,
+  "packaged_resources": {
+    "required_resources_valid": true,
+    "font_assets_verified": 60,
+    "archive_files": 990
+  },
+  "local_executable": "tmp/vertical-alignment-build/dist/ComiTrans/ComiTrans.exe",
+  "translation_api_called": false
+}

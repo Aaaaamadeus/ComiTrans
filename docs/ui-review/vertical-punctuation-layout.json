@@ -1,0 +1,448 @@
+[
+  {
+    "title": "中文省略号",
+    "text": "等等……真的？",
+    "font": "comic-translate-ai/font_file/CN/SourceHanSansSC-Medium-2.otf",
+    "effect": "auto",
+    "font_size": 32,
+    "cells": [
+      {
+        "char": "等",
+        "center_x": 170.0,
+        "center_y": 150.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 0
+      },
+      {
+        "char": "等",
+        "center_x": 170.0,
+        "center_y": 184.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 1
+      },
+      {
+        "char": "…",
+        "center_x": 170.0,
+        "center_y": 218.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 2
+      },
+      {
+        "char": "…",
+        "center_x": 170.0,
+        "center_y": 252.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 3
+      },
+      {
+        "char": "真",
+        "center_x": 170.0,
+        "center_y": 286.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 4
+      },
+      {
+        "char": "的",
+        "center_x": 170.0,
+        "center_y": 320.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 5
+      },
+      {
+        "char": "？",
+        "center_x": 170.0,
+        "center_y": 354.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 6
+      }
+    ]
+  },
+  {
+    "title": "较长省略号整体换列",
+    "text": "甲乙…………丙丁",
+    "font": "comic-translate-ai/font_file/CN/special/LXGWWenKai-Regular.ttf",
+    "effect": "auto",
+    "font_size": 32,
+    "cells": [
+      {
+        "char": "甲",
+        "center_x": 205.0,
+        "center_y": 190.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 0
+      },
+      {
+        "char": "乙",
+        "center_x": 205.0,
+        "center_y": 224.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 1
+      },
+      {
+        "char": "…",
+        "center_x": 170.0,
+        "center_y": 139.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 0
+      },
+      {
+        "char": "…",
+        "center_x": 170.0,
+        "center_y": 173.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 1
+      },
+      {
+        "char": "…",
+        "center_x": 170.0,
+        "center_y": 207.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 2
+      },
+      {
+        "char": "…",
+        "center_x": 170.0,
+        "center_y": 241.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 3
+      },
+      {
+        "char": "丙",
+        "center_x": 170.0,
+        "center_y": 275.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 4
+      },
+      {
+        "char": "丁",
+        "center_x": 135.0,
+        "center_y": 207.0,
+        "cell_size": 32,
+        "column": 2,
+        "row": 0
+      }
+    ]
+  },
+  {
+    "title": "常见破折号变体",
+    "text": "——\n――\n—―︱",
+    "font": "comic-translate-ai/font_file/CN/SourceHanSansSC-Medium-2.otf",
+    "effect": "auto",
+    "font_size": 32,
+    "cells": [
+      {
+        "char": "—",
+        "center_x": 205.0,
+        "center_y": 235.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 0
+      },
+      {
+        "char": "—",
+        "center_x": 205.0,
+        "center_y": 269.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 1
+      },
+      {
+        "char": "―",
+        "center_x": 170.0,
+        "center_y": 235.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 0
+      },
+      {
+        "char": "―",
+        "center_x": 170.0,
+        "center_y": 269.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 1
+      },
+      {
+        "char": "—",
+        "center_x": 135.0,
+        "center_y": 218.0,
+        "cell_size": 32,
+        "column": 2,
+        "row": 0
+      },
+      {
+        "char": "―",
+        "center_x": 135.0,
+        "center_y": 252.0,
+        "cell_size": 32,
+        "column": 2,
+        "row": 1
+      },
+      {
+        "char": "︱",
+        "center_x": 135.0,
+        "center_y": 286.0,
+        "cell_size": 32,
+        "column": 2,
+        "row": 2
+      }
+    ]
+  },
+  {
+    "title": "各类省略号等距排列",
+    "text": "……\n…⋯︙\n‥︰",
+    "font": "comic-translate-ai/font_file/CN/special/LXGWWenKai-Regular.ttf",
+    "effect": "auto",
+    "font_size": 32,
+    "cells": [
+      {
+        "char": "…",
+        "center_x": 205.0,
+        "center_y": 235.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 0
+      },
+      {
+        "char": "…",
+        "center_x": 205.0,
+        "center_y": 269.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 1
+      },
+      {
+        "char": "…",
+        "center_x": 170.0,
+        "center_y": 218.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 0
+      },
+      {
+        "char": "⋯",
+        "center_x": 170.0,
+        "center_y": 252.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 1
+      },
+      {
+        "char": "︙",
+        "center_x": 170.0,
+        "center_y": 286.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 2
+      },
+      {
+        "char": "‥",
+        "center_x": 135.0,
+        "center_y": 235.0,
+        "cell_size": 32,
+        "column": 2,
+        "row": 0
+      },
+      {
+        "char": "︰",
+        "center_x": 135.0,
+        "center_y": 269.0,
+        "cell_size": 32,
+        "column": 2,
+        "row": 1
+      }
+    ]
+  },
+  {
+    "title": "黑字白边",
+    "text": "真、真的吗……\n不要——",
+    "font": "comic-translate-ai/font_file/CN/SourceHanSansSC-Medium-2.otf",
+    "effect": "outlined",
+    "font_size": 32,
+    "cells": [
+      {
+        "char": "真",
+        "center_x": 187.5,
+        "center_y": 150.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 0
+      },
+      {
+        "char": "、",
+        "center_x": 187.5,
+        "center_y": 184.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 1
+      },
+      {
+        "char": "真",
+        "center_x": 187.5,
+        "center_y": 218.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 2
+      },
+      {
+        "char": "的",
+        "center_x": 187.5,
+        "center_y": 252.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 3
+      },
+      {
+        "char": "吗",
+        "center_x": 187.5,
+        "center_y": 286.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 4
+      },
+      {
+        "char": "…",
+        "center_x": 187.5,
+        "center_y": 320.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 5
+      },
+      {
+        "char": "…",
+        "center_x": 187.5,
+        "center_y": 354.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 6
+      },
+      {
+        "char": "不",
+        "center_x": 152.5,
+        "center_y": 201.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 0
+      },
+      {
+        "char": "要",
+        "center_x": 152.5,
+        "center_y": 235.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 1
+      },
+      {
+        "char": "—",
+        "center_x": 152.5,
+        "center_y": 269.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 2
+      },
+      {
+        "char": "—",
+        "center_x": 152.5,
+        "center_y": 303.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 3
+      }
+    ]
+  },
+  {
+    "title": "白字黑边 · 繁体字体",
+    "text": "等等……\n不要—―︱",
+    "font": "comic-translate-ai/font_file/Manga/SweiB2Sans/SweiB2SansCJKtc-Black.ttf",
+    "effect": "hollow",
+    "font_size": 32,
+    "cells": [
+      {
+        "char": "等",
+        "center_x": 187.5,
+        "center_y": 201.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 0
+      },
+      {
+        "char": "等",
+        "center_x": 187.5,
+        "center_y": 235.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 1
+      },
+      {
+        "char": "…",
+        "center_x": 187.5,
+        "center_y": 269.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 2
+      },
+      {
+        "char": "…",
+        "center_x": 187.5,
+        "center_y": 303.0,
+        "cell_size": 32,
+        "column": 0,
+        "row": 3
+      },
+      {
+        "char": "不",
+        "center_x": 152.5,
+        "center_y": 184.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 0
+      },
+      {
+        "char": "要",
+        "center_x": 152.5,
+        "center_y": 218.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 1
+      },
+      {
+        "char": "—",
+        "center_x": 152.5,
+        "center_y": 252.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 2
+      },
+      {
+        "char": "―",
+        "center_x": 152.5,
+        "center_y": 286.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 3
+      },
+      {
+        "char": "︱",
+        "center_x": 152.5,
+        "center_y": 320.0,
+        "cell_size": 32,
+        "column": 1,
+        "row": 4
+      }
+    ]
+  }
+]

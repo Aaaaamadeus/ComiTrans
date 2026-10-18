@@ -4,10 +4,13 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from punctuation_layout import (
     CENTERED_PUNCTUATION,
+    ELLIPSIS_DOT_COUNTS,
     CLOSING_PUNCTUATION,
     OPENING_PUNCTUATION,
     UPPER_RIGHT_PUNCTUATION,
+    VERTICAL_DASH_CHARS,
     normalize_cjk_punctuation,
+    normalize_line_breaks,
     vertical_form,
     wrap_vertical_text,
 )
@@ -19,7 +22,6 @@ except ImportError:  # 打包异常时仍可排版，只是不做逐字缺字回
 
 
 ROTATE_FALLBACK_PUNCTUATION = set("—-…（）【】［］｛｝《》「」『』〔〕～~")
-VERTICAL_DASH_CHARS = frozenset("—―")
 DEFAULT_RENDER_SCALE = 3
 MAX_RENDER_SURFACE_PIXELS = 16_000_000
 
@@ -252,7 +254,7 @@ class VerticalTypesetter:
 
     @staticmethod
     def _draw_glyph_at_ink_center(
-        draw, center_x, center_y, char, font, fill, stroke_width
+        draw, center_x, center_y, char, font, fill, stroke_width, stroke_fill="white"
     ):
         bbox = draw.textbbox(
             (0, 0), char, font=font, stroke_width=stroke_width
@@ -265,11 +267,11 @@ class VerticalTypesetter:
             font=font,
             fill=fill,
             stroke_width=stroke_width,
-            stroke_fill="white",
+            stroke_fill=stroke_fill,
         )
 
     @staticmethod
-    def _render_tight_glyph(char, font, fill, stroke_width):
+    def _render_tight_glyph(char, font, fill, stroke_width, stroke_fill="white"):
         probe = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
         probe_draw = ImageDraw.Draw(probe)
         bbox = probe_draw.textbbox(
@@ -286,7 +288,7 @@ class VerticalTypesetter:
             font=font,
             fill=fill,
             stroke_width=stroke_width,
-            stroke_fill="white",
+            stroke_fill=stroke_fill,
         )
         alpha_bbox = glyph.getchannel("A").getbbox()
         return glyph.crop(alpha_bbox) if alpha_bbox else glyph
@@ -303,7 +305,10 @@ class VerticalTypesetter:
         center_y,
         cell_size,
         stroke_width,
+        fill=None,
+        stroke_fill="white",
     ):
+        fill = self.color if fill is None else fill
         style_path = self.font_map.get(font_style)
         display_char = vertical_form(char)
         use_vertical_form = bool(
@@ -332,13 +337,14 @@ class VerticalTypesetter:
                 center_y,
                 display_char,
                 char_font,
-                self.color,
+                fill,
                 stroke_width,
+                stroke_fill,
             )
             return
 
         glyph = self._render_tight_glyph(
-            display_char, char_font, self.color, stroke_width
+            display_char, char_font, fill, stroke_width, stroke_fill
         )
         if not use_vertical_form and self._is_punctuation_to_rotate(char):
             glyph = glyph.rotate(-90, expand=True, resample=Image.Resampling.BICUBIC)
@@ -366,6 +372,35 @@ class VerticalTypesetter:
             paste_y = int(round(center_y - glyph.height / 2))
         image.paste(glyph, (paste_x, paste_y), glyph)
 
+    @staticmethod
+    def _draw_vertical_punctuation_run(
+        draw, text, *, center_x, top, cell_size, char_spacing, font_size,
+        stroke_width, fill, stroke_fill, outlined,
+    ):
+        span = len(text) * cell_size + (len(text) - 1) * char_spacing
+        margin = cell_size * 0.12
+        if text[0] in VERTICAL_DASH_CHARS:
+            points = [(center_x, top + margin), (center_x, top + span - margin)]
+            width = max(1, int(round(font_size * 0.07)))
+            if stroke_width and outlined:
+                draw.line(points, fill=stroke_fill, width=width + 2 * stroke_width)
+            draw.line(points, fill=fill, width=width)
+        else:
+            # Space every dot over the whole run, avoiding a font's side bearings
+            # and the extra gap between separately rendered ellipsis characters.
+            count = sum(ELLIPSIS_DOT_COUNTS[char] for char in text)
+            radius = max(0.5, font_size * 0.085 / 2)
+            first = top + margin + radius
+            last = top + span - margin - radius
+            for index in range(count):
+                y = first + (last - first) * index / (count - 1)
+                if stroke_width and outlined:
+                    outer = radius + stroke_width
+                    draw.ellipse((center_x - outer, y - outer, center_x + outer, y + outer),
+                                 fill=stroke_fill)
+                draw.ellipse((center_x - radius, y - radius, center_x + radius, y + radius),
+                             fill=fill)
+
     def _horizontal_runs(self, text, font_style, font_size):
         runs = []
         for char in text:
@@ -385,7 +420,10 @@ class VerticalTypesetter:
         center_x,
         center_y,
         stroke_width,
+        fill=None,
+        stroke_fill="white",
     ):
+        fill = self.color if fill is None else fill
         runs = self._horizontal_runs(text, font_style, font_size)
         if not runs:
             return
@@ -416,10 +454,10 @@ class VerticalTypesetter:
                     (current_x, baseline_y),
                     run_text,
                     font=font,
-                    fill=self.color,
+                    fill=fill,
                     anchor="ls",
                     stroke_width=stroke_width,
-                    stroke_fill="white",
+                    stroke_fill=stroke_fill,
                 )
             except ValueError:
                 bbox = draw.textbbox(
@@ -429,14 +467,18 @@ class VerticalTypesetter:
                     (current_x - bbox[0], center_y - (bbox[1] + bbox[3]) / 2),
                     run_text,
                     font=font,
-                    fill=self.color,
+                    fill=fill,
                     stroke_width=stroke_width,
-                    stroke_fill="white",
+                    stroke_fill=stroke_fill,
                 )
             current_x += width
 
     def wrap_text_horizontal(self, text, max_width, font):
         """【新增】根据宽度自动分行（横排模式）"""
+        text = normalize_line_breaks(text)
+        if '\n' in text:
+            return [line for paragraph in text.split('\n')
+                    for line in (self.wrap_text_horizontal(paragraph, max_width, font) or [''])]
         text = normalize_cjk_punctuation(text)
         lines = []
         current_line = ""
@@ -482,6 +524,8 @@ class VerticalTypesetter:
         target_font_size=None,
         non_bubble=False,
         manual_layout=False,
+        text_effect="auto",
+        vertical_alignment="center",
     ):
         """执行竖排绘制 (使用绝对居中算法 anchor='mm')"""
         try:
@@ -529,7 +573,7 @@ class VerticalTypesetter:
                 box_width = int(raw_width * scale_ratio)
                 box_height = int(raw_height * scale_ratio)
 
-            clean_text = normalize_cjk_punctuation(text.replace('\n', ''))
+            clean_text = normalize_cjk_punctuation(normalize_line_breaks(text))
             font_style = self._style_for_text(style, clean_text)
             current_font = self.fonts.get(font_style, self.fonts.get('dialogue'))
 
@@ -712,6 +756,11 @@ class VerticalTypesetter:
             if not columns:
                 return image
             stroke_width = self._stroke_width(style, best_size, non_bubble=non_bubble)
+            text_color, stroke_color = self.color, "white"
+            if text_effect in ("outlined", "hollow"):
+                stroke_width = max(1, int(round(best_size * 0.055)))
+            if text_effect == "hollow":
+                text_color, stroke_color = "white", "black"
             text_surface, draw, render_left, render_top, render_scale = (
                 self._make_render_surface(
                     image,
@@ -744,6 +793,8 @@ class VerticalTypesetter:
                         )
                         * render_scale,
                         scaled_stroke_width,
+                        fill=text_color,
+                        stroke_fill=stroke_color,
                     )
                     current_row_center_y += row_height + best_col_spacing
 
@@ -757,76 +808,65 @@ class VerticalTypesetter:
                 current_col_center_x = (
                     center_x + total_text_width / 2 - cell_size / 2
                 )
+                column_heights = [len(column) * cell_size
+                                  + max(0, len(column) - 1) * char_spacing
+                                  for column in columns]
+                group_height = max(column_heights)
                 for column_index, col_text in enumerate(columns):
-                    col_height = (
-                        len(col_text) * cell_size
-                        + max(0, len(col_text) - 1) * char_spacing
-                    )
-                    current_y = center_y - col_height / 2
+                    col_height = column_heights[column_index]
+                    if vertical_alignment == "top":
+                        current_y = center_y - group_height / 2
+                    elif vertical_alignment == "bottom":
+                        current_y = center_y + group_height / 2 - col_height
+                    else:
+                        current_y = center_y - col_height / 2
 
                     row_index = 0
                     while row_index < len(col_text):
                         char = col_text[row_index]
-                        dash_run = 1
-                        if char in VERTICAL_DASH_CHARS:
+                        punctuation_run = 1
+                        run_chars = (ELLIPSIS_DOT_COUNTS if char in ELLIPSIS_DOT_COUNTS
+                                     else VERTICAL_DASH_CHARS if char in VERTICAL_DASH_CHARS else ())
+                        if run_chars:
                             while (
-                                row_index + dash_run < len(col_text)
-                                and col_text[row_index + dash_run] == char
+                                row_index + punctuation_run < len(col_text)
+                                and col_text[row_index + punctuation_run] in run_chars
                             ):
-                                dash_run += 1
+                                punctuation_run += 1
 
-                        if dash_run >= 2:
+                        if run_chars:
                             cell_center_x = current_col_center_x + GLOBAL_OFFSET_X
-                            for dash_index in range(dash_run):
+                            for run_index in range(punctuation_run):
                                 cell_center_y = (
                                     current_y
-                                    + dash_index * (cell_size + char_spacing)
+                                    + run_index * (cell_size + char_spacing)
                                     + cell_size / 2
                                     + GLOBAL_OFFSET_Y
                                 )
                                 self.last_layout_debug.append(
                                     {
-                                        "char": char,
+                                        "char": col_text[row_index + run_index],
                                         "center_x": float(cell_center_x),
                                         "center_y": float(cell_center_y),
                                         "cell_size": int(cell_size),
                                         "column": column_index,
-                                        "row": row_index + dash_index,
+                                        "row": row_index + run_index,
                                     }
                                 )
 
-                            dash_margin = cell_size * 0.12
-                            dash_span = (
-                                dash_run * cell_size
-                                + (dash_run - 1) * char_spacing
+                            self._draw_vertical_punctuation_run(
+                                draw, col_text[row_index:row_index + punctuation_run],
+                                center_x=(cell_center_x - render_left) * render_scale,
+                                top=(current_y + GLOBAL_OFFSET_Y - render_top) * render_scale,
+                                cell_size=cell_size * render_scale,
+                                char_spacing=char_spacing * render_scale,
+                                font_size=scaled_font_size,
+                                stroke_width=scaled_stroke_width,
+                                fill=text_color, stroke_fill=stroke_color,
+                                outlined=text_effect in ("outlined", "hollow"),
                             )
-                            dash_x = (
-                                cell_center_x - render_left
-                            ) * render_scale
-                            dash_top = (
-                                current_y
-                                + GLOBAL_OFFSET_Y
-                                + dash_margin
-                                - render_top
-                            ) * render_scale
-                            dash_bottom = (
-                                current_y
-                                + GLOBAL_OFFSET_Y
-                                + dash_span
-                                - dash_margin
-                                - render_top
-                            ) * render_scale
-                            dash_width = max(
-                                1,
-                                int(round(best_size * 0.07 * render_scale)),
-                            )
-                            draw.line(
-                                [(dash_x, dash_top), (dash_x, dash_bottom)],
-                                fill=self.color,
-                                width=dash_width,
-                            )
-                            current_y += dash_run * (cell_size + char_spacing)
-                            row_index += dash_run
+                            current_y += punctuation_run * (cell_size + char_spacing)
+                            row_index += punctuation_run
                             continue
 
                         cell_center_x = current_col_center_x + GLOBAL_OFFSET_X
@@ -851,6 +891,8 @@ class VerticalTypesetter:
                             center_y=(cell_center_y - render_top) * render_scale,
                             cell_size=cell_size * render_scale,
                             stroke_width=scaled_stroke_width,
+                            fill=text_color,
+                            stroke_fill=stroke_color,
                         )
                         current_y += cell_size + char_spacing
                         row_index += 1

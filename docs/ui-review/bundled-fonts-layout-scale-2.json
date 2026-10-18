@@ -1,0 +1,44 @@
+{
+  "scale": "2",
+  "font_reference": "font_file/TC/10-SweiSugar/SweiSugarCJKtc-Black.ttf",
+  "captures": [
+    "bundled-fonts-editor-1440-scale-2.png",
+    "bundled-fonts-popup-1440-scale-2.png",
+    "bundled-fonts-editor-820-scale-2.png",
+    "bundled-fonts-popup-820-scale-2.png",
+    "bundled-fonts-english-search-scale-2.png"
+  ],
+  "checks": [
+    {
+      "window": [
+        1440,
+        900
+      ],
+      "caption": "当前字体：狮尾加糖宋体（繁体） · 特黑",
+      "caption_size": [
+        290,
+        20
+      ],
+      "caption_not_clipped": true,
+      "selector_width": 290,
+      "popup_width": 290,
+      "popup_no_ellipsis": true
+    },
+    {
+      "window": [
+        820,
+        480
+      ],
+      "caption": "当前字体：狮尾加糖宋体（繁体） · 特黑",
+      "caption_size": [
+        290,
+        20
+      ],
+      "caption_not_clipped": true,
+      "selector_width": 290,
+      "popup_width": 290,
+      "popup_no_ellipsis": true
+    }
+  ],
+  "original_english_search": true
+}

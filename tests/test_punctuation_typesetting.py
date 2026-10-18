@@ -41,6 +41,13 @@ class PunctuationNormalizationTests(unittest.TestCase):
         dash = next(token for token in tokens if token.text == "——")
         self.assertEqual(dash.cells, 2)
 
+    def test_entire_punctuation_run_is_one_token_including_alternate_forms(self):
+        for run in ('…………', '————', '――', '—―︱', '…⋯︙', '‥︰'):
+            with self.subTest(run=run):
+                tokens = tokenize_punctuation('甲' + run + '乙')
+                self.assertEqual([token.text for token in tokens], ['甲', run, '乙'])
+                self.assertEqual(tokens[1].cells, len(run))
+
     def test_numbers_urls_and_english_punctuation_are_preserved(self):
         source = "时间 9:05，价格 3.14 元。URL https://example.com..."
         normalized = normalize_cjk_punctuation(source)
@@ -58,6 +65,18 @@ class PunctuationNormalizationTests(unittest.TestCase):
 
 
 class VerticalKinsokuTests(unittest.TestCase):
+    def test_continuous_punctuation_is_not_split_at_column_boundary(self):
+        for run in ('……', '…………', '——', '————', '――', '—―︱', '…⋯︙', '‥︰'):
+            for capacity in (1, 2, 3, 4, 5):
+                with self.subTest(run=run, capacity=capacity):
+                    columns = wrap_vertical_text('甲乙' + run + '丙丁', capacity)
+                    self.assertEqual(''.join(columns), '甲乙' + run + '丙丁')
+                    self.assertEqual(sum(run in column for column in columns), 1)
+
+    def test_explicit_break_between_punctuation_still_starts_a_new_column(self):
+        self.assertEqual(wrap_vertical_text('……\n……', 8), ['……', '……'])
+        self.assertEqual(wrap_vertical_text('——\n――', 8), ['——', '――'])
+
     def test_closing_punctuation_never_starts_a_column(self):
         columns = wrap_vertical_text("甲乙，丙丁。戊", 2)
         self.assertTrue(columns)
@@ -195,6 +214,61 @@ class PunctuationRenderingTests(unittest.TestCase):
         midpoint_y = int(round((dash_cells[0]["center_y"] + dash_cells[1]["center_y"]) / 2))
         midpoint_x = int(round(dash_cells[0]["center_x"]))
         self.assertLess(int(gray[midpoint_y, midpoint_x]), 100)
+
+    @staticmethod
+    def occupied_row_bands(image):
+        occupied = np.any(np.asarray(image.convert('L')) < 180, axis=1)
+        edges = np.flatnonzero(np.diff(np.r_[False, occupied, False]))
+        return edges.reshape(-1, 2)
+
+    def test_ellipsis_dots_are_even_across_character_boundaries_and_fonts(self):
+        fonts = (*self.font_map.values(),
+                 str(ROOT / 'comic-translate-ai/font_file/TC/01-GenSenRounded/GenSenRounded2TW-R.otf'),
+                 str(ROOT / 'comic-translate-ai/font_file/Manga/SweiB2Sans/SweiB2SansCJKtc-Black.ttf'))
+        for path in fonts:
+            for text, count in (('……', 6), ('…⋯︙', 9), ('‥︰', 4)):
+                for size in (12, 24, 48):
+                    with self.subTest(font=path, text=text, size=size):
+                        setter = VerticalTypesetter({'dialogue': path}, size)
+                        image = Image.new('RGB', (300, 400), 'white')
+                        setter.draw_text(image, [40, 20, 260, 380], text, 'dialogue',
+                                         direction=1, target_font_size=size, manual_layout=True)
+                        bands = self.occupied_row_bands(image)
+                        self.assertEqual(len(bands), count)
+                        centers = bands.mean(axis=1)
+                        self.assertLessEqual(float(np.ptp(np.diff(centers))), 1.5)
+                        self.assertEqual({cell['column'] for cell in setter.last_layout_debug}, {0})
+
+    def test_alternate_and_mixed_dashes_render_as_one_unbroken_vertical_line(self):
+        for text in ('―', '――', '︱︱', '—―︱', '————'):
+            for effect in ('auto', 'outlined', 'hollow'):
+                with self.subTest(text=text, effect=effect):
+                    setter = self._typesetter()
+                    image = Image.new('RGB', (300, 400), 'white')
+                    setter.draw_text(image, [40, 20, 260, 380], text, 'dialogue',
+                                     direction=1, target_font_size=40, manual_layout=True,
+                                     text_effect=effect)
+                    bands = self.occupied_row_bands(image)
+                    self.assertEqual(len(bands), 1)
+                    gray = np.asarray(image.convert('L'))
+                    ys, xs = np.nonzero(gray < 180)
+                    self.assertGreater(int(ys.max() - ys.min()), int(xs.max() - xs.min()) * 2)
+                    self.assertEqual(''.join(cell['char'] for cell in setter.last_layout_debug), text)
+
+    def test_automatic_fit_moves_whole_runs_together_within_box(self):
+        for run in ('…………', '————', '――――'):
+            with self.subTest(run=run):
+                setter = self._typesetter()
+                image = Image.new('RGB', (300, 300), 'white')
+                setter.draw_text(image, [40, 70, 260, 230], '甲乙' + run + '丙丁',
+                                 'dialogue', direction=1, target_font_size=40)
+                cells = [cell for cell in setter.last_layout_debug if cell['char'] in run]
+                self.assertEqual(len(cells), len(run))
+                self.assertEqual(len({cell['column'] for cell in cells}), 1)
+                self.assertGreaterEqual(min(cell['center_y'] - cell['cell_size'] / 2 for cell in cells),
+                                        setter.last_layout_box[1])
+                self.assertLessEqual(max(cell['center_y'] + cell['cell_size'] / 2 for cell in cells),
+                                     setter.last_layout_box[3])
 
 
 if __name__ == "__main__":

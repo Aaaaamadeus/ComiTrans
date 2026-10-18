@@ -1,0 +1,414 @@
+[
+  {
+    "language": "zh-CN",
+    "screen": "translate",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-zh-CN-translate-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "zh-CN",
+    "screen": "preferences",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-zh-CN-preferences-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "alignment_inside_window": true
+  },
+  {
+    "language": "zh-CN",
+    "screen": "settings",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-zh-CN-settings-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "language_selector_visible": true
+  },
+  {
+    "language": "zh-CN",
+    "screen": "editor",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-zh-CN-editor-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "zh-CN",
+    "screen": "star",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-zh-CN-star-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "zh-CN",
+    "screen": "translate",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-zh-CN-translate-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "zh-CN",
+    "screen": "preferences",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-zh-CN-preferences-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "alignment_inside_window": true
+  },
+  {
+    "language": "zh-CN",
+    "screen": "settings",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-zh-CN-settings-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "language_selector_visible": true
+  },
+  {
+    "language": "zh-CN",
+    "screen": "editor",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-zh-CN-editor-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "zh-CN",
+    "screen": "star",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-zh-CN-star-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "zh-CN",
+    "screen": "fonts",
+    "size": [
+      820,
+      660
+    ],
+    "screenshot": "ui-zh-CN-fonts-820-scale-1.png",
+    "scale": "1"
+  },
+  {
+    "language": "zh-CN",
+    "screen": "first-launch",
+    "size": [
+      420,
+      278
+    ],
+    "screenshot": "ui-zh-CN-first-launch-420-scale-1.png",
+    "scale": "1"
+  },
+  {
+    "language": "en",
+    "screen": "translate",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-en-translate-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "visible_cjk_text": []
+  },
+  {
+    "language": "en",
+    "screen": "preferences",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-en-preferences-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "alignment_inside_window": true,
+    "visible_cjk_text": []
+  },
+  {
+    "language": "en",
+    "screen": "settings",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-en-settings-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "language_selector_visible": true,
+    "visible_cjk_text": []
+  },
+  {
+    "language": "en",
+    "screen": "editor",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-en-editor-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "visible_cjk_text": []
+  },
+  {
+    "language": "en",
+    "screen": "star",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-en-star-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "visible_cjk_text": []
+  },
+  {
+    "language": "en",
+    "screen": "translate",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-en-translate-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "visible_cjk_text": []
+  },
+  {
+    "language": "en",
+    "screen": "preferences",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-en-preferences-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "alignment_inside_window": true,
+    "visible_cjk_text": []
+  },
+  {
+    "language": "en",
+    "screen": "settings",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-en-settings-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "language_selector_visible": true,
+    "visible_cjk_text": []
+  },
+  {
+    "language": "en",
+    "screen": "editor",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-en-editor-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "visible_cjk_text": []
+  },
+  {
+    "language": "en",
+    "screen": "star",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-en-star-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "visible_cjk_text": []
+  },
+  {
+    "language": "en",
+    "screen": "fonts",
+    "size": [
+      820,
+      660
+    ],
+    "screenshot": "ui-en-fonts-820-scale-1.png",
+    "scale": "1"
+  },
+  {
+    "language": "en",
+    "screen": "first-launch",
+    "size": [
+      420,
+      296
+    ],
+    "screenshot": "ui-en-first-launch-420-scale-1.png",
+    "scale": "1"
+  },
+  {
+    "language": "ja",
+    "screen": "translate",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-ja-translate-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "ja",
+    "screen": "preferences",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-ja-preferences-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "alignment_inside_window": true
+  },
+  {
+    "language": "ja",
+    "screen": "settings",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-ja-settings-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "language_selector_visible": true
+  },
+  {
+    "language": "ja",
+    "screen": "editor",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-ja-editor-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "ja",
+    "screen": "star",
+    "size": [
+      1440,
+      900
+    ],
+    "screenshot": "ui-ja-star-1440-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "ja",
+    "screen": "translate",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-ja-translate-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "ja",
+    "screen": "preferences",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-ja-preferences-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "alignment_inside_window": true
+  },
+  {
+    "language": "ja",
+    "screen": "settings",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-ja-settings-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true,
+    "language_selector_visible": true
+  },
+  {
+    "language": "ja",
+    "screen": "editor",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-ja-editor-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "ja",
+    "screen": "star",
+    "size": [
+      820,
+      480
+    ],
+    "screenshot": "ui-ja-star-820-scale-1.png",
+    "scale": "1",
+    "visible_header_buttons_inside": true
+  },
+  {
+    "language": "ja",
+    "screen": "fonts",
+    "size": [
+      820,
+      660
+    ],
+    "screenshot": "ui-ja-fonts-820-scale-1.png",
+    "scale": "1"
+  },
+  {
+    "language": "ja",
+    "screen": "first-launch",
+    "size": [
+      420,
+      279
+    ],
+    "screenshot": "ui-ja-first-launch-420-scale-1.png",
+    "scale": "1"
+  }
+]

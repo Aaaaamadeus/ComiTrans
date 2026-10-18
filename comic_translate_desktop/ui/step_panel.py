@@ -1,4 +1,5 @@
 from __future__ import annotations
+from ..i18n import tr, ui_language
 
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
@@ -17,6 +18,7 @@ STAGE_LABELS = {
     "typeset": "中文排版",
     "save": "保存输出",
 }
+STAGE_COMPACT_LABELS = dict(zip(STAGE_ORDER, ('读取', '检测', '识别', '翻译', '修复', '排版', '保存')))
 
 PENDING = 0
 RUNNING = 1
@@ -44,10 +46,10 @@ class StepPanel(QWidget):
         self.setFixedHeight(54)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self._file_label = QLabel("等待任务", self)
+        self._file_label = QLabel(tr('等待任务'), self)
         self._file_label.hide()
         for index, stage in enumerate(STAGE_ORDER, start=1):
-            name = QLabel(f'{index:02d} {STAGE_LABELS[stage]}', self)
+            name = QLabel(f'{index:02d} {tr(STAGE_LABELS[stage])}', self)
             status = QLabel(self)
             for label in (name, status):
                 label.setAlignment(Qt.AlignCenter)
@@ -77,13 +79,13 @@ class StepPanel(QWidget):
 
     def reset(self) -> None:
         self._pages.clear()
-        self._file_label.setText("等待任务")
+        self._file_label.setText(tr('等待任务'))
         self._states = {stage: PENDING for stage in STAGE_ORDER}
         self._refresh()
 
     def start_file(self, name: str) -> None:
-        self._file_label.setText(f"正在处理 · {name}")
-        self._file_label.setToolTip(name)
+        self._file_label.setText(tr('正在处理 · {_0}', _0=name))
+        self._file_label.setToolTip(tr(name))
         self._states = {stage: PENDING for stage in STAGE_ORDER}
         self._states[STAGE_ORDER[0]] = RUNNING
         self._refresh()
@@ -91,8 +93,8 @@ class StepPanel(QWidget):
     def consume_event(self, event):
         page_id, stage = event['page_id'], event['stage']
         self._states = self._pages.setdefault(page_id, {key: PENDING for key in STAGE_ORDER})
-        self._file_label.setText(event['page_label'])
-        self._file_label.setToolTip(event['page_label'])
+        self._file_label.setText(tr(event['page_label']))
+        self._file_label.setToolTip(tr(event['page_label']))
         state = event['state']
         if stage == 'failure':
             self.mark_failed()
@@ -151,20 +153,23 @@ class StepPanel(QWidget):
 
     def _refresh(self) -> None:
         summary = []
-        for stage in STAGE_ORDER:
+        for index, stage in enumerate(STAGE_ORDER, start=1):
             state = self._states[stage]
             name, status = self._labels[stage]
+            compact_label = ui_language() != 'zh-CN' and (self._compact or self.width() < 650)
+            caption = STAGE_COMPACT_LABELS[stage] if compact_label else STAGE_LABELS[stage]
+            name.setText(f'{index:02d} {tr(caption)}')
             name.setFont(ui_font(12 if self._compact or self.width() < 850 else 13,
                                  QFont.Bold if state in (RUNNING, DONE) else QFont.Medium))
             status.setFont(ui_font(11))
             name.setStyleSheet('color: #111111; background: transparent;')
             status.setStyleSheet('color: %s; background: transparent;' %
                                 ('#111111' if state in (RUNNING, FAILED) else '#595959'))
-            status.setText(STATUS_TEXT[state])
+            status.setText(tr(STATUS_TEXT[state]))
             status.setVisible(not self._compact)
-            name.setAccessibleName(f'{STAGE_LABELS[stage]}，{STATUS_TEXT[state]}')
-            summary.append(f'{STAGE_LABELS[stage]} {STATUS_TEXT[state]}')
-        self.setAccessibleName(f'{self._file_label.text()}，已通过 {self.completed_nodes}/7 个节点；' + '；'.join(summary))
+            name.setAccessibleName(f'{tr(STAGE_LABELS[stage])}, {tr(STATUS_TEXT[state])}')
+            summary.append(f'{tr(STAGE_LABELS[stage])} {tr(STATUS_TEXT[state])}')
+        self.setAccessibleName(tr(tr('{_0}，已通过 {_1}/7 个节点；', _0=self._file_label.text(), _1=self.completed_nodes) + '；'.join(summary)))
         self._place_labels()
         self.update()
 

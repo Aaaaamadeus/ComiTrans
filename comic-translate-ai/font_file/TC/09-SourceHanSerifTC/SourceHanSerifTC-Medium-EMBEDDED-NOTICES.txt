@@ -1,0 +1,11 @@
+nameID 0: © 2017-2024 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.
+
+nameID 7: Source is a trademark of Adobe in the United States and/or other countries.
+
+nameID 8: Adobe
+
+nameID 9: Ryoko NISHIZUKA 西塚涼子 (kana & ideographs); Frank Grießhammer (Latin, Greek & Cyrillic); Wenlong ZHANG 张文龙 (bopomofo); Sandoll Communications 산돌커뮤니케이션, Soohyun PARK 박수현, Yejin WE 위예진 & Donghoon HAN 한동훈 (hangul elements, letters & syllables)
+
+nameID 13: This Font Software is licensed under the SIL Open Font License, Version 1.1. This Font Software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software.
+
+nameID 14: http://scripts.sil.org/OFL

@@ -1,0 +1,7 @@
+Upstream: https://github.com/jasonhandwriting/JasonHandwriting
+The upstream README and the unmodified font copyright/name table identify SIL Open Font License.
+The upstream repository has no standalone license file. README.md and the extracted original
+copyright notices are included. OFL-1.1-REFERENCE.txt is SIL's unmodified reference template,
+downloaded from https://openfontlicense.org/documents/OFL.txt; its placeholder header is not
+the copyright statement for JasonHandwriting3. The actual copyright statement is in
+JasonHandwriting3-EMBEDDED-NOTICES.txt and in the original font.

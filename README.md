@@ -19,7 +19,7 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 从 v2.2.1 开始，检测、OCR、修复全部切换为 **ONNX Runtime 推理**，彻底移除 PyTorch / torchvision / transformers 依赖；主程序和模型拆分发布，更新程序时不再需要重新下载模型。
 
 > [!NOTE]
-> v2.4.0 加入可检索、按需下载的字体库与蒙版拖拽热预览。下载[新版程序与模型包](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.4.0)，或使用 `start.bat` 运行源码。完整变更见[更新日志](CHANGELOG.md)。
+> v2.4.1 加入简繁译文、内置漫画字体、手动分行与竖排列对齐。译文字体和默认对齐统一收进“翻译偏好”。本版提供完整程序包，已有模型继续复用。[更新与安装说明](docs/RELEASE-v2.4.1.md) · [更新日志](CHANGELOG.md)。
 
 ## 漫画工作台
 
@@ -96,9 +96,13 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ## 快速开始
 
+界面支持 **中文 / English / 日本語**，默认中文。首次启动时选择界面语言；之后可在“设置 → 翻译服务 → 界面语言”修改并保存，下次启动生效。此选项不改变漫画译文语言。[界面语言说明](docs/UI_LANGUAGES.md)。
+
+翻译批次全部成功后，有 15% 概率在右下角显示仓库 Star 提示，8 秒无操作自动关闭，也可点 X 关闭。点击按钮才打开 GitHub 仓库。
+
 ### Release 用户（推荐）
 
-1. 在 [v2.4.0 发布页](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.4.0)下载 `ComiTrans-v2.4.0-app.zip`（主程序）和 `ComiTrans-v2.4.0-models.zip`（模型包）。
+1. 在[发布页](https://github.com/Aaaaamadeus/ComiTrans/releases)下载 `ComiTrans-v2.4.1-app.zip`（主程序），模型沿用 `ComiTrans-v2.4.0-models.zip`。已有安装按下方步骤迁移配置与模型。
 2. 解压主程序包得到 `ComiTrans` 文件夹。
 3. 两个压缩包都解压到同一个父目录，让包内的 `ComiTrans` 文件夹合并，最终模型路径为 `ComiTrans\comic-translate-ai\models\`。
 4. 双击 `ComiTrans.exe`，在“设置”页填写翻译 API Key 和模型。
@@ -107,7 +111,7 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 Release 用户不需要安装 Python、PyTorch、pip 或 CUDA Toolkit。GPU 加速只需本机已有 NVIDIA 驱动。
 
-v2.4.0 提供补丁基线和 Windows 更新入口。后续小版本可在程序目录运行 `Update-ComiTrans.bat`，选择对应的小补丁 ZIP。详见[补丁更新说明](docs/PATCH_UPDATES.md)。
+升级到 v2.4.1：关闭程序，将 `ComiTrans-v2.4.1-app.zip` 解压到新目录，把旧目录的 `config.yaml`、`user_fonts/` 和 `comic-translate-ai/models/` 复制到对应位置。漫画输出及其 `_cleaned`、`_layout` 目录保持相对位置；确认新程序正常后再整理旧目录。本版使用完整包，详见[更新说明](docs/RELEASE-v2.4.1.md)。
 
 ### 源码运行（开发者）
 
@@ -145,13 +149,25 @@ Copy-Item comic-translate-ai/main/config.example.yaml comic-translate-ai/main/co
 
 ### 译文字体
 
-翻译页顶部的“译文字体”可直接选择默认字体，无需进入设置。选中具体字体后，全部译文使用该字体；选择“自动匹配漫画风格”恢复各类原有风格字体。“＋ 导入字体”支持多选 TTF、OTF、TTC、OTC，导入完成后自动选中最后一款，字体集合使用第一个款式。
+竖排各列可在精修页“排版与位置 → 竖排列对齐”选择上对齐、居中对齐或下对齐，按最长列统一起点/终点，整组文字保持居中。设置按文本块保存，实时预览并随布局恢复。
+
+精修译文可按 **Enter** 或点击“插入换行”手动分行，横排换行、竖排向左换列，连续回车保留空行/空列。修改立即预览，保存图片与布局后可继续恢复编辑。“排版与位置 → 文字效果”可选黑字白边或白字黑边（空心）。[操作说明](docs/EDITOR_LIVE_PREVIEW.md)。
+
+竖排连续省略号、破折号整体换列，兼容常见标点变体；省略号点间距一致，破折号连成竖线，保留手动指定的换列位置。
+
+内置“狮尾B2黑体”和“狮尾牙膏圆体”的独立简体/繁体特黑版本，共 4 个字体、约 58.6 MiB，可离线检索使用；用于粗重强调字和圆润空心字的风格替代。[字体、搭配与授权](comic-translate-ai/font_file/Manga/README.md)。
+
+翻译页顶部的“译文”可切换 **简体中文／繁體中文**，选择后自动保存，重启后恢复。翻译请求、续传和本地输出规范化均使用所选字形，适用于图片和 PDF；当前字体选择、已有结果和精修草稿保持原样。[简繁切换说明](docs/CHINESE_OUTPUT.md)。
+
+展开翻译页的“翻译偏好”，即可选择“译文字体”和默认“竖排列对齐”，无需进入设置；默认折叠，自动保存选择。选中具体字体后，全部译文使用该字体；选择“自动匹配漫画风格”恢复各类原有风格字体。“＋ 导入字体”支持多选 TTF、OTF、TTC、OTC，导入完成后自动选中最后一款，字体集合使用第一个款式。默认对齐写入新译文的精修布局，已有草稿保留各自选择。
 
 两个页面的字体选择框均可输入名称检索；点击“字体库”还可按名称、语言和风格筛选 Google Fonts，选择款式后点击“下载并使用”。完整目录可离线检索，下载一次后可断网使用。当前快照中 10 个缺少许可证附件的字体族仅展示，暂不提供下载。详见[字体库说明](docs/FONT_LIBRARY.md)。
 
+另随应用内置 **10 个繁体漫画字体系列、12 个字重**，含源泉圆体、粉圆、芫荽、霞鹜文楷 TC、内海、清松手写体，以及思源黑体/宋体 TC、狮尾加糖宋体和大波浪圆体，首次使用即可离线选择。原始字体约 183.4 MiB，授权与来源一并分发。[完整清单](docs/TRADITIONAL_MANGA_FONTS.md)。字体选择优先显示中文名和粗细，保留英文名检索；精修页字体框独占一行，下方完整名称可换行，下拉列表自动加宽。
+
 选择自动保存，下次翻译生效；精修中的页面会更新预览并保留草稿，手动指定字体的文本块保持原选择，点击“保存图片”才写入输出。精修选择“跟随翻译默认字体”可恢复默认。导入和下载的字体保存在应用目录的 `user_fonts`，不安装到系统；重复文件复用已有字体，缺字逐字回退。搬迁或更新应用时保留整个 `user_fonts` 文件夹。详见[字体使用说明](docs/CUSTOM_FONTS.md)。
 
-可在“设置 → 运行设置 → 输出水印”开关 `@ComiTrans` 水印，默认关闭。保存配置后，后续翻译图片和 PDF 每页右下角会按开关添加小号半透明 Skribble 字标。精修中的页面也会更新预览，点击“保存图片”写入；重复保存不会叠加水印，清理底图保持无水印。
+默认在输出页右下角添加小号半透明 Skribble `@ComiTrans` 字标，可在“设置 → 第一页（翻译服务）→ 添加 @ComiTrans 水印”取消勾选并保存以关闭。已保存的关闭选择会保留。后续翻译图片和 PDF 每页按开关添加水印；精修中的页面也会更新预览，点击“保存图片”写入。重复保存不会叠加水印，清理底图保持无水印。
 
 PDF 会以一个文件任务显示，内部按页分批处理，成功后输出 `<原文件名>_translated.pdf`。输出 PDF 保留页数、顺序和页面尺寸；页面内容会栅格化。加密或需要密码的 PDF 暂不支持，PDF 页面也暂不支持在“嵌字精修”页逐块调整。
 
@@ -261,12 +277,15 @@ Python 扩展通过 `OcrEngine.recognize(image, language) -> OcrResult` 接入�
 python package_release.py
 ```
 
-Release 提供两个压缩包：
+本版 Release 提供完整程序包；模型沿用 v2.4.0：
 
-- `ComiTrans-v2.4.0-app.zip`：主程序，不含模型
-- `ComiTrans-v2.4.0-models.zip`：含日语、韩语、英语 OCR 的 ONNX 模型包
+- `ComiTrans-v2.4.1-app.zip`：主程序，不含模型
+- [ComiTrans-v2.4.0-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.4.0/ComiTrans-v2.4.0-models.zip)：含日语、韩语、英语 OCR 的 ONNX 模型包
 
 版本元数据保存在源码仓库，随发布提交：
+
+- [docs/releases/v2.4.1/baseline.json](docs/releases/v2.4.1/baseline.json)：2.4.1 目标构建基线
+- [docs/releases/v2.4.1/SHA256SUMS.txt](docs/releases/v2.4.1/SHA256SUMS.txt)：2.4.1 完整程序及目标基线的 SHA256
 
 - [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json)：程序文件 SHA256 清单与构建指纹，供后续生成补丁
 - [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt)：程序包、模型包和基线清单的 SHA256

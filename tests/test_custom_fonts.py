@@ -8,6 +8,7 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
+from tests.qt_utils import destroy_widget
 from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
@@ -56,7 +57,7 @@ class CustomFontTests(unittest.TestCase):
     def window(self):
         with patch.object(MainWindow, '_start_warmup'):
             window = MainWindow()
-        self.addCleanup(window.close)
+        self.addCleanup(destroy_widget, window)
         return window
 
     def test_import_copies_deduplicates_and_survives_original_removal(self):
@@ -111,7 +112,7 @@ class CustomFontTests(unittest.TestCase):
         self.assertFalse(loaded['translation_font_active'])
         self.assertEqual(loaded['font_map'], loaded['style_font_map'])
         picker = TranslationFontPicker(loaded)
-        self.addCleanup(picker.close)
+        self.addCleanup(destroy_widget, picker)
         self.assertIn('不可用', picker.combo.currentText())
         self.assertIn('回退', picker.status.text())
         self.assertFalse(picker.preview.pixmap().isNull())
@@ -180,7 +181,7 @@ class CustomFontTests(unittest.TestCase):
 
     def test_import_batch_keeps_valid_font_and_reports_invalid_file(self):
         picker = TranslationFontPicker(config.load_ai_config())
-        self.addCleanup(picker.close)
+        self.addCleanup(destroy_widget, picker)
         invalid = self.root / 'bad.ttf'
         invalid.write_bytes(b'bad font')
         selections = []

@@ -18,7 +18,10 @@ VERTICAL_FORMS = {
     "！": "︕",
     "？": "︖",
     "…": "︙",
+    "⋯": "︙",
+    "‥": "︰",
     "—": "︱",
+    "―": "︱",
     "（": "︵",
     "）": "︶",
     "【": "︻",
@@ -38,7 +41,9 @@ VERTICAL_FORMS = {
 }
 
 UPPER_RIGHT_PUNCTUATION = frozenset("，。、．“”‘’")
-CENTERED_PUNCTUATION = frozenset("！？：；…—～")
+ELLIPSIS_DOT_COUNTS = {"…": 3, "⋯": 3, "︙": 3, "‥": 2, "︰": 2}
+VERTICAL_DASH_CHARS = frozenset("—―︱")
+CENTERED_PUNCTUATION = frozenset("！？：；～") | frozenset(ELLIPSIS_DOT_COUNTS) | VERTICAL_DASH_CHARS
 OPENING_PUNCTUATION = frozenset("（《「『【〔〈〖〘〚［｛‘“")
 CLOSING_PUNCTUATION = frozenset("）》】」』〕〉〗〙〛］｝’”")
 FORBIDDEN_COLUMN_START = frozenset(
@@ -48,7 +53,7 @@ FORBIDDEN_COLUMN_END = OPENING_PUNCTUATION
 
 _CJK_RE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
 _DOT_RUN_RE = re.compile(r"(?<!\d)(?:\.{3,}|．{3,})(?!\d)")
-_GROUPS = ("……", "——", "！？", "？！", "!?", "?!")
+_GROUPS = ("！？", "？！", "!?", "?!")
 _ASCII_TO_CJK = {
     ",": "，",
     ".": "。",
@@ -179,6 +184,18 @@ def tokenize_punctuation(text: str, *, normalize: bool = True) -> list[GlyphToke
     tokens = []
     index = 0
     while index < len(text):
+        # A continuous ellipsis/dash is one unit, including alternate glyphs.
+        # Pairwise grouping still allows longer runs to split between columns.
+        char = text[index]
+        run_chars = (ELLIPSIS_DOT_COUNTS if char in ELLIPSIS_DOT_COUNTS
+                     else VERTICAL_DASH_CHARS if char in VERTICAL_DASH_CHARS else ())
+        if run_chars:
+            end = index + 1
+            while end < len(text) and text[end] in run_chars:
+                end += 1
+            tokens.append(GlyphToken(text[index:end], "centered"))
+            index = end
+            continue
         group = next((value for value in _GROUPS if text.startswith(value, index)), None)
         if group:
             tokens.append(GlyphToken(group, punctuation_kind(group)))
@@ -242,9 +259,21 @@ def wrap_vertical_tokens(tokens: list[GlyphToken], max_cells: int) -> list[list[
     return [column for column in columns if column]
 
 
+def normalize_line_breaks(text: str) -> str:
+    return text.replace('\r\n', '\n').replace('\r', '\n').replace('\u2028', '\n').replace('\u2029', '\n')
+
+
 def wrap_vertical_text(text: str, max_cells: int) -> list[str]:
-    tokens = tokenize_punctuation(text)
-    return ["".join(token.text for token in column) for column in wrap_vertical_tokens(tokens, max_cells)]
+    if not text:
+        return []
+    columns = []
+    for paragraph in normalize_line_breaks(text).split('\n'):
+        tokens = tokenize_punctuation(paragraph)
+        wrapped = wrap_vertical_tokens(tokens, max_cells)
+        columns.extend("".join(token.text for token in column) for column in wrapped)
+        if not wrapped:
+            columns.append('')
+    return columns
 
 
 def vertical_form(char: str) -> str | None:

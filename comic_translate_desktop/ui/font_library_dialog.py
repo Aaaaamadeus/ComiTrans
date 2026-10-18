@@ -1,5 +1,6 @@
 """Search the complete offline catalog and download a chosen font face."""
 from __future__ import annotations
+from ..i18n import tr
 
 from PIL import Image
 from PIL.ImageQt import ImageQt
@@ -33,7 +34,7 @@ class FontDownloadThread(QThread):
 class FontLibraryDialog(QDialog):
     def __init__(self, settings, parent=None):
         super().__init__(parent)
-        self.setWindowTitle('开源字体库')
+        self.setWindowTitle(tr('开源字体库'))
         self.resize(820, 660)
         self.setMinimumSize(560, 480)
         self.reference = None
@@ -47,26 +48,26 @@ class FontLibraryDialog(QDialog):
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 18, 20, 18)
         root.setSpacing(12)
-        intro = QLabel(f'Google Fonts · {len(self._families):,} 款字体族\n完整目录离线检索，按需下载；下载后离线使用。')
+        intro = QLabel(tr('Google Fonts · {_0:,} 款字体族\n完整目录离线检索，按需下载；下载后离线使用。', _0=len(self._families)))
         intro.setWordWrap(True)
         root.addWidget(intro)
         self.search = QLineEdit()
-        self.search.setPlaceholderText('搜索名称、中文别名、语言或风格，例如：霞鹜、中文、手写…')
+        self.search.setPlaceholderText(tr('搜索名称、中文别名、语言或风格，例如：霞鹜、中文、手写…'))
         self.search.setClearButtonEnabled(True)
-        self.search.setAccessibleName('检索开源字体库')
+        self.search.setAccessibleName(tr('检索开源字体库'))
         root.addWidget(self.search)
         filters = QHBoxLayout()
         self.language = QComboBox()
-        self.language.addItem('全部语言', '')
+        self.language.addItem(tr('全部语言'), '')
         for subset, label in LANGUAGE_LABELS.items():
-            self.language.addItem(label, subset)
+            self.language.addItem(tr(label), subset)
         self.category = QComboBox()
-        self.category.addItem('全部风格', '')
+        self.category.addItem(tr('全部风格'), '')
         for category, label in CATEGORY_LABELS.items():
-            self.category.addItem(label, category)
+            self.category.addItem(tr(label), category)
         self.availability = QComboBox()
-        self.availability.addItem('全部字体', False)
-        self.availability.addItem('已下载', True)
+        self.availability.addItem(tr('全部字体'), False)
+        self.availability.addItem(tr('已下载'), True)
         for widget in (self.language, self.category, self.availability):
             filters.addWidget(widget)
         root.addLayout(filters)
@@ -74,7 +75,7 @@ class FontLibraryDialog(QDialog):
         self.count.setProperty('muted', True)
         root.addWidget(self.count)
         self.font_list = QListWidget()
-        self.font_list.setAccessibleName('开源字体检索结果')
+        self.font_list.setAccessibleName(tr('开源字体检索结果'))
         root.addWidget(self.font_list, 1)
         self.details = QLabel()
         self.details.setWordWrap(True)
@@ -83,9 +84,9 @@ class FontLibraryDialog(QDialog):
         self.face = QComboBox()
         self.face.setMinimumContentsLength(20)
         self.face.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        self.face.setAccessibleName('字体款式与字重')
+        self.face.setAccessibleName(tr('字体款式与字重'))
         root.addWidget(self.face)
-        self.preview = QLabel('下载后显示实际字体预览')
+        self.preview = QLabel(tr('下载后显示实际字体预览'))
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setMinimumHeight(52)
         self.preview.setWordWrap(True)
@@ -98,10 +99,10 @@ class FontLibraryDialog(QDialog):
         root.addWidget(self.status)
         actions = QHBoxLayout()
         actions.addStretch()
-        self.cancel_button = QPushButton('关闭')
+        self.cancel_button = QPushButton(tr('关闭'))
         self.cancel_button.clicked.connect(self.reject)
         actions.addWidget(self.cancel_button)
-        self.use_button = QPushButton('下载并使用')
+        self.use_button = QPushButton(tr('下载并使用'))
         self.use_button.setProperty('role', 'primary')
         self.use_button.clicked.connect(self._use_font)
         actions.addWidget(self.use_button)
@@ -125,14 +126,14 @@ class FontLibraryDialog(QDialog):
                     or category and category != family['category']
                     or downloaded and not any(face['sha1'] in self._installed for face in family['faces'])):
                 continue
-            badge = ' · 已下载' if any(face['sha1'] in self._installed for face in family['faces']) else ''
+            badge = tr(' · 已下载') if any(face['sha1'] in self._installed for face in family['faces']) else ''
             alias = font_alias(family['name'])
             name = f'{alias} · {family["name"]}' if alias else family['name']
-            item = QListWidgetItem(f'{name}  ·  {CATEGORY_LABELS.get(family["category"], "其它")}{badge}')
+            item = QListWidgetItem(f"{name}  ·  {tr(CATEGORY_LABELS.get(family['category'], '其它'))}{badge}")
             item.setData(Qt.UserRole, family)
             self.font_list.addItem(item)
         self.font_list.blockSignals(False)
-        self.count.setText(f'{self.font_list.count():,} / {len(self._families):,} 款字体族')
+        self.count.setText(tr('{_0:,} / {_1:,} 款字体族', _0=self.font_list.count(), _1=len(self._families)))
         self.font_list.setCurrentRow(0)
         if not self.font_list.count():
             self._family_changed(None)
@@ -142,13 +143,13 @@ class FontLibraryDialog(QDialog):
         self.face.clear()
         if item:
             family = item.data(Qt.UserRole)
-            languages = '、'.join(LANGUAGE_LABELS.get(subset, subset) for subset in family['subsets']) or '语言信息未收录'
-            self.details.setText(f'{family["name"]} · {family["license"]} · {languages}')
+            languages = ', '.join(tr(LANGUAGE_LABELS.get(subset, subset)) for subset in family['subsets']) or tr('语言信息未收录')
+            self.details.setText(f"{family['name']} · {family['license']} · {languages}")
             for face in family['faces']:
-                label = face['name'] + (' · 已下载' if face['sha1'] in self._installed else '')
-                self.face.addItem(label, face)
+                label = face['name'] + (tr(' · 已下载') if face['sha1'] in self._installed else '')
+                self.face.addItem(tr(label), face)
         else:
-            self.details.setText('没有匹配的字体，请更换关键词或筛选条件。')
+            self.details.setText(tr('没有匹配的字体，请更换关键词或筛选条件。'))
         self.face.blockSignals(False)
         self._face_changed()
 
@@ -157,16 +158,16 @@ class FontLibraryDialog(QDialog):
         face = self.face.currentData()
         family = self.font_list.currentItem().data(Qt.UserRole) if self.font_list.currentItem() else None
         reference = self._installed.get(face['sha1']) if face else None
-        self.use_button.setText('使用此字体' if reference else '下载并使用')
+        self.use_button.setText(tr('使用此字体') if reference else tr('下载并使用'))
         self.use_button.setEnabled(bool(face and (reference or family['licenses'])))
         if family and not family['licenses']:
-            self.status.setText('上游目录缺少独立许可证附件，该条目暂不提供下载。')
+            self.status.setText(tr('上游目录缺少独立许可证附件，该条目暂不提供下载。'))
         else:
             self.status.clear()
         if reference:
             self._show_preview(reference)
         else:
-            self.preview.setText('下载后显示实际字形；未覆盖的字符会使用内置字体。')
+            self.preview.setText(tr('下载后显示实际字形；未覆盖的字符会使用内置字体。'))
 
     def _show_preview(self, reference):
         from vertical_typesetter import VerticalTypesetter
@@ -199,8 +200,8 @@ class FontLibraryDialog(QDialog):
         self._worker.finished.connect(self._download_finished)
         for widget in (self.search, self.language, self.category, self.availability, self.font_list, self.face, self.use_button):
             widget.setEnabled(False)
-        self.cancel_button.setText('取消下载')
-        self.status.setText('正在下载字体与许可证…')
+        self.cancel_button.setText(tr('取消下载'))
+        self.status.setText(tr('正在下载字体与许可证…'))
         self.progress.setRange(0, 0)
         self.progress.show()
         self._worker.start()
@@ -209,13 +210,13 @@ class FontLibraryDialog(QDialog):
         if total:
             self.progress.setRange(0, 100)
             self.progress.setValue(round(received * 100 / total))
-        self.status.setText(f'已下载 {received / 1048576:.1f} MB' + (f' / {total / 1048576:.1f} MB' if total else ''))
+        self.status.setText(tr(tr('已下载 {_0:.1f} MB', _0=received / 1048576) + (f' / {total / 1048576:.1f} MB' if total else '')))
 
     def _download_complete(self, reference):
         self._downloaded = reference
 
     def _download_failed(self, message):
-        self.status.setText(f'下载失败：{message}。可以稍后重试；已有字体仍可使用。')
+        self.status.setText(tr('下载失败：{_0}。可以稍后重试；已有字体仍可使用。', _0=message))
 
     def _download_finished(self):
         worker, self._worker = self._worker, None
@@ -229,14 +230,14 @@ class FontLibraryDialog(QDialog):
             for widget in (self.search, self.language, self.category, self.availability, self.font_list, self.face, self.use_button):
                 widget.setEnabled(True)
             self.progress.hide()
-            self.cancel_button.setText('关闭')
+            self.cancel_button.setText(tr('关闭'))
 
     def reject(self):
         if self._worker:
             self._closing = True
             self._worker.requestInterruption()
             self.cancel_button.setEnabled(False)
-            self.status.setText('正在取消下载…')
+            self.status.setText(tr('正在取消下载…'))
         else:
             super().reject()
 

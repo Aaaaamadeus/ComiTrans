@@ -1,0 +1,44 @@
+{
+  "reviewed_on": "2026-10-18",
+  "languages": [
+    "zh-CN",
+    "en",
+    "ja"
+  ],
+  "logical_window_sizes": [
+    [
+      1440,
+      900
+    ],
+    [
+      820,
+      480
+    ]
+  ],
+  "scale_factors": [
+    1,
+    2
+  ],
+  "native_windows_qt": true,
+  "captures": 66,
+  "screens": [
+    "translation",
+    "preferences",
+    "settings",
+    "editor",
+    "star",
+    "fonts",
+    "first-launch"
+  ],
+  "translated_catalog_entries_per_language": 496,
+  "regression": {
+    "passed": 246,
+    "seconds": 47.739,
+    "process_exit_code": 0
+  },
+  "behavior": "Chinese by default; first launch chooses once; Settings saves for next launch; translation text and drafts stay unchanged.",
+  "layout_reports": [
+    "ui-languages-layout-scale-1.json",
+    "ui-languages-layout-scale-2.json"
+  ]
+}

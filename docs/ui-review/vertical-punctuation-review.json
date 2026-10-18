@@ -1,0 +1,25 @@
+{
+  "reviewed_on": "2026-10-17",
+  "feature": "Keep vertical ellipsis and em-dash runs together and render consistent spacing",
+  "packaging": "Paused at user request; source changes only",
+  "regression": {
+    "passed": 230,
+    "seconds": 43.610,
+    "process_exit_code": 0,
+    "targeted_tests_passed": 62
+  },
+  "checks": [
+    "Whole punctuation runs remain in the same automatic column, including alternate forms",
+    "Explicit line breaks remain authoritative",
+    "Ellipsis dot count and uniform spacing across seven bundled fonts at 12, 24 and 48 px",
+    "Continuous vertical dashes with default, outlined and hollow effects",
+    "Automatic fitting keeps punctuation runs inside the layout region",
+    "Editor live preview matches saved PNG pixels and restored layouts"
+  ],
+  "visual_review": {
+    "cases": 6,
+    "screenshot": "vertical-punctuation-runs.png",
+    "layout_report": "vertical-punctuation-layout.json",
+    "result": "passed"
+  }
+}
