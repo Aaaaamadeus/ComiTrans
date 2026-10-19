@@ -55,8 +55,8 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 | 翻译前 | 翻译后 |
 | --- | --- |
-| ![第 6 页日文原图](docs/images/before1.png) | ![第 6 页中文译图](docs/images/after1.png) |
-| ![第 7 页日文原图](docs/images/before2.png) | ![第 7 页中文译图](docs/images/after2.png) |
+| ![日文原图](docs/images/beforeA.png) | ![中文译图](docs/images/afterA.png) |
+| ![日文原图](docs/images/beforeB.png) | ![中文译图](docs/images/afterB.png) |
 
 ## 目录
 
