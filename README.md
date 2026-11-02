@@ -1,4 +1,4 @@
-# ComiTrans
+![ComiTrans 漫画自动汉化工作台](docs/images/comitrans-hero-v2.png)
 
 <div align="center">
 

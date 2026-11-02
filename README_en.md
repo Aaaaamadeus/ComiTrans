@@ -1,4 +1,4 @@
-# ComiTrans
+![ComiTrans — Manga translation and lettering workbench](docs/images/comitrans-hero-v2.png)
 
 <div align="center">
 
