@@ -21,10 +21,13 @@ font_size: 16
 translation_font: ""
 # 竖排各列的默认对齐：top / center / bottom，在翻译偏好中选择。
 vertical_alignment: center
+# 译文颜色：留空沿用默认黑白效果，或填入 '#RRGGBB'。
+text_color: ''
 issue_url: ""
 lama_model: models/manga-lama/lama-manga-dynamic.onnx
 max_workers: null
 pdf_dpi: 200
+resume_enabled: true  # 默认按页续传；false 从头翻译，仍记录本次进度
 multimodal: false
 multimodal_font_probe: false   # 实验：让 AI 参与字体族判别（默认关闭，见 docs/FONT_STYLE_STRATEGY.md §4.14）
 disable_thinking: true   # 关闭思考模式省 token（见 docs/FONT_STYLE_STRATEGY.md §4.15）
@@ -51,6 +54,6 @@ page_input_dir: page/test
 page_output_dir: page/output_page_output
 page_test_output_dir: page/test_output
 translation_model: gemini-2.5-flash
-use_gpu: false
+use_gpu: true
 ui_language: zh-CN
 ui_language_selected: false

@@ -1,0 +1,152 @@
+[
+  {
+    "language": "zh-CN",
+    "page": "preferences",
+    "width": 1440,
+    "scale": "2",
+    "canvas_height": 144,
+    "preference_height": 279,
+    "actual_width": 1440,
+    "actual_height": 900
+  },
+  {
+    "language": "zh-CN",
+    "page": "editor",
+    "width": 1440,
+    "scale": "2",
+    "canvas_width": 852,
+    "canvas_height": 606,
+    "visible_text_height": 175,
+    "desired_panels": [
+      true,
+      true
+    ],
+    "actual_width": 1440,
+    "actual_height": 900
+  },
+  {
+    "language": "zh-CN",
+    "page": "preferences",
+    "width": 850,
+    "scale": "2",
+    "canvas_height": 144,
+    "preference_height": 158,
+    "actual_width": 850,
+    "actual_height": 620
+  },
+  {
+    "language": "zh-CN",
+    "page": "editor",
+    "width": 850,
+    "scale": "2",
+    "canvas_width": 490,
+    "canvas_height": 346,
+    "visible_text_height": 180,
+    "desired_panels": [
+      true,
+      true
+    ],
+    "actual_width": 850,
+    "actual_height": 620
+  },
+  {
+    "language": "en",
+    "page": "preferences",
+    "width": 1440,
+    "scale": "2",
+    "canvas_height": 144,
+    "preference_height": 279,
+    "actual_width": 1440,
+    "actual_height": 900
+  },
+  {
+    "language": "en",
+    "page": "editor",
+    "width": 1440,
+    "scale": "2",
+    "canvas_width": 852,
+    "canvas_height": 605,
+    "visible_text_height": 172,
+    "desired_panels": [
+      true,
+      true
+    ],
+    "actual_width": 1440,
+    "actual_height": 900
+  },
+  {
+    "language": "en",
+    "page": "preferences",
+    "width": 850,
+    "scale": "2",
+    "canvas_height": 144,
+    "preference_height": 129,
+    "actual_width": 850,
+    "actual_height": 620
+  },
+  {
+    "language": "en",
+    "page": "editor",
+    "width": 850,
+    "scale": "2",
+    "canvas_width": 490,
+    "canvas_height": 345,
+    "visible_text_height": 180,
+    "desired_panels": [
+      true,
+      true
+    ],
+    "actual_width": 850,
+    "actual_height": 620
+  },
+  {
+    "language": "ja",
+    "page": "preferences",
+    "width": 1440,
+    "scale": "2",
+    "canvas_height": 144,
+    "preference_height": 279,
+    "actual_width": 1440,
+    "actual_height": 900
+  },
+  {
+    "language": "ja",
+    "page": "editor",
+    "width": 1440,
+    "scale": "2",
+    "canvas_width": 852,
+    "canvas_height": 606,
+    "visible_text_height": 175,
+    "desired_panels": [
+      true,
+      true
+    ],
+    "actual_width": 1440,
+    "actual_height": 900
+  },
+  {
+    "language": "ja",
+    "page": "preferences",
+    "width": 850,
+    "scale": "2",
+    "canvas_height": 144,
+    "preference_height": 132,
+    "actual_width": 850,
+    "actual_height": 620
+  },
+  {
+    "language": "ja",
+    "page": "editor",
+    "width": 850,
+    "scale": "2",
+    "canvas_width": 490,
+    "canvas_height": 346,
+    "visible_text_height": 180,
+    "desired_panels": [
+      true,
+      true
+    ],
+    "actual_width": 850,
+    "actual_height": 620
+  }
+]

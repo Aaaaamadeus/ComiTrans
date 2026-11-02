@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import cv2
 import numpy as np
-import onnxruntime as ort
+from comic_translate_core.inference_control import run_inference
+from comic_translate_core.onnx_session import create_onnx_session
 
 from comic_text_detector.utils.db_utils import SegDetectorRepresenter
 from comic_text_detector.utils.imgproc_utils import letterbox
@@ -104,11 +105,7 @@ def _postprocess_mask_np(img: np.ndarray) -> np.ndarray:
 
 class OnnxTextDetector:
     def __init__(self, model_path: str, input_size: int = 1024, device: str = "cpu", conf_thresh: float = 0.4, nms_thresh: float = 0.35, mask_thresh: float = 0.3):
-        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"] if device == "cuda" else ["CPUExecutionProvider"]
-        try:
-            self.session = ort.InferenceSession(str(model_path), providers=providers)
-        except Exception:
-            self.session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+        self.session = create_onnx_session(model_path, device)
         self.input_size = input_size if isinstance(input_size, tuple) else (input_size, input_size)
         self.conf_thresh = conf_thresh
         self.nms_thresh = nms_thresh
@@ -122,7 +119,7 @@ class OnnxTextDetector:
 
         img_in, ratio, dw, dh = _preprocess_img_np(img, self.input_size)
         im_h, im_w = img.shape[:2]
-        blks, mask, lines_map = self.session.run(None, {"images": img_in})
+        blks, mask, lines_map = run_inference(self.session, None, {"images": img_in})
         resize_ratio = (im_w / (self.input_size[0] - dw), im_h / (self.input_size[1] - dh))
 
         blks = _postprocess_yolo_np(blks, self.conf_thresh, self.nms_thresh, resize_ratio)

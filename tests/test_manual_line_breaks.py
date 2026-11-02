@@ -32,6 +32,21 @@ class ManualLineBreakTests(unittest.TestCase):
         self.assertEqual(wrap_vertical_text('甲（\n乙）', 2), ['甲（', '乙）'])
         self.assertEqual(wrap_vertical_text('甲乙丙丁\n戊己', 2), ['甲乙', '丙丁', '戊己'])
 
+    def test_word_boundaries_reflow_in_both_directions_without_changing_script(self):
+        setter = self.typesetter()
+        for text in ('去图书馆看书', '去圖書館看書'):
+            with self.subTest(text=text):
+                word = text[1:4]
+                self.assertEqual(wrap_vertical_text(text, 3), [text[:1], word, text[4:]])
+                self.assertEqual(wrap_vertical_text(text, 4), [text[:4], text[4:]])
+                font = setter._get_font_object('dialogue', 24)
+                width = setter._font_advance(font, word)
+                self.assertEqual(setter.wrap_text_horizontal(text, width, font),
+                                 [text[:1], word, text[4:]])
+                self.assertEqual(wrap_vertical_text(word, 2), [word[:2], word[2:]])
+                self.assertEqual(wrap_vertical_text(word[:1] + '\n' + word[1:], 4),
+                                 [word[:1], word[1:]])
+
     def test_horizontal_hard_breaks_still_allow_overflow_wrapping(self):
         setter = self.typesetter()
         font = setter.fonts['dialogue']

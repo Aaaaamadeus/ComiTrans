@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import os
+import math
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+from PIL import Image
 
 from PySide6.QtCore import QMarginsF, QRectF, QSize, QSizeF
-from PySide6.QtGui import QImage, QPageLayout, QPageSize, QPainter, QPdfWriter
+from PySide6.QtGui import QImage, QImageReader, QPageLayout, QPageSize, QPainter, QPdfWriter
 from PySide6.QtPdf import QPdfDocument
 
 
@@ -42,48 +45,90 @@ def _open_pdf(path: Path) -> QPdfDocument:
 def _scaled_pixel_size(width_points: float, height_points: float, dpi: int) -> QSize:
     width = max(1, round(width_points * dpi / 72.0))
     height = max(1, round(height_points * dpi / 72.0))
-    # 防止异常页面尺寸一次性占用过多内存，同时保持纵横比。
+    # Reject oversized allocations instead of silently reducing the requested resolution.
     longest = max(width, height)
     if longest > 12000:
-        scale = 12000 / longest
-        width = max(1, round(width * scale))
-        height = max(1, round(height * scale))
+        raise PdfProcessingError("页面渲染尺寸超过 12000 像素安全上限，已停止；不会自动降低 DPI 或缩小页面。")
     return QSize(width, height)
 
 
-def render_pdf_pages(pdf_path: str | Path, output_dir: str | Path, dpi: int = 200) -> list[RenderedPdfPage]:
-    """Render every PDF page to a PNG and retain its original point size."""
+class PdfPageRenderer:
+    """One open document; native-resolution pages are materialized on demand."""
 
-    pdf_path = Path(pdf_path)
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    document = _open_pdf(pdf_path)
-    pages: list[RenderedPdfPage] = []
-    try:
-        for page_index in range(document.pageCount()):
-            point_size = document.pagePointSize(page_index)
-            if point_size.width() <= 0 or point_size.height() <= 0:
+    def __init__(self, pdf_path, dpi=200):
+        self.document = _open_pdf(Path(pdf_path))
+        self.dpi = dpi
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        self.close()
+
+    def close(self):
+        if self.document is not None:
+            self.document.close()
+            self.document = None
+
+    def pages(self, output_dir, cancel_callback=None):
+        pages = []
+        for page_index in range(self.document.pageCount()):
+            if cancel_callback:
+                cancel_callback()
+            size = self.document.pagePointSize(page_index)
+            if any(not math.isfinite(v) or v <= 0 for v in (size.width(), size.height())):
                 raise PdfProcessingError(f"PDF 第 {page_index + 1} 页尺寸无效")
-            image = document.render(
-                page_index,
-                _scaled_pixel_size(point_size.width(), point_size.height(), dpi),
-            )
+            pages.append(RenderedPdfPage(page_index,
+                Path(output_dir) / f'page_{page_index + 1:04d}.png',
+                float(size.width()), float(size.height())))
+        return pages
+
+    def render(self, page, *, reuse_cached=False, cancel_callback=None):
+        if cancel_callback:
+            cancel_callback()
+        target = _scaled_pixel_size(page.width_points, page.height_points, self.dpi)
+        if reuse_cached:
+            try:
+                with Image.open(page.image_path) as cached:
+                    valid = cached.format == 'PNG' and cached.size == (target.width(), target.height())
+                    cached.verify()
+                if valid:
+                    return page
+            except (OSError, ValueError, SyntaxError):
+                pass
+        page.image_path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, name = tempfile.mkstemp(prefix='.render-', suffix='.png', dir=page.image_path.parent)
+        os.close(descriptor)
+        staged = Path(name)
+        try:
+            image = self.document.render(page.page_index, target)
             if image.isNull():
-                raise PdfProcessingError(f"PDF 第 {page_index + 1} 页渲染失败")
-            image_path = output_dir / f"page_{page_index + 1:04d}.png"
-            if not image.save(str(image_path), "PNG"):
-                raise PdfProcessingError(f"PDF 第 {page_index + 1} 页临时图片保存失败")
-            pages.append(
-                RenderedPdfPage(
-                    page_index=page_index,
-                    image_path=image_path,
-                    width_points=float(point_size.width()),
-                    height_points=float(point_size.height()),
-                )
-            )
-    finally:
-        document.close()
-    return pages
+                raise PdfProcessingError(f"PDF 第 {page.page_index + 1} 页渲染失败")
+            if cancel_callback:
+                cancel_callback()
+            if not image.save(str(staged), 'PNG'):
+                raise PdfProcessingError(f"PDF 第 {page.page_index + 1} 页临时图片保存失败")
+            if cancel_callback:
+                cancel_callback()
+            os.replace(staged, page.image_path)
+        finally:
+            staged.unlink(missing_ok=True)
+        return page
+
+
+def plan_pdf_pages(pdf_path, output_dir, dpi=200, cancel_callback=None):
+    """Read page sizes without rendering or decoding any page images."""
+    with PdfPageRenderer(pdf_path, dpi) as renderer:
+        return renderer.pages(output_dir, cancel_callback)
+
+
+def render_pdf_pages(pdf_path: str | Path, output_dir: str | Path, dpi: int = 200) -> list[RenderedPdfPage]:
+    """Compatibility helper for callers that explicitly need all page images."""
+    with PdfPageRenderer(pdf_path, dpi) as renderer:
+        pages = renderer.pages(output_dir)
+        for page in pages:
+            renderer.render(page)
+        return pages
 
 
 def render_pdf_preview(pdf_path: str | Path, max_size: QSize) -> QImage:
@@ -118,6 +163,7 @@ def build_pdf_from_images(
     image_paths: Iterable[str | Path],
     page_sizes_points: Iterable[tuple[float, float]],
     output_path: str | Path,
+    *, progress_callback=None, cancel_callback=None,
 ) -> Path:
     """Assemble translated page images into a validated, atomically-written PDF."""
 
@@ -128,7 +174,16 @@ def build_pdf_from_images(
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = output_path.with_name(f".{output_path.stem}.writing.pdf")
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{output_path.stem}.", suffix=".writing.pdf", dir=output_path.parent)
+    os.close(descriptor)
+    temporary_path = Path(temporary)
+    try:
+        return _write_pdf(paths, sizes, output_path, temporary_path, progress_callback, cancel_callback)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def _write_pdf(paths, sizes, output_path, temporary_path, progress_callback, cancel_callback):
 
     writer = QPdfWriter(str(temporary_path))
     writer.setResolution(72)
@@ -141,19 +196,29 @@ def build_pdf_from_images(
             raise PdfProcessingError("无法设置 PDF 页面尺寸")
         if not painter.begin(writer):
             raise PdfProcessingError("无法创建输出 PDF")
+        # Embed every page at its full pixel dimensions without JPEG loss.
+        # The writer's 72 DPI sets page coordinates, not image resolution.
+        painter.setRenderHint(QPainter.RenderHint.LosslessImageRendering, True)
 
         for index, (image_path, (width, height)) in enumerate(zip(paths, sizes)):
+            if cancel_callback:
+                cancel_callback()
             if index:
                 if not writer.setPageSize(_page_size(width, height)) or not writer.newPage():
                     raise PdfProcessingError(f"无法创建 PDF 第 {index + 1} 页")
-            image = QImage(str(image_path))
+            reader = QImageReader(str(image_path))
+            reader.setAutoTransform(True)
+            image = reader.read()
             if image.isNull():
                 raise PdfProcessingError(f"无法读取译图: {image_path.name}")
             target = QRectF(writer.pageLayout().paintRectPixels(writer.resolution()))
             painter.drawImage(target, image)
+            if progress_callback:
+                progress_callback(index + 1, len(paths))
     finally:
         if painter.isActive():
             painter.end()
+        del writer
 
     # 重新打开并核对页数/页面尺寸，验证通过后才替换最终文件。
     document = _open_pdf(temporary_path)
@@ -171,9 +236,11 @@ def build_pdf_from_images(
                 raise PdfProcessingError(f"输出 PDF 第 {index + 1} 页尺寸不正确")
     finally:
         document.close()
+        del document
 
     # Windows keeps the source handle open until the QPdfDocument wrapper is
     # destroyed, even after close(). Drop the final reference before replace().
-    del document
+    if cancel_callback:
+        cancel_callback()
     os.replace(temporary_path, output_path)
     return output_path

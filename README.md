@@ -19,7 +19,18 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 从 v2.2.1 开始，检测、OCR、修复全部切换为 **ONNX Runtime 推理**，彻底移除 PyTorch / torchvision / transformers 依赖；主程序和模型拆分发布，更新程序时不再需要重新下载模型。
 
 > [!NOTE]
-> v2.4.1 加入简繁译文、内置漫画字体、手动分行与竖排列对齐。译文字体和默认对齐统一收进“翻译偏好”。本版提供完整程序包，已有模型继续复用。[更新与安装说明](docs/RELEASE-v2.4.1.md) · [更新日志](CHANGELOG.md)。
+> **v2.5.0 大更新**：PDF 图片精修与无损导出、按气泡还原原图、原尺寸分块修补、连续翻译流水线、按页续传和严格 JSON 校验。已有模型可复用。[详细更新与升级说明](docs/RELEASE-v2.5.0.md) · [更新日志](CHANGELOG.md)。
+
+## v2.5.0 重要更新
+
+- **长篇 PDF 工作流**：页图按需生成；精修保存和切页不合成整本 PDF，完成后显式后台导出。连续长条按可见范围加载，支持打开 `project.json`。[PDF 使用说明](docs/PDF_EDITING.md)。
+- **翻译速度与续传**：当前页修补时，后续页继续检测、OCR 和 API 翻译；默认最多 4 页在途。GPU 日志报告实际设备。失败、停止或重启后跳过完成页，复用合法译文。[续传](docs/RESUMABLE_TRANSLATION.md) · [性能实测](docs/TRANSLATION_PERFORMANCE.md)。
+- **保留清晰度的擦字**：LaMa 按原尺寸分块，内存不足时缩小块而非缩图。改善黑底白字、头发交叠、白描边、网点和渐变背景；掩膜可独立测试或替换。[掩膜组件](docs/TEXT_MASK_COMPONENT.md)。
+- **更完整的精修**：自选区域后台修补、按块文字颜色与描边、中文按词换行；“还原此气泡”同时撤销该块修补和嵌字，保存重开后仍可切回处理结果。[气泡还原](docs/BUBBLE_RESTORATION.md)。
+- **大项目操作**：后台索引、切页和保存；只保留最新加载请求，保存时继续编辑不丢草稿。折叠栏、侧栏和专注模式保留手动偏好。[精修性能与边界](docs/EDITOR_PERFORMANCE.md)。
+- **API 与架构**：严格 JSON Schema 优先，降级后仍校验译文类型和数量；页面文件事务、模型共享、掩膜和调度拆成独立组件。[接口约定](docs/TRANSLATION_JSON_CONTRACT.md) · [架构图](docs/ARCHITECTURE.md)。
+
+三页离线调度对照为 **42.43 → 37.85 秒**，输出像素一致；其中 API 等待模拟为 2 秒，不代表整本 PDF 或实时服务的速度保证。复杂背景仍可能需要人工修图。独立修图插件目前只有接口设计，宿主加载尚未实现。
 
 ## 漫画工作台
 
@@ -60,7 +71,7 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ## 目录
 
-[漫画工作台与日志动画](#漫画工作台) · [OCR 接口](#ocr-接口) · [完整更新日志](CHANGELOG.md)
+[漫画工作台与日志动画](#漫画工作台) · [OCR 接口](#ocr-接口) · [精修工具插件接口设计](docs/RETOUCH_PLUGIN_API.md) · [完整更新日志](CHANGELOG.md)
 
 1. [核心特性](#核心特性)
 2. [快速开始](#快速开始)
@@ -76,12 +87,12 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ## 核心特性
 
-- **多语言源文与自定义 OCR**：选择日语、韩语、英语或“自定义 OCR”，统一翻译成简体中文；支持独立 HTTP OCR 与兼容视觉模型接口。[接入说明与混合语言策略](docs/MULTILINGUAL_OCR.md)。
+- **多语言源文与自定义 OCR**：选择日语、韩语、英语或“自定义 OCR”，可翻译成简体或繁体中文；支持独立 HTTP OCR 与兼容视觉模型接口。[接入说明与混合语言策略](docs/MULTILINGUAL_OCR.md)。
 - **纯本地桌面客户端**：PySide6 桌面应用，抛弃 Web 页面，启动后即可使用。
 - **全 ONNX 推理**：漫画文本检测、Baberu/manga-ocr、LaMa 修复全部为 ONNX 模型，不再依赖 PyTorch。
 - **模型拆包发布**：模型单独一个下载包，更新程序无需重新下载模型。
 - **启动即预热**：打开客户端自动加载 AI 管线，不等点击翻译才加载模型。
-- **GPU 推理**：支持 NVIDIA CUDA，只需本机已有 NVIDIA 驱动。
+- **GPU 推理**：新安装默认优先 NVIDIA CUDA；软件内提供 CUDA/cuDNN 官方安装链接，需兼容的 NVIDIA 驱动，日志明确实际设备。保留旧配置中的 CPU 选择。
 - **多模态翻译开关**：勾选后发送整页图片给 AI，结合画面翻译；不勾选则发送 OCR 文本。字体、字号与横竖方向默认由本地算法决定，实验性字体比对需单独启用。
 - **PDF 整本翻译**：可与图片混合导入 PDF，逐页翻译后按原页序和原页面尺寸生成一个 `*_translated.pdf`。
 - **15 类字体风格**：提供对白、强调、手写、内心、旁白、拟声、标题等风格，本地自动分类并支持编辑器手动选择，对缺字逐字回退。
@@ -102,15 +113,15 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ### Release 用户（推荐）
 
-1. 在[发布页](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.4.1)下载 `ComiTrans-v2.4.1-app.zip`（程序包）和 `ComiTrans-v2.4.1-models.zip`（模型包）。
-2. 两个压缩包解压到同一个父目录，合并顶层同名 `ComiTrans` 文件夹，保留子目录结构。最终模型路径为 `ComiTrans\comic-translate-ai\models\`。
+1. 在[发布页](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.5.0)下载 `ComiTrans-v2.5.0-app.zip`（程序包）和 `ComiTrans-v2.5.0-models.zip`（模型包）。
+2. 所需压缩包解压到同一个父目录，合并顶层同名 `ComiTrans` 文件夹，保留子目录结构。最终模型路径为 `ComiTrans\comic-translate-ai\models\`。
 3. 双击合并后的 `ComiTrans.exe`，在“设置”页填写翻译 API Key 和模型。
 
 从 v2.3.0 升级可复用已有模型；从 v2.2.2 升级时，日语模型可复用，韩语/英语识别需合并新版模型包。保留原有 `config.yaml`、整个 `user_fonts` 文件夹与输出文件。
 
-Release 用户不需要安装 Python、PyTorch、pip 或 CUDA Toolkit。GPU 加速只需本机已有 NVIDIA 驱动。
+Release 用户不需要安装 Python、PyTorch 或 pip。GPU 加速需要兼容的 NVIDIA 驱动、CUDA 12 和 cuDNN 9；软件“设置 → 运行与输出 → GPU 安装说明与下载”提供官方链接。已有兼容环境可复用，CPU 用户无需安装这些 GPU 库。[GPU 安装指南](docs/GPU_SETUP.md)。
 
-升级到 v2.4.1：关闭程序，将 `ComiTrans-v2.4.1-app.zip` 解压到新目录，把旧目录的 `config.yaml`、`user_fonts/` 和 `comic-translate-ai/models/` 复制到对应位置。漫画输出及其 `_cleaned`、`_layout` 目录保持相对位置；确认新程序正常后再整理旧目录。本版使用完整包，详见[更新说明](docs/RELEASE-v2.4.1.md)。
+升级到 v2.5.0：关闭程序，将 `ComiTrans-v2.5.0-app.zip` 解压到新目录，把旧目录的 `config.yaml`、`user_fonts/` 和 `comic-translate-ai/models/` 复制到对应位置。漫画输出及其 `_cleaned`、`_layout` 目录保持相对位置；确认新程序正常后再整理旧目录。GPU 用户可从软件设置打开官方运行库安装链接；本项目不打包上传 CUDA/cuDNN。本版使用完整包，详见[更新说明](docs/RELEASE-v2.5.0.md)。
 
 ### 源码运行（开发者）
 
@@ -168,7 +179,9 @@ Copy-Item comic-translate-ai/main/config.example.yaml comic-translate-ai/main/co
 
 默认在输出页右下角添加小号半透明 Skribble `@ComiTrans` 字标，可在“设置 → 第一页（翻译服务）→ 添加 @ComiTrans 水印”取消勾选并保存以关闭。已保存的关闭选择会保留。后续翻译图片和 PDF 每页按开关添加水印；精修中的页面也会更新预览，点击“保存图片”写入。重复保存不会叠加水印，清理底图保持无水印。
 
-PDF 会以一个文件任务显示，内部按页分批处理，成功后输出 `<原文件名>_translated.pdf`。输出 PDF 保留页数、顺序和页面尺寸；页面内容会栅格化。加密或需要密码的 PDF 暂不支持，PDF 页面也暂不支持在“嵌字精修”页逐块调整。
+默认启用按页断点续传。网络失败或停止后，使用相同原文件、输出目录和翻译设置再次开始，即可跳过已完成页面并复用已保存译文；重启程序后同样有效。需要全部重译时，取消“翻译偏好 → 断点续传”勾选。[断点续传说明](docs/RESUMABLE_TRANSLATION.md)。
+
+PDF 会以一个文件任务显示，内部按在途页数上限连续处理，成功后输出 `<原文件名>_translated.pdf`，并保留同名 `.comitrans.json` 索引和独立精修资料目录。点击结果页的精修入口，或在“嵌字精修”导入译文 PDF，即可逐页改字、排版与修补背景；开启“连续长条”可纵向滚动浏览并点击页面原位编辑。精修始终操作逐页图片，“保存图片”和切页不会合成 PDF；需要成书时点击“导出 PDF”，选择文件名后在后台无损合成，支持进度与取消。也可直接导入资料目录中的 `project.json`，不依赖 PDF 本身。输出保留页数、顺序和页面尺寸，页面内容会栅格化；加密或需要密码的 PDF 暂不支持。移动项目时请一起保留 PDF、索引和资料目录。详见 [PDF 精修说明](docs/PDF_EDITING.md)。
 
 ### OCR 接口
 
@@ -229,12 +242,12 @@ Python 扩展通过 `OcrEngine.recognize(image, language) -> OcrResult` 接入�
 
 ## 翻译流程
 
-每一张图片或 PDF 页面按以下流程处理：
+每张图片或 PDF 页面按以下流程处理。不同页面的准备、API 等待与修补可重叠，按并发设置限制在途页数，结果按输入顺序保存：
 
 1. **气泡与文本检测**：ONNX 文本检测器输出气泡、文字掩膜和文本行。
 2. **源语言 OCR**：日语使用 Baberu / manga-ocr，韩语和英语按文本行使用 PP-OCRv5，也可使用自定义 OCR。仅日语本地模式保留原有英文跳过规则；其它模式可正常识别、翻译英文。无原文或无译文的区域保留原图。
 3. **大模型翻译**：纯文本模式发送 OCR 结果；多模态模式发送整页图片。字体默认由本地按角色、字形和文本框选择；单独启用实验性字体比对时，AI 才参与三候选字体族判断，结果通过本地门控后生效。字号与排版方向始终由本地决定。
-4. **背景修复**：按检测文字掩膜擦除，简单白气泡直接涂白，复杂背景调用 LaMa ONNX 修复。
+4. **背景修复**：按检测文字掩膜擦除，纯色使用实际底色，验证通过的规则网点与渐变局部重建，复杂背景调用原尺寸分块 LaMa 修复。
 5. **中文排版**：按掩膜有效面积估算字号、按掩膜质心定位，横竖方向自适应，长文本自动收紧字号。
 6. **保存与编辑**：输出翻译图，清理底图单独保存到 `<输出目录>_cleaned/`，布局 JSON 保存到 `<输出目录>_layout/`，可在嵌字编辑页继续人工微调。
 7. **PDF 重组**：PDF 的全部页面成功后，按原页面尺寸重组并重新打开校验；任一页失败时不生成半成品 PDF。
@@ -273,18 +286,20 @@ Python 扩展通过 `OcrEngine.recognize(image, language) -> OcrResult` 接入�
 ### 生成发布包
 
 ```powershell
-python package_release.py
+python package_release.py --output release/v2.5.0
 ```
 
 本版 Release 提供完整程序包与模型包：
 
-- `ComiTrans-v2.4.1-app.zip`：主程序，不含模型
-- [ComiTrans-v2.4.1-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.4.1/ComiTrans-v2.4.1-models.zip)：含日语、韩语、英语 OCR 的 ONNX 模型包；已有模型可复用
+- `ComiTrans-v2.5.0-app.zip`：主程序，不含模型
+- [ComiTrans-v2.5.0-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.5.0/ComiTrans-v2.5.0-models.zip)：含日语、韩语、英语 OCR 的 ONNX 模型包；已有模型可复用
+
+不发布 CUDA/cuDNN 运行库包；GPU 用户通过软件内的官方链接安装。发布页同时提供 `SHA256SUMS.txt` 和 `baseline.json`。
 
 版本元数据保存在源码仓库，随发布提交：
 
-- [docs/releases/v2.4.1/baseline.json](docs/releases/v2.4.1/baseline.json)：2.4.1 目标构建基线
-- [docs/releases/v2.4.1/SHA256SUMS.txt](docs/releases/v2.4.1/SHA256SUMS.txt)：2.4.1 程序包、模型包及目标基线的 SHA256
+- [docs/releases/v2.5.0/baseline.json](docs/releases/v2.5.0/baseline.json)：2.5.0 目标构建基线
+- [docs/releases/v2.5.0/SHA256SUMS.txt](docs/releases/v2.5.0/SHA256SUMS.txt)：2.5.0 程序包、模型包及目标基线的 SHA256
 
 - [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json)：程序文件 SHA256 清单与构建指纹，供后续生成补丁
 - [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt)：程序包、模型包和基线清单的 SHA256
@@ -320,6 +335,17 @@ ComiTrans
 └── package_release.py             # Release 拆包脚本
 ```
 ## 更新日志
+
+### v2.5.0（2026-11-02）
+
+- PDF 图片项目与显式无损导出；原尺寸分块修补、改进文字掩膜、网点/渐变重建和白描边处理。
+- 有上限的连续翻译流水线、GPU 实际设备检测、背景估计滤波加速、按页断点续传和付费译文缓存。
+- 连续长条、后台索引/切页/保存、局部合成；折叠栏与专注模式记住手动偏好。
+- 自选区域修补、逐气泡原图还原、默认和块级文字颜色、中文按词换行。
+- 独立翻译与文件服务，严格 JSON 输出及本地校验；诊断报告移除 PyTorch/CUDA 探测。
+- 新增 GPU 官方安装入口及已安装运行库目录识别；新安装默认优先 GPU，运行库不随发布包上传，旧模型可复用。
+- [详细更新、安装与已知边界](docs/RELEASE-v2.5.0.md) · [完整开发日志](CHANGELOG.md)。
+
 
 ### v2.4.0（2026-10-13）
 
@@ -410,9 +436,9 @@ ComiTrans
 
 ## 常见问题
 
-**Release 需要安装 Python 或 CUDA Toolkit 吗？**
+**Release 需要安装 Python 或 GPU 运行库吗？**
 
-不需要。主程序和模型包解压后即可运行，GPU 加速只需本机已有 NVIDIA 驱动。
+不需要 Python。CPU 模式解压程序与模型即可运行；GPU 模式需要兼容的 NVIDIA 驱动、CUDA 12 和 cuDNN 9，软件内提供官方安装链接，已有环境可复用。实际设备可在日志中确认。
 
 **模型放哪里？**
 
@@ -424,7 +450,7 @@ ComiTrans
 
 **为什么主程序包这么小？**
 
-v2.2.1 已全面 ONNX 化并移除 PyTorch。检测、OCR、修复均为 ONNX 模型，运行库只需 onnxruntime。
+v2.2.1 已全面 ONNX 化并移除 PyTorch。检测、OCR、修复均使用 ONNX Runtime；GPU 推理还需兼容的 CUDA/cuDNN，通过软件中的官方安装链接获取。
 
 ## 反馈与支持
 

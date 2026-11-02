@@ -1,0 +1,47 @@
+{
+  "scope": "background_repair_only",
+  "providers": [
+    "CUDAExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "model_load_seconds": 5.580450999987079,
+  "torch_imported": false,
+  "pages": [
+    {
+      "page": 1,
+      "size": [
+        3928,
+        5556
+      ],
+      "detection_seconds": 1.331054900001618,
+      "repair_seconds": 8.99434000000474,
+      "tiles": 24,
+      "inference_seconds": 4.98704819996783,
+      "unmasked_pixels_unchanged": true
+    },
+    {
+      "page": 2,
+      "size": [
+        3928,
+        5556
+      ],
+      "detection_seconds": 0.2323885999940103,
+      "repair_seconds": 5.7591136999981245,
+      "tiles": 22,
+      "inference_seconds": 4.5221039000025485,
+      "unmasked_pixels_unchanged": true
+    },
+    {
+      "page": 3,
+      "size": [
+        3928,
+        5556
+      ],
+      "detection_seconds": 0.1497827999992296,
+      "repair_seconds": 5.7586203000100795,
+      "tiles": 21,
+      "inference_seconds": 4.6020448000053875,
+      "unmasked_pixels_unchanged": true
+    }
+  ]
+}

@@ -76,6 +76,8 @@ class PageCanvas(QLabel):
         super().__init__(parent)
         self.region = self.image_size = None
         self.region_editable = False
+        self.region_creation = False
+        self.stretch_pixmap = False
         self._region_drag = None
         self.setMouseTracking(True)
         self.setAccessibleName(tr('漫画画布'))
@@ -85,6 +87,8 @@ class PageCanvas(QLabel):
         if pixmap is None or pixmap.isNull():
             return QRectF()
         bounds = self.contentsRect()
+        if self.stretch_pixmap:
+            return QRectF(bounds)
         size = pixmap.deviceIndependentSize()
         return QRectF(bounds.center().x() + .5 - size.width() / 2,
                       bounds.center().y() + .5 - size.height() / 2,
@@ -138,7 +142,10 @@ class PageCanvas(QLabel):
                    'n': Qt.SizeVerCursor, 's': Qt.SizeVerCursor,
                    'w': Qt.SizeHorCursor, 'e': Qt.SizeHorCursor, 'move': Qt.OpenHandCursor}
         if hit is None:
-            self.unsetCursor()
+            if self.region_creation:
+                self.setCursor(Qt.CrossCursor)
+            else:
+                self.unsetCursor()
         else:
             self.setCursor(cursors[hit])
 
@@ -150,6 +157,13 @@ class PageCanvas(QLabel):
 
     def mousePressEvent(self, event):
         hit = self._region_hit(event.position())
+        if (self.region_creation and event.button() == Qt.LeftButton
+                and self.page_rect().contains(event.position()) and hit is None):
+            self._region_drag = ('create', QPointF(event.position()), self.region)
+            self.setFocus(Qt.MouseFocusReason)
+            self.grabMouse()
+            event.accept()
+            return
         if event.button() == Qt.LeftButton and hit is not None:
             self._region_drag = (hit, QPointF(event.position()), tuple(self.region))
             self.setFocus(Qt.MouseFocusReason)
@@ -167,6 +181,19 @@ class PageCanvas(QLabel):
         page = self.page_rect()
         dx = round((point.x() - start.x()) * self.image_size.width() / page.width())
         dy = round((point.y() - start.y()) * self.image_size.height() / page.height())
+        if hit == 'create':
+            def image_point(position):
+                return (max(0, min(self.image_size.width(), round((position.x() - page.left()) * self.image_size.width() / page.width()))),
+                        max(0, min(self.image_size.height(), round((position.y() - page.top()) * self.image_size.height() / page.height()))))
+            sx, sy = image_point(start)
+            ex, ey = image_point(point)
+            box = (min(sx, ex), min(sy, ey), max(sx, ex), max(sy, ey))
+            box = box if box[0] < box[2] and box[1] < box[3] else None
+            if box != self.region:
+                self.region = box
+                self.update()
+                self.region_edited.emit(box)
+            return
         x1, y1, x2, y2 = map(int, original)
         if hit == 'move':
             width, height = x2 - x1, y2 - y1
@@ -239,7 +266,16 @@ class PageCanvas(QLabel):
         super().changeEvent(event)
 
     def paintEvent(self, event):
-        super().paintEvent(event)
+        if self.stretch_pixmap:
+            pixmap = self.pixmap()
+            if pixmap is not None and not pixmap.isNull():
+                painter = QPainter(self)
+                painter.setRenderHint(QPainter.SmoothPixmapTransform)
+                # Paint only the exposed viewport; never allocate a full-page zoomed bitmap.
+                painter.drawPixmap(QRectF(self.contentsRect()), pixmap, QRectF(pixmap.rect()))
+                painter.end()
+        else:
+            super().paintEvent(event)
         pixmap = self.pixmap()
         if pixmap is None or pixmap.isNull():
             return
@@ -356,6 +392,22 @@ class ImagePreview(QWidget):
         self._stack.setCurrentWidget(self._scroll)
         self._update_scaled()
 
+    def update_regions(self, image, regions):
+        from PIL.ImageQt import ImageQt
+        if not regions:
+            return
+        displayed = self._label.pixmap()
+        if displayed is not None and displayed.cacheKey() == self._original.cacheKey():
+            self._label.clear()
+        del displayed
+        painter = QPainter(self._original)
+        try:
+            for box in regions:
+                painter.drawImage(box[0], box[1], ImageQt(image.crop(box)))
+        finally:
+            painter.end()
+        self._update_scaled()
+
     def clear(self, text=tr('等待预览')):
         self._original = QPixmap()
         self.set_region(None)
@@ -368,14 +420,19 @@ class ImagePreview(QWidget):
         self._zoom = factor
         self._update_scaled()
 
+    def set_region_creation(self, enabled):
+        self.cancel_region_drag()
+        self._label.region_creation = enabled
+        self.set_region(None)
+
     def set_region(self, box=None, *, editable=False):
         """Canvas-only selection guide; never alter the rendered/exported pixels."""
         self._label.region = tuple(box) if box is not None else None
         self._label.region_editable = editable and box is not None
-        self._label.setFocusPolicy(Qt.StrongFocus if self._label.region_editable else Qt.NoFocus)
+        self._label.setFocusPolicy(Qt.StrongFocus if self._label.region_editable or self._label.region_creation else Qt.NoFocus)
         self._label.setToolTip(tr(tr('拖动边角调整蒙版大小，框内拖动位置；Esc 恢复本次拖动前的范围')
                                if self._label.region_editable else ''))
-        if not self._label.region_editable:
+        if not self._label.region_editable and not self._label.region_creation:
             self.cancel_region_drag()
         self._label.update()
 

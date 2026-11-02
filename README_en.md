@@ -14,14 +14,25 @@
 
 </div>
 
-Source-language selection supports Japanese, Korean, English, and **Custom OCR**, with Simplified Chinese output. Download the local Korean/English PP-OCRv5 ONNX models using `.venv\Scripts\python scripts/download_ocr_models.py`. Custom OCR supports HTTP endpoints and compatible vision models. See the [integration guide and proposed mixed-language strategy](docs/MULTILINGUAL_OCR.md). Automatic mixed-language routing is not yet enabled.
+Source-language selection supports Japanese, Korean, English, and **Custom OCR**, with Simplified or Traditional Chinese output. Download the local Korean/English PP-OCRv5 ONNX models using `.venv\Scripts\python scripts/download_ocr_models.py`. Custom OCR supports HTTP endpoints and compatible vision models. See the [integration guide and proposed mixed-language strategy](docs/MULTILINGUAL_OCR.md). Automatic mixed-language routing is not yet enabled.
 
 ComiTrans is a manga translation desktop client. Detection, built-in Japanese/Korean/English OCR, inpainting, and Chinese typesetting run locally; translation uses your configured LLM API. No web frontend is required.
 
-Since v2.2.1, detection, OCR, and inpainting are powered entirely by **ONNX Runtime**, removing PyTorch / torchvision / transformers dependencies. The app and models are released as separate packages: model updates no longer require re-downloading the program.
+Since v2.2.1, detection, OCR, and inpainting are powered entirely by **ONNX Runtime**, removing PyTorch / torchvision / transformers dependencies. The app and models are released as separate packages: app updates no longer require re-downloading unchanged models.
 
 > [!NOTE]
-> v2.4.1 adds Simplified/Traditional Chinese output, bundled manga fonts, manual line breaks and vertical column alignment. Translation font and default alignment choices are grouped inside Translation Preferences. This release provides the full app archive and reuses existing models. [Update guide](docs/RELEASE-v2.4.1.md) · [Changelog](CHANGELOG.md).
+> **v2.5.0 major update:** image-based PDF editing and lossless export, per-bubble original restoration, native-resolution tiled repair, bounded streaming translation, per-page resume and strict JSON validation. Existing models remain reusable. [Detailed update and upgrade guide](docs/RELEASE-v2.5.0.md) · [Changelog](CHANGELOG.md).
+
+## What's new in v2.5.0
+
+- **Long PDF workflow:** render pages on demand; edit individual images and explicitly export a lossless PDF. Continuous Strip loads nearby pages, and projects can open from `project.json`. [PDF guide](docs/PDF_EDITING.md).
+- **Streaming translation and resume:** prepare/OCR/translate later pages while repairing the current page, with a default cap of four in-flight pages. Logs report the actual GPU/CPU provider. Resume completed pages and reuse cached valid translations. [Resume](docs/RESUMABLE_TRANSLATION.md) · [Measured performance](docs/TRANSLATION_PERFORMANCE.md).
+- **Native-resolution repair:** smaller repair tiles on memory pressure, without downscaling pages. Improved masks for light/dark text, outlines, overlapping artwork, screentones and gradients; masks are independently testable and replaceable. [Mask component](docs/TEXT_MASK_COMPONENT.md).
+- **Retouching controls:** background selection repair, per-block colors/outlines, word-aware Chinese wrapping, and restoration of a selected bubble's original pixels and text. Restoration remains reversible after saving. [Bubble restoration](docs/BUBBLE_RESTORATION.md).
+- **Large-project editing:** background indexing, decoding and saving; bounded loading and visible-canvas reuse; edits made during saving remain dirty. Preference panels retain manual choices across resizing and focus mode. [Editor measurements](docs/EDITOR_PERFORMANCE.md).
+- **API reliability:** strict JSON Schema where supported, with local type/count validation on every fallback; isolated translation, mask, persistence and scheduling components. [JSON contract](docs/TRANSLATION_JSON_CONTRACT.md) · [Architecture](docs/ARCHITECTURE.md).
+
+A three-page offline scheduling comparison measured **42.43 → 37.85 seconds**, with identical output pixels and a simulated two-second API delay. This is not a live API or whole-PDF speed guarantee. Complex backgrounds may still need manual retouching. The independent retouch plugin API is designed; host-side plugin loading is not implemented.
 
 ## Manga workbench
 
@@ -62,7 +73,7 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 
 ## Table of Contents
 
-[Manga workbench and log animation](#manga-workbench) · [OCR interfaces](#ocr-interfaces) · [Detailed changelog](CHANGELOG.md)
+[Manga workbench and log animation](#manga-workbench) · [OCR interfaces](#ocr-interfaces) · [Retouch plugin API design (Chinese)](docs/RETOUCH_PLUGIN_API.md) · [Detailed changelog](CHANGELOG.md)
 
 1. [Key Features](#key-features)
 2. [Quick Start](#quick-start)
@@ -83,7 +94,7 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 - **All-ONNX inference**: text detection, Baberu/manga-ocr, and LaMa inpainting all use ONNX; no PyTorch required.
 - **Split release packages**: models ship separately, so app updates do not require re-downloading models.
 - **Startup warmup**: the AI pipeline loads automatically when the app opens.
-- **GPU inference**: NVIDIA CUDA supported when the machine already has an NVIDIA driver.
+- **GPU inference**: new installations prefer NVIDIA CUDA. Settings provide official CUDA/cuDNN installation links; a compatible NVIDIA driver is required; logs report the actual device. Existing CPU preferences are preserved.
 - **Multimodal translation toggle**: sends the full page image to the AI for visual context; pure-text mode sends OCR results. Font selection, size, and orientation are local by default. Experimental font comparison requires a separate opt-in.
 - **Whole-PDF translation**: import PDFs alongside images, translate them page by page, and create one `*_translated.pdf` with the original page order and page sizes.
 - **15 font categories**: dialogue, bold dialogue, emphasis, handwriting, Seto, 851 handwriting, thought, whisper, serious, narration, SFX, LXGW Marker, cute, preview, and title styles with per-glyph fallback.
@@ -104,15 +115,15 @@ A fully successful translation batch has a 15% chance of showing a small reposit
 
 ### Release users (recommended)
 
-1. Download `ComiTrans-v2.4.1-app.zip` and `ComiTrans-v2.4.1-models.zip` from the [v2.4.1 release](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.4.1).
-2. Extract both archives into the same parent directory and merge their top-level `ComiTrans` folders, preserving the subfolder structure. The final model path is `ComiTrans\comic-translate-ai\models\`.
+1. Download `ComiTrans-v2.5.0-app.zip` and `ComiTrans-v2.5.0-models.zip` from the [v2.5.0 release](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.5.0).
+2. Extract the required archives into the same parent directory and merge their top-level `ComiTrans` folders, preserving the subfolder structure. The final model path is `ComiTrans\comic-translate-ai\models\`.
 3. Double-click the merged `ComiTrans.exe` and enter your translation API key and model on the "Settings" page.
 
 Upgrading from v2.3.0: reuse your existing models. From v2.2.2, existing Japanese models can be reused; merge the new model archive to add Korean/English recognition. Keep your existing `config.yaml`, entire `user_fonts` folder, and output files.
 
-Release users do not need to install Python, PyTorch, pip, or the CUDA Toolkit. GPU acceleration only requires an existing NVIDIA driver.
+Release users do not need Python, PyTorch, or pip. GPU acceleration requires a compatible NVIDIA driver, CUDA 12 and cuDNN 9. Open Settings → Runtime & Output → GPU setup and downloads for official installation links. Reuse a compatible environment; CPU users do not need GPU libraries. [Setup guide](docs/GPU_SETUP.md). New installations prefer GPU; if CUDA cannot start, the app reports its CPU fallback. Existing CPU preferences are preserved.
 
-To upgrade to v2.4.1, close the app and extract `ComiTrans-v2.4.1-app.zip` into a new folder. Copy `config.yaml`, `user_fonts/` and `comic-translate-ai/models/` from the old installation to the same relative locations. Keep output images and their companion `_cleaned` and `_layout` folders together. Keep the old installation until the new one works. This version uses the full app archive; see the [update guide](docs/RELEASE-v2.4.1.md).
+To upgrade to v2.5.0, close the app and extract `ComiTrans-v2.5.0-app.zip` into a new folder. Copy `config.yaml`, `user_fonts/` and `comic-translate-ai/models/` from the old installation to the same relative locations. Keep output images and their companion `_cleaned` and `_layout` folders together. Keep the old installation until the new one works. This version uses the full app archive; see the [update guide](docs/RELEASE-v2.5.0.md).
 
 ### Run from source (developers)
 
@@ -160,7 +171,7 @@ Swei B2 Sans and Swei Toothpaste are bundled in separate SC and TC Black faces (
 
 Use the “译文” selector on the translation page to switch between **Simplified and Traditional Chinese**. The choice saves automatically and applies to subsequent image and PDF translations, including continuation requests and local output normalization. Existing results, editor drafts, and font choices are preserved. [Chinese output guide](docs/CHINESE_OUTPUT.md).
 
-Expand “翻译偏好” on the translation page to choose the default font and vertical column alignment. Both controls start collapsed and save their choices automatically. A specific font applies to all translated text; “自动匹配漫画风格” restores the existing style fonts. “＋ 导入字体” imports multiple TTF, OTF, TTC, or OTC files and selects the last successful import. Font collections use their first face. Default alignment is recorded in newly translated layouts; existing editor drafts retain their own choices.
+Expand “翻译偏好” on the translation page to choose the default font and vertical column alignment. The panel remembers manual expansion choices, and settings save automatically. A specific font applies to all translated text; “自动匹配漫画风格” restores the existing style fonts. “＋ 导入字体” imports multiple TTF, OTF, TTC, or OTC files and selects the last successful import. Font collections use their first face. Default alignment is recorded in newly translated layouts; existing editor drafts retain their own choices.
 
 Both pages support name search in their font selectors. Open “字体库” to filter Google Fonts by name, language, or style, choose a face, and click “下载并使用”. The full catalog is searchable offline, and downloaded fonts remain available without a connection. Ten families in the snapshot lack a license attachment and are currently view-only. See the [font library guide](docs/FONT_LIBRARY.md).
 
@@ -170,7 +181,9 @@ Choices save automatically and apply to the next translation. The editor refresh
 
 The `@ComiTrans` watermark is enabled by default. To disable it, uncheck Add @ComiTrans Watermark on the first Settings tab (Translation Service) and save the configuration. Previously saved off settings are preserved. Subsequent image translations and every PDF page receive a small, translucent Skribble wordmark in the lower-right corner when enabled. The current editor page also updates its preview; click Save Image to write it. Repeated saves do not accumulate the watermark, and the clean background remains unmarked.
 
-A PDF is shown as one file task and processed internally in page-sized batches. On success, ComiTrans writes `<original_name>_translated.pdf`, preserving page count, order, and page sizes while rasterizing page content. Password-protected PDFs are not supported, and PDF pages cannot yet be adjusted block-by-block in the Typesetting Editor.
+Per-page resume is enabled by default. After a network failure, cancellation, or restart, use the same source files, output folder, and translation settings to skip completed pages and reuse saved translations. Uncheck Resume in Translation Preferences to start over. [Resume guide](docs/RESUMABLE_TRANSLATION.md).
+
+A PDF is shown as one file task and processed through a bounded page pipeline. ComiTrans retains the translated PDF, a matching `.comitrans.json` index, and a separate directory of editable pages. Open the result in the Typesetting Editor or import the translated PDF to adjust text, layout, and backgrounds. Continuous Strip mode lets you scroll vertically and click a page to edit it in place. Editing and Save Image operate on individual images. Export PDF explicitly assembles saved pages in the background with lossless compression, progress and cancellation, preserving page count, order, and sizes. You can also import the project directory’s `project.json` without the PDF. Content is rasterized; password-protected PDFs are not supported. Keep the PDF, index, and project directory together when moving them. [PDF editing guide](docs/PDF_EDITING.md).
 
 ### OCR interfaces
 
@@ -233,7 +246,7 @@ Typesetting renders text on a local 3x supersampled surface and downsamples it w
 1. **Bubble & text detection**: an ONNX detector outputs bubbles, text masks, and text lines.
 2. **Source-language OCR**: Japanese uses Baberu/manga-ocr, Korean and English use PP-OCRv5 text-line recognition, or a custom OCR service can be selected. The English-skip rule applies only to Japanese local mode. Empty source/translation regions retain the original artwork.
 3. **LLM translation**: pure-text mode sends OCR results; multimodal mode sends the page image. Local role, glyph, and box heuristics select fonts by default. With experimental font comparison explicitly enabled, the AI identifies a font family among three local candidates, subject to local gates. Size and orientation always stay local.
-4. **Background inpainting**: erases only the detector text mask; simple white bubbles are filled directly, complex backgrounds use LaMa ONNX.
+4. **Background inpainting**: erases only the detector text mask; solid regions retain their actual background color; verified screentones/gradients use local reconstruction, and complex backgrounds use native-resolution tiled LaMa.
 5. **Chinese typesetting**: font size is estimated from the mask area, text is centered on the mask centroid, orientation adapts automatically, and long text gets tighter sizing.
 6. **Save & edit**: output images are saved, cleaned canvases go to `<output_dir>_cleaned/`, layout JSON goes to `<output_dir>_layout/`, and the editor lets you refine everything manually.
 7. **PDF assembly**: once every page succeeds, pages are rebuilt at their original sizes and the PDF is reopened for validation; no partial PDF is emitted if a page fails.
@@ -272,18 +285,20 @@ By default the app is built without models. For local testing with models:
 ### Generate release packages
 
 ```powershell
-python package_release.py
+python package_release.py --output release/v2.5.0
 ```
 
 This Release provides the full app and model archives:
 
-- `ComiTrans-v2.4.1-app.zip`: program only, no models
-- [ComiTrans-v2.4.1-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.4.1/ComiTrans-v2.4.1-models.zip): ONNX models including Japanese, Korean, and English OCR; existing models can be reused
+- `ComiTrans-v2.5.0-app.zip`: program only, no models
+- [ComiTrans-v2.5.0-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.5.0/ComiTrans-v2.5.0-models.zip): ONNX models including Japanese, Korean, and English OCR; existing models can be reused
+
+CUDA/cuDNN libraries are not distributed in this release. GPU users can open official installation links from Settings. The release includes `SHA256SUMS.txt` and `baseline.json`.
 
 Version metadata is stored and committed in the source repository:
 
-- [docs/releases/v2.4.1/baseline.json](docs/releases/v2.4.1/baseline.json): v2.4.1 target build fingerprint
-- [docs/releases/v2.4.1/SHA256SUMS.txt](docs/releases/v2.4.1/SHA256SUMS.txt): v2.4.1 app, models and target baseline checksums
+- [docs/releases/v2.5.0/baseline.json](docs/releases/v2.5.0/baseline.json): v2.5.0 target build fingerprint
+- [docs/releases/v2.5.0/SHA256SUMS.txt](docs/releases/v2.5.0/SHA256SUMS.txt): v2.5.0 app, models and target baseline checksums
 
 - [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json): file hashes and build fingerprint for generating future patches
 - [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt): checksums for the app, models and baseline
@@ -320,6 +335,17 @@ ComiTrans
 ```
 
 ## Changelog
+
+### v2.5.0 (2026-11-02)
+
+- Image-based PDF editing and explicit lossless export; native-resolution tiled repair, improved masks/background reconstruction and outline handling.
+- Bounded streaming translation, actual CUDA provider reporting, faster equivalent background filtering, per-page resume and cached valid translations.
+- Continuous Strip, background project/page/save jobs and regional composition; persistent preference panels and focus-mode choices.
+- Selection repair, per-bubble restoration, default/per-block text colors and word-aware Chinese wrapping.
+- Separate translation/persistence services with strict JSON validation; diagnostics no longer probe PyTorch/CUDA.
+- Official GPU setup links and installed runtime discovery; new installations prefer GPU. CUDA/cuDNN are not bundled. Existing models can be reused.
+- [Detailed update, installation and limitations](docs/RELEASE-v2.5.0.md).
+
 
 ### v2.4.1 (2026-10-18)
 
@@ -421,9 +447,9 @@ App and models remain separate packages; v2.3.0 users can reuse their models. Se
 
 ## FAQ
 
-**Do releases require Python or the CUDA Toolkit?**
+**Do releases require Python or GPU libraries?**
 
-No. Extract the app and models, then run. GPU acceleration only needs an existing NVIDIA driver.
+Python is not required. CPU users can extract the app and models and run. GPU users need a compatible NVIDIA driver, CUDA 12 and cuDNN 9; Settings provide official installation links. Existing compatible installations can be reused. Logs show the actual provider.
 
 **Where do models go?**
 
@@ -435,7 +461,7 @@ Japanese local mode preserves detector-labeled English blocks and high-Latin-rat
 
 **Why is the app archive so small?**
 
-Since v2.2.1 everything is ONNX and PyTorch is gone. Detection, OCR, and inpainting only need onnxruntime.
+Since v2.2.1 everything is ONNX and PyTorch is gone. Detection, OCR, and inpainting use ONNX Runtime. GPU inference also needs compatible CUDA/cuDNN libraries, available via the official installation links in Settings.
 
 ## Feedback
 

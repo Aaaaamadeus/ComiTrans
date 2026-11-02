@@ -5,7 +5,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import onnxruntime as ort
+from comic_translate_core.inference_control import run_inference
+from comic_translate_core.onnx_session import create_onnx_session
 from PIL import Image
 
 
@@ -19,15 +20,7 @@ class OnnxPPOcr:
     def __init__(self, model_path: str, device: str = "cpu"):
         if not Path(model_path).is_file():
             raise FileNotFoundError(f"PP-OCR 模型不存在: {model_path}，请运行 scripts/download_ocr_models.py")
-        providers = ["CPUExecutionProvider"]
-        if device == "cuda" and "CUDAExecutionProvider" in ort.get_available_providers():
-            providers.insert(0, "CUDAExecutionProvider")
-        try:
-            self.session = ort.InferenceSession(str(model_path), providers=providers)
-        except Exception:
-            if len(providers) == 1:
-                raise
-            self.session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+        self.session = create_onnx_session(model_path, device)
         self.input = self.session.get_inputs()[0]
         if len(self.input.shape) != 4:
             raise ValueError("PP-OCR 模型输入必须为 NCHW。")
@@ -50,7 +43,7 @@ class OnnxPPOcr:
         return batch
 
     def recognize(self, image: Image.Image) -> tuple[str, float]:
-        scores = self.session.run(None, {self.input.name: self.preprocess(image)})[0]
+        scores = run_inference(self.session, None, {self.input.name: self.preprocess(image)})[0]
         if scores.ndim != 3 or scores.shape[2] != len(self.characters):
             raise ValueError("PP-OCR 输出与字符字典不匹配。")
         ids = scores[0].argmax(axis=1)

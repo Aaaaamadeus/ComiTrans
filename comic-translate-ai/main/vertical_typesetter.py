@@ -2,6 +2,7 @@ import math
 import traceback
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+from comic_translate_core.layout_options import normalize_text_color
 from punctuation_layout import (
     CENTERED_PUNCTUATION,
     ELLIPSIS_DOT_COUNTS,
@@ -12,6 +13,7 @@ from punctuation_layout import (
     normalize_cjk_punctuation,
     normalize_line_breaks,
     vertical_form,
+    wrap_paragraph,
     wrap_vertical_text,
 )
 
@@ -181,13 +183,14 @@ class VerticalTypesetter:
         return surface, ImageDraw.Draw(surface), left, top, scale
 
     @staticmethod
-    def _composite_render_surface(image, surface, left, top, scale):
+    def _composite_render_surface(image, surface, left, top, scale, composite=True):
         if scale > 1:
             surface = surface.resize(
                 (max(1, surface.width // scale), max(1, surface.height // scale)),
                 Image.Resampling.LANCZOS,
             )
-        image.paste(surface, (left, top), surface)
+        if composite:
+            image.paste(surface, (left, top), surface)
         return surface, left, top
 
     def _calculate_layout_fast(self, text, font, limit, is_horizontal=False, spacing=None):
@@ -474,38 +477,14 @@ class VerticalTypesetter:
             current_x += width
 
     def wrap_text_horizontal(self, text, max_width, font):
-        """【新增】根据宽度自动分行（横排模式）"""
-        text = normalize_line_breaks(text)
-        if '\n' in text:
-            return [line for paragraph in text.split('\n')
-                    for line in (self.wrap_text_horizontal(paragraph, max_width, font) or [''])]
-        text = normalize_cjk_punctuation(text)
-        lines = []
-        current_line = ""
-        # 简单的溢出容忍系数
-        sample_w = self._font_advance(font, "国")
-        overflow_tolerance = sample_w * 0.8
+        if not text:
+            return []
+        def width(value):
+            return self._font_advance(font, value)
 
-        for i, char in enumerate(text):
-            proposed = current_line + char
-            proposed_width = self._font_advance(font, proposed)
-
-            # 核心逻辑：当前行宽 + 新字宽 > 最大宽度
-            if current_line and proposed_width > max_width:
-                # 容忍逻辑：如果是最后一个字，且超出不多，不换行
-                is_last_char = (i == len(text) - 1)
-                if is_last_char and proposed_width <= max_width + overflow_tolerance:
-                    current_line += char
-                    break
-
-                lines.append(current_line)
-                current_line = char
-            else:
-                current_line = proposed
-
-        if current_line:
-            lines.append(current_line)
-        return lines
+        tolerance = width("国") * 0.8
+        return [line for part in normalize_line_breaks(text).split('\n')
+                for line in wrap_paragraph(normalize_cjk_punctuation(part), max_width, width, tolerance)]
 
     def wrap_text_vertical(self, text, max_height, font):
         cell_size = self._vertical_cell_size(font)
@@ -526,6 +505,9 @@ class VerticalTypesetter:
         manual_layout=False,
         text_effect="auto",
         vertical_alignment="center",
+        text_color=None,
+        source_outline_ratio=None,
+        composite=True,
     ):
         """执行竖排绘制 (使用绝对居中算法 anchor='mm')"""
         try:
@@ -746,8 +728,8 @@ class VerticalTypesetter:
 
             # 保底逻辑
             if current_font is None:
-                best_size = 12
-                current_font = self._get_font_object(font_style, 12)
+                best_size = min(12, preferred_size) if preferred_size else 12
+                current_font = self._get_font_object(font_style, best_size)
                 _, _, best_lines_struct, best_col_spacing = self._calculate_layout_fast(
                     clean_text, current_font, constraint_limit, is_horizontal=is_horizontal
                 )
@@ -756,11 +738,17 @@ class VerticalTypesetter:
             if not columns:
                 return image
             stroke_width = self._stroke_width(style, best_size, non_bubble=non_bubble)
+            requested_color = normalize_text_color(text_color)
             text_color, stroke_color = self.color, "white"
             if text_effect in ("outlined", "hollow"):
-                stroke_width = max(1, int(round(best_size * 0.055)))
+                ratio = 0.055
+                if (text_effect == "outlined" and type(source_outline_ratio) in (float, int)
+                        and 0 < source_outline_ratio <= .3):
+                    ratio = source_outline_ratio
+                stroke_width = max(1, int(round(best_size * ratio)))
             if text_effect == "hollow":
                 text_color, stroke_color = "white", "black"
+            text_color = requested_color or text_color
             text_surface, draw, render_left, render_top, render_scale = (
                 self._make_render_surface(
                     image,
@@ -905,6 +893,7 @@ class VerticalTypesetter:
                 render_left,
                 render_top,
                 render_scale,
+                composite=composite,
             )
 
             # #调试框 (取消注释可查看排版范围)
@@ -933,9 +922,5 @@ class VerticalTypesetter:
             return image
 
         except Exception as e:
-            if manual_layout:
-                raise
-            import traceback
-            print(f"【严重错误】draw_text 崩溃: {e}")
-            traceback.print_exc()
-            return image
+            # Callers must not publish an erased page as successfully typeset.
+            raise

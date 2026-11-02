@@ -1,0 +1,28 @@
+{
+  "scope": "native_image_decode_ocr_simulated_api_repair_typeset_save",
+  "simulated_api_seconds": 2.0,
+  "capacity": 4,
+  "results": [
+    {
+      "mode": "batch_barrier",
+      "seconds": 42.429096499996376,
+      "first_page_seconds": 23.120421600004192,
+      "page_completions": [
+        23.120421600004192,
+        32.05895639999653,
+        42.42383109999355
+      ]
+    },
+    {
+      "mode": "streaming",
+      "seconds": 37.85106790000282,
+      "first_page_seconds": 18.69109190000745,
+      "page_completions": [
+        18.69109190000745,
+        27.378874200003338,
+        37.8467859000084
+      ]
+    }
+  ],
+  "identical_output_pixels": true
+}

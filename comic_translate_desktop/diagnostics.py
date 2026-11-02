@@ -43,14 +43,6 @@ class Diagnostics:
     def build_prompt(self) -> str:
         config = app_config.load_ai_config()
         try:
-            import torch
-
-            torch_version = torch.__version__
-            cuda_available = torch.cuda.is_available()
-        except Exception:
-            torch_version = "未知"
-            cuda_available = False
-        try:
             import PySide6
 
             pyside_version = PySide6.__version__
@@ -67,8 +59,6 @@ class Diagnostics:
                 f"- 操作系统: {platform.platform()}",
                 f"- Python: {sys.version.split()[0]}",
                 f"- PySide6: {pyside_version}",
-                f"- Torch: {torch_version}",
-                f"- CUDA 可用: {cuda_available}",
                 f"- 翻译模型: {config.get('translation_model', '')}",
                 f"- API Base URL: {config.get('api_base_url', '')}",
                 f"- API Key: {key_display}",

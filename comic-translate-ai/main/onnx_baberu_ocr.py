@@ -12,7 +12,9 @@ import unicodedata
 from pathlib import Path
 
 import numpy as np
+from comic_translate_core.inference_control import run_inference
 import onnxruntime as ort
+from comic_translate_core.onnx_session import create_onnx_session
 from PIL import Image
 
 
@@ -83,19 +85,10 @@ class OnnxBaberuOcr:
         options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         # 当前发布的 int4 视觉模型在 CPU EP 上兼容性最好。若使用 fp16 版本且
         # CUDA EP 可用，则优先让 ORT 尝试 GPU，失败时自动回退 CPU。
-        providers = (
-            ["CUDAExecutionProvider", "CPUExecutionProvider"]
-            if device == "cuda" and vision_name == "vision_fp16.onnx"
-            else ["CPUExecutionProvider"]
-        )
+        session_device = device if vision_name == "vision_fp16.onnx" else "cpu"
 
         def make_session(path: Path):
-            try:
-                return ort.InferenceSession(str(path), options, providers=providers)
-            except Exception:
-                return ort.InferenceSession(
-                    str(path), options, providers=["CPUExecutionProvider"]
-                )
+            return create_onnx_session(path, session_device, sess_options=options)
 
         self.vision = make_session(onnx_dir / vision_name)
         self.decoder_prefill = make_session(onnx_dir / "decoder_prefill_int8.onnx")
@@ -119,10 +112,10 @@ class OnnxBaberuOcr:
             raise ValueError("image_or_path 必须是路径或 PIL.Image")
 
         vocab = self.vocab
-        vision_embeds = self.vision.run(
+        vision_embeds = run_inference(self.vision,
             ["vision_embeds"], {"pixel_values": preprocess(image)}
         )[0]
-        outputs = self.decoder_prefill.run(
+        outputs = run_inference(self.decoder_prefill,
             None,
             {
                 "vision_embeds": vision_embeds,
@@ -169,7 +162,7 @@ class OnnxBaberuOcr:
             feed.update(
                 {name: value for name, value in zip(_PAST_NAMES, present)}
             )
-            outputs = self.decoder_step.run(None, feed)
+            outputs = run_inference(self.decoder_step, None, feed)
             logits = outputs[0][0, -1].astype(np.float64)
             present = outputs[1:]
             position += 1

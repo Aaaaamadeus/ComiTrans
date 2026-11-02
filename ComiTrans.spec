@@ -62,9 +62,12 @@ a = Analysis(
     binaries=[],
     datas=datas,
     hiddenimports=hidden_imports,
-    hookspath=[],
+    hookspath=[os.path.join(SPECPATH, "scripts", "pyinstaller_hooks")],
     runtime_hooks=[],
     excludes=[
+        "jieba.lac_small",
+        "jieba.posseg",
+        "jieba.analyse",
         "torch",
         "torchvision",
         "transformers",
@@ -89,6 +92,11 @@ a = Analysis(
     ],
     noarchive=False,
 )
+
+# The OpenCV hook collects an optional Windows video backend. ComiTrans uses
+# OpenCV for still images and processes PDFs through Qt.
+a.binaries = [entry for entry in a.binaries
+              if not Path(entry[0]).match("opencv_videoio_ffmpeg*.dll")]
 
 pyz = PYZ(a.pure)
 

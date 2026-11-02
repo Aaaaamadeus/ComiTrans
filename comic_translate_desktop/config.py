@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 from comic_translate_core.chinese import normalize_target_language
-from comic_translate_core.layout_options import normalize_vertical_alignment
+from comic_translate_core.layout_options import normalize_text_color, normalize_vertical_alignment
 from .i18n import normalize_ui_language
 from comic_translate_core.languages import (
     OCR_DEFAULTS, OCR_CONFIG_KEYS, effective_ocr_backend, source_language, validate_ocr_config,
@@ -130,6 +130,7 @@ def load_ai_config() -> dict[str, Any]:
         "translation_model": _clean_text(raw.get("translation_model")) or "gemini-2.5-flash",
         "target_language": normalize_target_language(raw.get("target_language")),
         "vertical_alignment": normalize_vertical_alignment(raw.get("vertical_alignment")),
+        "text_color": normalize_text_color(raw.get("text_color")),
         "translation_prompt": str(raw.get("translation_prompt") or ""),
         "chinese_names": str(raw.get("chinese_names") or ""),
         "font_size": int(raw.get("font_size") or 16),
@@ -142,8 +143,9 @@ def load_ai_config() -> dict[str, Any]:
         "watermark_enabled": bool(raw.get("watermark_enabled", True)),
         "max_workers": int(raw.get("max_workers") or 4),
         "pdf_dpi": int(raw.get("pdf_dpi") or 200),
+        "resume_enabled": bool(raw.get("resume_enabled", True)),
         "issue_url": str(raw.get("issue_url") or ""),
-        "use_gpu": bool(raw.get("use_gpu", False)),
+        "use_gpu": bool(raw.get("use_gpu", True)),
         "font_map": font_map,
         "style_font_map": style_font_map,
         "font_fallbacks": font_fallbacks,

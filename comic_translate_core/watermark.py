@@ -31,29 +31,38 @@ def _wordmark(width: int) -> Image.Image:
     return layer.resize((width, height), Image.Resampling.LANCZOS)
 
 
-def apply_watermark(image: Image.Image, *, enabled: bool = True) -> Image.Image:
-    """Return a marked copy; disabled output is the original image without any I/O.
+def watermark_overlay(size):
+    page_width, page_height = size
+    short_edge = min(size)
+    right_margin = max(1, round(short_edge * .020))
+    bottom_margin = max(1, round(short_edge * .016))
+    width = max(1, min(round(page_width * .14), page_width - right_margin * 2))
+    layer = _wordmark(width)
+    # Very wide pages must still leave the artwork visible and keep the mark in bounds.
+    max_height = max(1, min(round(page_height * .05), page_height - bottom_margin * 2))
+    if layer.height > max_height:
+        layer = layer.resize(
+            (max(1, round(layer.width * max_height / layer.height)), max_height),
+            Image.Resampling.LANCZOS,
+        )
+    x = page_width - right_margin - layer.width
+    y = page_height - bottom_margin - layer.height
+    return layer, x, y
+
+
+def apply_watermark(image: Image.Image, *, enabled: bool = True, in_place: bool = False) -> Image.Image:
+    """Mark a copy by default. An owned final canvas can be marked in place.
 
     The signature spans 14% of the page width, inset from the lower-right edge.
     Always call with a freshly typeset image so repeated saves cannot accumulate it.
     """
     if not enabled or min(image.size) < 8:
         return image
-    short_edge = min(image.size)
-    right_margin = max(1, round(short_edge * .020))
-    bottom_margin = max(1, round(short_edge * .016))
-    width = max(1, min(round(image.width * .14), image.width - right_margin * 2))
-    layer = _wordmark(width)
-    # Very wide pages must still leave the artwork visible and keep the mark in bounds.
-    max_height = max(1, min(round(image.height * .05), image.height - bottom_margin * 2))
-    if layer.height > max_height:
-        layer = layer.resize(
-            (max(1, round(layer.width * max_height / layer.height)), max_height),
-            Image.Resampling.LANCZOS,
-        )
-    x = image.width - right_margin - layer.width
-    y = image.height - bottom_margin - layer.height
-    result = image.copy() if image.mode in ("RGB", "RGBA", "L", "LA") else image.convert("RGBA")
+    layer, x, y = watermark_overlay(image.size)
+    if image.mode in ("RGB", "RGBA", "L", "LA"):
+        result = image if in_place else image.copy()
+    else:
+        result = image.convert("RGBA")
     region = (x, y, x + layer.width, y + layer.height)
     composed = Image.alpha_composite(result.crop(region).convert("RGBA"), layer)
     result.paste(composed.convert(result.mode), (x, y))

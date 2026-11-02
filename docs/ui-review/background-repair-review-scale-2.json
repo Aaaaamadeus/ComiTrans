@@ -1,0 +1,56 @@
+[
+  {
+    "real_model": true,
+    "changed_box": [
+      26,
+      26,
+      70,
+      70
+    ],
+    "undo_exact": true,
+    "save_reload": true,
+    "elapsed_seconds": 14.08
+  },
+  {
+    "language": "zh-CN",
+    "width": 1440,
+    "height": 900,
+    "buttons_visible": true,
+    "screenshot": "background-repair-zh-CN-1440-scale-2.png"
+  },
+  {
+    "language": "zh-CN",
+    "width": 820,
+    "height": 480,
+    "buttons_visible": true,
+    "screenshot": "background-repair-zh-CN-820-scale-2.png"
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "height": 900,
+    "buttons_visible": true,
+    "screenshot": "background-repair-en-1440-scale-2.png"
+  },
+  {
+    "language": "en",
+    "width": 820,
+    "height": 480,
+    "buttons_visible": true,
+    "screenshot": "background-repair-en-820-scale-2.png"
+  },
+  {
+    "language": "ja",
+    "width": 1440,
+    "height": 900,
+    "buttons_visible": true,
+    "screenshot": "background-repair-ja-1440-scale-2.png"
+  },
+  {
+    "language": "ja",
+    "width": 820,
+    "height": 480,
+    "buttons_visible": true,
+    "screenshot": "background-repair-ja-820-scale-2.png"
+  }
+]

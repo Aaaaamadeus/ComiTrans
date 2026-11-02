@@ -6,7 +6,8 @@ from pathlib import Path
 
 import jaconv
 import numpy as np
-import onnxruntime as ort
+from comic_translate_core.inference_control import run_inference
+from comic_translate_core.onnx_session import create_onnx_session
 from PIL import Image
 from tokenizers import Tokenizer
 
@@ -21,13 +22,8 @@ class OnnxMangaOcr:
         if not (self.encoder_path.exists() and self.decoder_path.exists() and self.tokenizer_path.exists()):
             raise FileNotFoundError(f"OCR ONNX 模型不完整: {model_dir}")
 
-        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"] if device == "cuda" else ["CPUExecutionProvider"]
-        try:
-            self.encoder = ort.InferenceSession(str(self.encoder_path), providers=providers)
-            self.decoder = ort.InferenceSession(str(self.decoder_path), providers=providers)
-        except Exception:
-            self.encoder = ort.InferenceSession(str(self.encoder_path), providers=["CPUExecutionProvider"])
-            self.decoder = ort.InferenceSession(str(self.decoder_path), providers=["CPUExecutionProvider"])
+        self.encoder = create_onnx_session(self.encoder_path, device)
+        self.decoder = create_onnx_session(self.decoder_path, device)
         self.tokenizer = Tokenizer.from_file(str(self.tokenizer_path))
 
         config = json.loads(self.config_path.read_text(encoding="utf-8")) if self.config_path.exists() else {}
@@ -45,11 +41,11 @@ class OnnxMangaOcr:
             raise ValueError("img_or_path must be a path or PIL.Image")
 
         pixel_values = self._preprocess(img)
-        encoder_hidden_states = self.encoder.run(None, {"pixel_values": pixel_values})[0]
+        encoder_hidden_states = run_inference(self.encoder, None, {"pixel_values": pixel_values})[0]
 
         ids = [self.decoder_start_token_id]
         for _ in range(self.max_length):
-            logits = self.decoder.run(
+            logits = run_inference(self.decoder,
                 None,
                 {
                     "input_ids": np.asarray([ids], dtype=np.int64),

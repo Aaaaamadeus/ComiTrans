@@ -13,3 +13,4 @@ tokenizers>=0.20.0
 jaconv>=0.3
 fonttools>=4.50.0
 opencc-python-reimplemented==0.1.7
+jieba==0.42.1

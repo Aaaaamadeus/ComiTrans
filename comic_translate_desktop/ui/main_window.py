@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QAbstractItemView,
     QComboBox,
+    QCheckBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -48,6 +49,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from comic_translate_core.pipeline_settings import apply_runtime_settings
 from .. import config as app_config
 from ..config import config_fingerprint, missing_models, save_ai_config
 from comic_translate_core.languages import SOURCE_LANGUAGES, validate_ocr_config
@@ -55,6 +57,7 @@ from comic_translate_core.chinese import TARGET_LANGUAGES, target_language_name
 from comic_translate_core.layout_options import VERTICAL_ALIGNMENTS
 from ..diagnostics import Diagnostics
 from ..pdf_utils import render_pdf_preview
+from ..pdf_project import project_link_path
 from ..worker import BatchWorker
 from .api_config_page import ApiConfigPage
 from .editor_page import EditorPage
@@ -64,6 +67,7 @@ from .theme import APP_STYLESHEET, brand_font, refresh_style
 from .preview import ImagePreview
 from .log_panel import LogPanel
 from .font_picker import TranslationFontPicker
+from .color_picker import TextColorPicker
 from .manga_components import PanelHeading, StageFocus
 from .step_panel import STAGE_LABELS, STAGE_ORDER
 from .star_prompt import StarPrompt, STAR_PROMPT_PROBABILITY
@@ -365,6 +369,17 @@ class MainWindow(QMainWindow):
         pref_layout.setContentsMargins(0, 0, 0, 0)
         pref_layout.setSpacing(10)
         pref_layout.addWidget(self._font_picker)
+        color_row = QHBoxLayout()
+        color_row.addWidget(QLabel(tr('文字颜色')))
+        self._translation_color = TextColorPicker(self.config.get('text_color'))
+        self._translation_color.setAccessibleName(tr('译文默认文字颜色'))
+        self._translation_color.color_changed.connect(self._change_translation_color)
+        color_row.addWidget(self._translation_color)
+        color_hint = QLabel(tr('自动保存 · 下次翻译生效'))
+        color_hint.setProperty('muted', True)
+        color_hint.setWordWrap(True)
+        color_row.addWidget(color_hint, 1)
+        pref_layout.addLayout(color_row)
         alignment_row = QHBoxLayout()
         alignment_row.addWidget(QLabel(tr('竖排列对齐')))
         self._translation_alignment = QComboBox()
@@ -382,6 +397,12 @@ class MainWindow(QMainWindow):
         alignment_hint.setWordWrap(True)
         alignment_row.addWidget(alignment_hint, 1)
         pref_layout.addLayout(alignment_row)
+
+        self._resume_enabled = QCheckBox(tr('断点续传：跳过已完成页面'))
+        self._resume_enabled.setChecked(self.config.get('resume_enabled', True))
+        self._resume_enabled.setToolTip(tr('中断后重新添加原文件并使用同一输出目录，即可继续。取消勾选将从头翻译。'))
+        self._resume_enabled.toggled.connect(self._save_translation_preferences)
+        pref_layout.addWidget(self._resume_enabled)
 
         prompt_panel = QVBoxLayout()
         prompt_panel.setSpacing(4)
@@ -409,12 +430,26 @@ class MainWindow(QMainWindow):
 
         context_row = QHBoxLayout()
         context_row.setSpacing(10)
+        self._preference_context_layout = context_row
         context_row.addLayout(prompt_panel, 1)
         context_row.addLayout(names_panel, 1)
         pref_layout.addLayout(context_row)
 
         self._prompt_input.setPlainText(self.config.get("translation_prompt", ""))
         self._names_input.setPlainText(self.config.get("chinese_names", ""))
+        self._pref_scroll_value = 0
+        self._pref_save_error = False
+        preference_status = QHBoxLayout()
+        self._pref_status = QLabel(tr('设置会自动保存'))
+        self._pref_status.setWordWrap(True)
+        self._pref_status.setProperty('muted', True)
+        self._pref_retry = QPushButton(tr('重试保存'))
+        self._pref_retry.setProperty('compact', True)
+        self._pref_retry.setVisible(False)
+        self._pref_retry.clicked.connect(self._save_translation_preferences)
+        preference_status.addWidget(self._pref_status, 1)
+        preference_status.addWidget(self._pref_retry)
+        pref_layout.addLayout(preference_status)
         self._pref_toggle.toggled.connect(self._toggle_preferences)
         self._pref_save_timer = QTimer(self)
         self._pref_save_timer.setSingleShot(True)
@@ -539,6 +574,19 @@ class MainWindow(QMainWindow):
         self._font_picker.load_config(updated)
         self._elapsed_label.setText(tr('批量翻译 · 输出{_0}', _0=tr(target_language_name(target))))
         self._append_log(tr('译文已切换为 {_0}，下次翻译生效。', _0=tr(target_language_name(target))))
+
+    def _change_translation_color(self, color) -> None:
+        try:
+            updated = save_ai_config({'text_color': color or ''})
+        except OSError as exc:
+            self._translation_color.set_color(self.config.get('text_color'))
+            self._set_status(tr('文字颜色未保存'), 'error')
+            self._append_log(tr('文字颜色未保存：{error}', error=str(exc)))
+            return
+        self.config = updated
+        if self.pipeline is not None:
+            self.pipeline.text_color = updated['text_color']
+        self._append_log(tr('译文颜色已保存，下次翻译生效。'))
 
     def _change_translation_alignment(self) -> None:
         value = self._translation_alignment.currentData()
@@ -767,7 +815,9 @@ class MainWindow(QMainWindow):
 
         self._apply_output_dir()
         self.step_panel.reset()
-        self._save_translation_preferences()
+        if not self._save_translation_preferences():
+            self._set_status(tr('偏好未保存，请重试'), 'error')
+            return
         missing = missing_models(self.config)
         if missing:
             detail = "\n".join(missing)
@@ -859,6 +909,7 @@ class MainWindow(QMainWindow):
         self._output_dir_input.setEnabled(not running)
         self._browse_output_btn.setEnabled(not running)
         self._font_picker.setEnabled(not running and not warming)
+        self._translation_color.setEnabled(not running and not warming)
         self._pref_container.setEnabled(not running)
         self._settings_btn.setEnabled(not running)
         self._remove_btn.setEnabled(not running and selected_count > 0)
@@ -868,7 +919,8 @@ class MainWindow(QMainWindow):
         self._target_language.setEnabled(not running and not warming)
         self._translation_alignment.setEnabled(not running and not warming)
         self._file_count_label.setText(tr('{_0} 个文件', _0=count))
-        self.step_panel.setVisible(count > 0 or running)
+        self.step_panel.setVisible((count > 0 or running)
+                                   and not (self.height() < 680 and self._pref_toggle.isChecked()))
         self.stage_focus.setVisible(count > 0 or running or warming)
         self._page_progress_label.setVisible(count > 0 or running)
         self._progress_label.setVisible(count > 0 or running)
@@ -877,8 +929,9 @@ class MainWindow(QMainWindow):
         )
         selected = self.file_list.selectedItems()
         output = self.results.get(selected[-1].data(Qt.UserRole)) if selected else None
-        self._edit_result_btn.setEnabled(bool(output and Path(output).suffix.lower() != ".pdf"))
-        self._edit_result_btn.setToolTip(tr('精修已生成的图片') if self._edit_result_btn.isEnabled() else tr('请选择已完成的图片；PDF 暂无持久化精修数据'))
+        self._edit_result_btn.setEnabled(bool(output and (
+            Path(output).suffix.lower() != ".pdf" or project_link_path(output).is_file())))
+        self._edit_result_btn.setToolTip(tr('精修已生成的图片或 PDF') if self._edit_result_btn.isEnabled() else tr('请选择已完成且带精修资料的图片或 PDF'))
         if warming:
             self._start_btn.setToolTip(tr('本地模型正在准备，完成后即可开始'))
         elif not count:
@@ -932,6 +985,7 @@ class MainWindow(QMainWindow):
         if selected and selected[-1].data(Qt.UserRole) == key:
             self.result_view.set_image(output_path)
             self.preview_tabs.setCurrentWidget(self.result_view)
+        self._update_actions()
 
     def _on_image_failed(self, name: str, message: str) -> None:
         self.step_panel.mark_failed()
@@ -1023,6 +1077,8 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentWidget(self.api_config_page)
 
     def _on_tab_changed(self, index: int) -> None:
+        if self._pref_save_timer.isActive():
+            self._save_translation_preferences()
         page = self.tabs.widget(index)
         self._nav_auto.setChecked(page is self.translate_tab)
         self._nav_editor.setChecked(page is self.editor_page)
@@ -1034,8 +1090,8 @@ class MainWindow(QMainWindow):
             selected = self.file_list.selectedItems()
             if selected:
                 output = self.results.get(selected[-1].data(Qt.UserRole))
-                if output and Path(output).suffix.lower() != ".pdf":
-                    self.editor_page.load_page(output)
+                if output:
+                    self.editor_page.request_page(output)
 
     def _show_error_log(self) -> None:
         self.error_log_page.refresh()
@@ -1045,8 +1101,15 @@ class MainWindow(QMainWindow):
         self.error_log_page.refresh()
 
     def _toggle_preferences(self, checked: bool) -> None:
+        if not checked:
+            self._pref_scroll_value = self._pref_container.verticalScrollBar().value()
+            if self._pref_save_timer.isActive():
+                self._save_translation_preferences()
         self._pref_toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow)
         self._pref_container.setVisible(checked)
+        if checked:
+            QTimer.singleShot(0, lambda: self._pref_container.verticalScrollBar().setValue(self._pref_scroll_value))
+        self._ui_settings.setValue('ui/preferencesVisible', checked)
         self._apply_compact_layout()
 
     def _toggle_log_panel(self, visible: bool) -> None:
@@ -1059,7 +1122,11 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'preview_tabs'):
             return
         compact = self.height() < 680
-        self._pref_container.setMaximumHeight(160 if compact else 240)
+        # Leave a useful image viewport; additional preferences scroll inside the foldout.
+        self._pref_container.setMinimumHeight(120 if self._pref_toggle.isChecked() else 0)
+        self._pref_container.setMaximumHeight(max(120, min(280, self.height() - 440)))
+        if hasattr(self, '_preference_context_layout'):
+            self._preference_context_layout.setDirection(QHBoxLayout.TopToBottom if self._pref_container.width() < 580 else QHBoxLayout.LeftToRight)
         self._brand_title.setFont(brand_font(28 if self.width() < 960 else 36 if self.width() < 1180 else 40))
         self._header_layout.setContentsMargins(12 if self.width() < 1120 else 20, 8, 12 if self.width() < 1120 else 20, 8)
         self._nav_auto.setText(tr('自动处理') if self.width() < 1120 else tr('01  自动处理'))
@@ -1090,11 +1157,14 @@ class MainWindow(QMainWindow):
             self._control_grid.addWidget(self._output_controls, 0 if inline else 1, 1 if inline else 0, 1, 1 if inline else 3)
             self._control_grid.addWidget(self._start_btn, 0, 2)
             self._control_grid.setColumnStretch(1, 1)
-        self._output_controls.setVisible(self.height() >= 580)
+        editing_preferences = compact and self._pref_toggle.isChecked()
+        self._output_controls.setVisible(self.height() >= 580 and not editing_preferences)
+        self.step_panel.setVisible((self.file_list.count() > 0 or self.worker is not None) and not editing_preferences)
         self._elapsed_label.setVisible(not compact)
         self.step_panel.set_compact(compact)
-        self.preview_tabs.setVisible(not compact or not self._log_toggle.isChecked())
-        self._log_toggle.setToolTip(tr('小窗口下，收起日志可查看图像') if compact else tr('独立展开或收起详细日志'))
+        self.preview_tabs.setVisible(True)
+        self._log_panel.setMaximumHeight(100 if compact else 16777215)
+        self._log_toggle.setToolTip(tr('独立展开或收起详细日志'))
         margin = 12 if self.width() < 1180 else 20
         self._work_layout.setContentsMargins(margin, 8 if compact else 14, margin, 12)
         self._work_layout.setSpacing(4 if compact else 8)
@@ -1111,22 +1181,41 @@ class MainWindow(QMainWindow):
             self._star_prompt.reposition()
 
     def _schedule_save_preferences(self) -> None:
+        self._pref_status.setText(tr('修改待保存…'))
+        self._pref_toggle.setToolTip(tr('修改待保存，收起面板也会立即保存。'))
         self._pref_save_timer.start()
 
-    def _save_translation_preferences(self) -> None:
-        self.config["translation_prompt"] = self._prompt_input.toPlainText().strip()
-        self.config["chinese_names"] = self._names_input.toPlainText().strip()
-        self.config = save_ai_config(
-            {
-                "translation_prompt": self.config["translation_prompt"],
-                "chinese_names": self.config["chinese_names"],
-            }
-        )
-        if self.pipeline is not None:
-            self.pipeline.translation_prompt = self.config["translation_prompt"]
-            self.pipeline.chinese_names = self.config["chinese_names"]
+    def _save_translation_preferences(self) -> bool:
+        self._pref_save_timer.stop()
+        values = {
+            'translation_prompt': self._prompt_input.toPlainText().strip(),
+            'chinese_names': self._names_input.toPlainText().strip(),
+            'resume_enabled': self._resume_enabled.isChecked(),
+        }
+        try:
+            if self._pref_save_error or any(self.config.get(key) != value for key, value in values.items()):
+                updated = save_ai_config(values)
+                self.config = updated
+                if self.pipeline is not None:
+                    apply_runtime_settings(self.pipeline, updated)
+        except (OSError, ValueError) as exc:
+            self._pref_save_error = True
+            message = tr('保存失败，修改仍保留：{_0}', _0=exc)
+            self._pref_status.setText(message)
+            self._pref_toggle.setText(tr('翻译偏好 · 未保存'))
+            self._pref_toggle.setToolTip(message)
+            self._pref_retry.setVisible(True)
+            return False
+        self._pref_save_error = False
+        self._pref_status.setText(tr('已自动保存'))
+        self._pref_toggle.setText(tr('翻译偏好'))
+        self._pref_toggle.setToolTip(tr('偏好已保存；展开状态会记住。'))
+        self._pref_retry.setVisible(False)
+        return True
 
     def _save_api_config(self) -> None:
+        if not self._save_translation_preferences():
+            return
         updates = self.api_config_page.values()
         errors = validate_ocr_config({**self.config, **updates})
         if errors:
@@ -1146,7 +1235,9 @@ class MainWindow(QMainWindow):
             return
         self.api_config_page.load_config(self.config)
         self._font_picker.load_config(self.config)
+        self._translation_color.set_color(self.config.get('text_color'))
         self.editor_page.set_watermark_enabled(bool(self.config.get("watermark_enabled", True)))
+        self.editor_page.set_repair_config(self.config)
         self._source_language.blockSignals(True)
         self._source_language.setCurrentIndex(max(0, self._source_language.findData(self.config.get("source_language", "ja"))))
         self._source_language.blockSignals(False)
@@ -1162,14 +1253,7 @@ class MainWindow(QMainWindow):
             self.api_config_page._save_status.setText(tr('界面语言已保存，下次启动生效。'))
         fingerprint = config_fingerprint(self.config)
         if self.pipeline and self.pipeline_fingerprint == fingerprint:
-            self.pipeline.api_key = self.config["api_key"]
-            self.pipeline.api_base_url = self.config["api_base_url"]
-            self.pipeline.translation_model = self.config["translation_model"]
-            self.pipeline.translation_prompt = self.config.get("translation_prompt", "")
-            self.pipeline.target_language = self.config['target_language']
-            self.pipeline.vertical_alignment = self.config['vertical_alignment']
-            self.pipeline.chinese_names = self.config.get("chinese_names", "")
-            self.pipeline.multimodal = bool(self.config.get("multimodal", False))
+            apply_runtime_settings(self.pipeline, self.config)
         else:
             self.pipeline = None
         self._set_status(tr('配置已保存'), "success")
@@ -1219,7 +1303,11 @@ class MainWindow(QMainWindow):
         event.acceptProposedAction()
 
     def closeEvent(self, event) -> None:
-        if not self.editor_page.confirm_discard():
+        if (self._pref_save_timer.isActive() or self._pref_save_error) and not self._save_translation_preferences():
+            self._set_status(tr('偏好未保存，请重试'), 'error')
+            event.ignore()
+            return
+        if not self.editor_page._allow_navigation(self.close):
             event.ignore()
             return
         if self.worker and self.worker.isRunning():
@@ -1244,4 +1332,5 @@ class MainWindow(QMainWindow):
         self._ui_settings.setValue("ui/logVisible", self._log_toggle.isChecked())
         self._ui_settings.setValue("ui/preferencesVisible", self._pref_toggle.isChecked())
         self._star_prompt.dismiss()
+        self.editor_page.shutdown_jobs()
         event.accept()

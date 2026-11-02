@@ -33,4 +33,4 @@ if ($IncludeModels) {
 
 Write-Host ""
 Write-Host "打包完成: dist\ComiTrans\ComiTrans.exe"
-Write-Host "注意: 发布时需要同时上传主程序包和模型包，模型解压到 ComiTrans\comic-translate-ai\models"
+Write-Host "发布时只上传程序和模型两个包；GPU 运行库由软件内的官方安装链接提供，不打包上传。"

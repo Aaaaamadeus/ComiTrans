@@ -17,12 +17,13 @@ from .font_catalog import load_catalog
 from .ui.font_library_dialog import FontLibraryDialog
 from .i18n import install_qt_language, load_ui_catalog, set_ui_language, tr
 from .ui.language_dialog import InterfaceLanguageDialog
+from .ui.gpu_setup_dialog import GpuSetupDialog
 from .ui.star_prompt import STAR_PROMPT_PROBABILITY, STAR_PROMPT_IDLE_MS
 from .ui.theme import install_ui_font
 from comic_translate_core.chinese import convert_chinese
 
 
-def run_smoke_test(app, output_dir):
+def run_smoke_test(app, output_dir, *, require_gpu=False):
     output = Path(output_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
     # Exercise default local models without loading the user's API credentials.
@@ -32,6 +33,7 @@ def run_smoke_test(app, output_dir):
     app.setApplicationName("ComiTrans-Smoke-Test")
     QSettings.setDefaultFormat(QSettings.IniFormat)
     QSettings.setPath(QSettings.IniFormat, QSettings.UserScope, str(output / "settings"))
+    config.save_ai_config({'use_gpu': require_gpu})
     window = MainWindow()
     window.setAttribute(Qt.WA_DontShowOnScreen, True)
     window.show()
@@ -51,6 +53,33 @@ def run_smoke_test(app, output_dir):
             result["svg_valid"] = QSvgRenderer(str(config.ICON_PATH.parent / "ui/icons/chevron-down.svg")).isValid()
             result["window_visible"] = window.isVisible()
             pipeline = window.pipeline
+            if pipeline is not None:
+                import numpy as np
+                from PIL import Image
+                result['providers'] = {
+                    'detector': pipeline.detector.session.get_providers(),
+                    'inpainting': pipeline.inpainter.onnx_session.get_providers(),
+                }
+                for name, value in vars(pipeline.ocr).items():
+                    if hasattr(value, 'get_providers'):
+                        result['providers']['ocr_' + name] = value.get_providers()
+                # The bundled Baberu int4/int8 models deliberately use CPU.
+                # Require CUDA for every stage that actually requests it.
+                result['ocr_cpu_expected'] = getattr(pipeline.ocr, 'vision_name', '') == 'vision_int4.onnx'
+                result['gpu_active'] = all('CUDAExecutionProvider' in p
+                    for name, p in result['providers'].items()
+                    if not (name.startswith('ocr_') and result['ocr_cpu_expected']))
+                pipeline.detector(np.full((256, 256, 3), 255, np.uint8))
+                recognized = pipeline.ocr_engine.recognize(Image.new('RGB', (128, 192), 'white'), 'ja')
+                result['real_detection_and_ocr'] = isinstance(recognized.text, str)
+                yy, xx = np.indices((384, 512))
+                pixels = np.stack(((xx % 256), (yy % 256), ((xx + yy) % 256)), axis=-1).astype(np.uint8)
+                mask = np.zeros((384, 512), np.uint8)
+                mask[140:200, 190:290] = 255
+                repaired = pipeline.inpainter(Image.fromarray(pixels), Image.fromarray(mask))
+                result['native_repair_pixels'] = repaired.size == (512, 384) and bool(np.array_equal(np.array(repaired)[mask == 0], pixels[mask == 0]))
+                repaired.save(output / 'native-repair.png')
+                result['no_torch_import'] = 'torch' not in sys.modules
             result['translation_preferences_collapsed'] = not window._font_picker.isVisible() and not window._translation_alignment.isVisible()
             window._pref_toggle.click()
             app.processEvents()
@@ -78,6 +107,8 @@ def run_smoke_test(app, output_dir):
             result['font_editor_updated'] = window.editor_page.typesetter.font_map == window.config['font_map']
             from PIL import Image
             from vertical_typesetter import VerticalTypesetter
+            from punctuation_layout import wrap_paragraph
+            result['word_wrap_dictionary'] = wrap_paragraph('去图书馆看书', 3, len) == ['去', '图书馆', '看书']
             font_root = config.AI_ROOT / 'font_file/Manga'
             lettering_fonts = [font_root / family / f'{family}CJK{variant}-Black.ttf'
                                for family in ('SweiB2Sans', 'SweiToothpaste') for variant in ('sc', 'tc')]
@@ -101,6 +132,16 @@ def run_smoke_test(app, output_dir):
                 result[f'vertical_{alignment}_alignment'] = len(ends) == 2 and ends[0] == ends[1]
                 aligned.save(output / f'vertical-{alignment}.png')
             result["screenshot_saved"] = window.grab().save(str(output / "startup.png"))
+            for language in ('zh-CN', 'en', 'ja'):
+                set_ui_language(language)
+                setup = GpuSetupDialog(window)
+                setup.setAttribute(Qt.WA_DontShowOnScreen, True)
+                setup.show()
+                app.processEvents()
+                result[f'gpu_setup_{language}_saved'] = setup.grab().save(str(output / f'gpu-setup-{language}.png'))
+                setup.close()
+                setup.deleteLater()
+            set_ui_language('zh-CN')
             catalog = load_catalog()
             result['catalog_families'] = len(catalog['families'])
             result['font_search_enabled'] = (window._font_picker.combo.isEditable()
@@ -158,13 +199,18 @@ def run_smoke_test(app, output_dir):
                                      result['catalog_search_results'] > 0, result['font_library_screenshot_saved'],
                                      result['traditional_conversion'], result['simplified_conversion'],
                                      result['target_language_persisted'], result['target_language_models_reused'],
-                                     result['manga_font_pairs_bundled'], result['manual_line_breaks'], result['hollow_lettering'],
+                                     result['manga_font_pairs_bundled'], result['word_wrap_dictionary'],
+                                     result['manual_line_breaks'], result['hollow_lettering'],
                                      result['vertical_top_alignment'], result['vertical_bottom_alignment'],
                                      result['translation_preferences_collapsed'], result['translation_preferences_expand'],
                                      result['default_alignment_persisted'], result['default_alignment_models_reused']))
             result['success'] = result['success'] and all(
                 value for name, value in result.items()
                 if name.startswith(('en_', 'ja_', 'onboarding_')) or name == 'star_prompt_behavior')
+            result['success'] = result['success'] and all(result.get(key, False) for key in (
+                'real_detection_and_ocr', 'native_repair_pixels', 'no_torch_import'))
+            if require_gpu:
+                result['success'] = result['success'] and result.get('gpu_active', False)
         except Exception as exc:
             result.update(success=False, error=f"{type(exc).__name__}: {exc}")
         (output / "smoke-result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -7,6 +7,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
+from itertools import accumulate
+
+
+from comic_translate_core.chinese import convert_chinese
 
 
 VERTICAL_FORMS = {
@@ -207,56 +212,47 @@ def tokenize_punctuation(text: str, *, normalize: bool = True) -> list[GlyphToke
     return tokens
 
 
-def token_starts_forbidden(token: GlyphToken) -> bool:
-    return bool(token.text and token.text[0] in FORBIDDEN_COLUMN_START)
+@lru_cache(maxsize=512)
+def _paragraph_breaks(text: str):
+    """Reusable offsets for all font sizes tried while fitting this paragraph."""
+    import jieba
+    # Use the main dictionary for both scripts, but always slice the original.
+    analysis = convert_chinese(text, 'zh-Hans')
+    if len(analysis) != len(text):
+        analysis = text
+    word_ends = {end for _, _, end in jieba.tokenize(analysis)}
+    tokens = tokenize_punctuation(text, normalize=False)
+    ends = accumulate(len(token.text) for token in tokens)
+    legal = tuple(end for end in ends if end == len(text) or (
+        text[end - 1] not in FORBIDDEN_COLUMN_END and text[end] not in FORBIDDEN_COLUMN_START
+    ))
+    return legal, word_ends
 
 
-def token_ends_forbidden(token: GlyphToken) -> bool:
-    return bool(token.text and token.text[-1] in FORBIDDEN_COLUMN_END)
-
-
-def wrap_vertical_tokens(tokens: list[GlyphToken], max_cells: int) -> list[list[GlyphToken]]:
-    """按固定字格分列，并执行基础中文/日文避头尾规则。"""
-    if not tokens:
-        return []
-    max_cells = max(1, int(max_cells))
-    columns: list[list[GlyphToken]] = []
-    current: list[GlyphToken] = []
-
-    def used(items: list[GlyphToken]) -> int:
-        return sum(token.cells for token in items)
-
-    for token in tokens:
-        if not current or used(current) + token.cells <= max_cells:
-            current.append(token)
-            continue
-
-        carry: list[GlyphToken] = []
-        # 左括号等不能留在旧列末尾，应和下一个字符一起移到新列。
-        while len(current) > 1 and token_ends_forbidden(current[-1]):
-            carry.insert(0, current.pop())
-
-        # 结束标点不能独占新列：从旧列带一个正文字符过去。若旧列只有一个
-        # 字符，则允许标点在旧列溢出一个字格，避免产生标点孤列。
-        if token_starts_forbidden(token) and not carry:
-            if len(current) > 1:
-                carry.insert(0, current.pop())
-                while current and token_ends_forbidden(current[-1]):
-                    carry.insert(0, current.pop())
-                if not current:
-                    current = carry + [token]
-                    continue
-            else:
-                current.append(token)
-                continue
-
-        if current:
-            columns.append(current)
-        current = carry + [token]
-
-    if current:
-        columns.append(current)
-    return [column for column in columns if column]
+def wrap_paragraph(text, limit, measure, final_tolerance=0):
+    """Fit one normalized paragraph in pixels or cells, preferring word boundaries."""
+    if not text or measure(text) <= limit + final_tolerance:
+        return [text]
+    breaks, word_ends = _paragraph_breaks(text)
+    lines = []
+    start = first = 0
+    while first < len(breaks):
+        # Even the narrowest box gets one legal unit (e.g. a whole dash run).
+        chosen = first
+        for index in range(first, len(breaks)):
+            end = breaks[index]
+            tolerance = final_tolerance if end == len(text) else 0
+            if measure(text[start:end]) > limit + tolerance:
+                break
+            if end == len(text) or end in word_ends:
+                chosen = index
+            elif breaks[chosen] not in word_ends:
+                chosen = index  # A long word alone can split at a legal glyph.
+        end = breaks[chosen]
+        lines.append(text[start:end])
+        start = end
+        first = chosen + 1
+    return lines
 
 
 def normalize_line_breaks(text: str) -> str:
@@ -268,11 +264,7 @@ def wrap_vertical_text(text: str, max_cells: int) -> list[str]:
         return []
     columns = []
     for paragraph in normalize_line_breaks(text).split('\n'):
-        tokens = tokenize_punctuation(paragraph)
-        wrapped = wrap_vertical_tokens(tokens, max_cells)
-        columns.extend("".join(token.text for token in column) for column in wrapped)
-        if not wrapped:
-            columns.append('')
+        columns.extend(wrap_paragraph(normalize_cjk_punctuation(paragraph), max(1, int(max_cells)), len))
     return columns
 
 

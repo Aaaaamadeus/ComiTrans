@@ -1,0 +1,376 @@
+{
+  "reviewed_on": "2026-10-21",
+  "feature": "Default translation and per-block lettering colors",
+  "source_only": true,
+  "full_regression": {
+    "passed": 257,
+    "seconds": 56.615,
+    "process_exit_code": 0
+  },
+  "after_ui_polish": {
+    "passed": 27,
+    "seconds": 11.664,
+    "process_exit_code": 0
+  },
+  "native_windows_qt": true,
+  "captures_checked": 30,
+  "editor_horizontal_overflow": false,
+  "behavior": [
+    "RGB/hex picker with confirmation and no changes on cancellation",
+    "Default color saved for subsequent image and PDF translation without rebuilding models",
+    "Per-block live preview, cached layers, immediate image/layout save and reload",
+    "Explicit colors keep outlines; reset restores legacy black/white fills",
+    "Existing layouts retain their saved colors independently of translation preferences"
+  ],
+  "screenshots": [
+    "text-color-zh-CN-editor-1440-scale-1.png",
+    "text-color-zh-CN-preferences-1440-scale-1.png",
+    "text-color-en-editor-820-scale-1.png",
+    "text-color-ja-editor-820-scale-2.png",
+    "text-color-zh-CN-picker-660-scale-1.png"
+  ],
+  "layout_checks": [
+    {
+      "language": "zh-CN",
+      "screen": "preferences",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "zh-CN",
+      "screen": "editor",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "zh-CN",
+      "screen": "preferences",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "zh-CN",
+      "screen": "editor",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "zh-CN",
+      "screen": "picker",
+      "logical_size": [
+        660,
+        507
+      ],
+      "scale": "1"
+    },
+    {
+      "language": "en",
+      "screen": "preferences",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "en",
+      "screen": "editor",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "en",
+      "screen": "preferences",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "en",
+      "screen": "editor",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "en",
+      "screen": "picker",
+      "logical_size": [
+        626,
+        507
+      ],
+      "scale": "1"
+    },
+    {
+      "language": "ja",
+      "screen": "preferences",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "ja",
+      "screen": "editor",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "ja",
+      "screen": "preferences",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "ja",
+      "screen": "editor",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "1",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "ja",
+      "screen": "picker",
+      "logical_size": [
+        626,
+        507
+      ],
+      "scale": "1"
+    },
+    {
+      "language": "zh-CN",
+      "screen": "preferences",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "zh-CN",
+      "screen": "editor",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "zh-CN",
+      "screen": "preferences",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "zh-CN",
+      "screen": "editor",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "zh-CN",
+      "screen": "picker",
+      "logical_size": [
+        660,
+        507
+      ],
+      "scale": "2"
+    },
+    {
+      "language": "en",
+      "screen": "preferences",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "en",
+      "screen": "editor",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "en",
+      "screen": "preferences",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "en",
+      "screen": "editor",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "en",
+      "screen": "picker",
+      "logical_size": [
+        626,
+        507
+      ],
+      "scale": "2"
+    },
+    {
+      "language": "ja",
+      "screen": "preferences",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "ja",
+      "screen": "editor",
+      "logical_size": [
+        1440,
+        900
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "ja",
+      "screen": "preferences",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#245fbb",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "ja",
+      "screen": "editor",
+      "logical_size": [
+        820,
+        480
+      ],
+      "scale": "2",
+      "color_button_inside_window": true,
+      "color_value": "#dc3d61",
+      "reset_button_inside_window": true
+    },
+    {
+      "language": "ja",
+      "screen": "picker",
+      "logical_size": [
+        626,
+        507
+      ],
+      "scale": "2"
+    }
+  ]
+}

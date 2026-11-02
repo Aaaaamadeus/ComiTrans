@@ -168,6 +168,31 @@ class CustomOcrTests(unittest.TestCase):
 
 
 class PipelineLanguageTests(unittest.TestCase):
+    def test_multiline_bubble_uses_source_orientation_and_median_glyph_size(self):
+        def polygon(x, y, width, height):
+            return [[x, y], [x + width, y], [x + width, y + height], [x, y + height]]
+
+        vertical = [polygon(20, 10, 16, 60), polygon(85, 10, 18, 60), polygon(135, 8, 38, 85)]
+        horizontal = [polygon(10, 20, 60, 16), polygon(10, 90, 60, 20)]
+        for box, lines, expected_direction, expected_size in (
+            ([0, 0, 200, 95], vertical, 1, 18),
+            ([0, 0, 90, 200], horizontal, 0, 18),
+            # A single line or conflicting lines retain the wide-box fallback.
+            ([0, 0, 200, 95], vertical[:1], 0, 47),
+            ([0, 0, 200, 95], [vertical[0], horizontal[0]], 0, 47),
+        ):
+            with self.subTest(box=box, direction=expected_direction, size=expected_size):
+                pipeline = bare_pipeline('ja')
+                block = SimpleNamespace(xyxy=box, lines=lines, font_size=70, vertical=True)
+                pipeline.detector = Mock(return_value=(None, None, [block]))
+                pipeline.run_ocr = Mock(return_value='漫画')
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / 'page.png'
+                    Image.new('RGB', (220, 220), 'white').save(path)
+                    item, = pipeline.prepare_comic_page(path)['bubble_metadata']
+                self.assertEqual((item['direction'], item['target_font_size']),
+                                 (expected_direction, expected_size))
+
     def test_japanese_english_preservation_does_not_apply_to_other_languages(self):
         box = (1, 1, 20, 20, 0, "dialogue", 16, 0, "eng")
         self.assertTrue(bare_pipeline("ja")._preserve_english(box))
@@ -182,7 +207,7 @@ class PipelineLanguageTests(unittest.TestCase):
             pipeline = bare_pipeline(language)
             client = Mock()
             client.chat.completions.create.side_effect = [
-                SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{"translations":["你好"]}'))]),
+                SimpleNamespace(choices=[SimpleNamespace(finish_reason='length', message=SimpleNamespace(content='{"translations":["你好",'))]),
                 SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{"translations":["再见"]}'))]),
             ]
             with self.subTest(language=language), patch.object(pipeline_module, "OpenAI", return_value=client):
@@ -248,6 +273,7 @@ class PPOcrTests(unittest.TestCase):
         for i, token in enumerate(ids):
             logits[0, i, token] = .95
         ocr.session = Mock()
+        ocr.session.get_providers.return_value = ['CPUExecutionProvider']
         ocr.session.run.return_value = [logits]
         ocr.preprocess = Mock(return_value=np.zeros((1, 3, 48, 320)))
         text, confidence = ocr.recognize(Image.new("RGB", (10, 10)))

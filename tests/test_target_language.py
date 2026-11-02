@@ -68,9 +68,12 @@ class ChineseOutputTests(unittest.TestCase):
                     pipeline = self.pipeline(target, multimodal=multimodal)
                     client = Mock()
                     client.chat.completions.create.side_effect = [
-                        SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(
-                            content=json.dumps({'translations': [text]}, ensure_ascii=False)))])
-                        for text in response_texts
+                        SimpleNamespace(choices=[SimpleNamespace(
+                            finish_reason='length' if index == 0 else 'stop',
+                            message=SimpleNamespace(content=(
+                                json.dumps({'translations': [text]}, ensure_ascii=False)[:-2] + ','
+                                if index == 0 else json.dumps({'translations': [text]}, ensure_ascii=False))))])
+                        for index, text in enumerate(response_texts)
                     ]
                     with patch.object(pipeline_module, 'OpenAI', return_value=client):
                         actual = pipeline.translate_page_batch(['髪が伸びた', '漫画が始まる'], np.zeros((2, 2, 3), np.uint8))

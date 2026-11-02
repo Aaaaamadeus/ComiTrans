@@ -1,0 +1,17 @@
+{
+  "pages": 100,
+  "native_pixels": [
+    3000,
+    4500
+  ],
+  "open_ms": 395,
+  "switch_median_ms": 333,
+  "edit_median_ms": 88,
+  "save_ms": 801,
+  "max_gui_timer_gap_ms": 313,
+  "rss_before_mb": 225.2,
+  "rss_after_mb": 402.6,
+  "max_canvas_widgets": 4,
+  "sidebar_thumbnail_count": 15,
+  "median_redrawn_fraction": 0.0525
+}

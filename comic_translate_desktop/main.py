@@ -12,6 +12,7 @@ from .ui.theme import APP_STYLESHEET, install_ui_font
 def main() -> int:
     parser = argparse.ArgumentParser(description="ComiTrans desktop client")
     parser.add_argument("--smoke-test", metavar="OUTPUT_DIR", help="Verify startup/resources/models, write evidence, then exit")
+    parser.add_argument("--smoke-test-require-gpu", action="store_true", help="Fail smoke verification if CUDA is not actually active")
     args = parser.parse_args()
     app = QApplication(sys.argv)
     app.setApplicationName("ComiTrans")
@@ -21,7 +22,7 @@ def main() -> int:
     app.setStyleSheet(APP_STYLESHEET)
     if args.smoke_test:
         from .smoke_test import run_smoke_test
-        return run_smoke_test(app, args.smoke_test)
+        return run_smoke_test(app, args.smoke_test, require_gpu=args.smoke_test_require_gpu)
     initialize_ui_language(app)
     install_ui_font(app)
     from .ui.main_window import MainWindow

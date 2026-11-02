@@ -16,6 +16,26 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ProjectCleanupTests(unittest.TestCase):
+    def test_diagnostics_does_not_probe_torch_or_cuda(self):
+        import builtins
+        from comic_translate_desktop.diagnostics import Diagnostics
+        from comic_translate_desktop import config
+        original_import = builtins.__import__
+        def guarded(name, *args, **kwargs):
+            if name == 'torch' or name.startswith('torch.'):
+                raise AssertionError('Diagnostics must not import torch')
+            return original_import(name, *args, **kwargs)
+        with tempfile.TemporaryDirectory() as raw, patch.object(config, 'PROJECT_ROOT', Path(raw)), \
+             patch.object(config, 'CONFIG_PATH', Path(raw) / 'config.yaml'):
+            diagnostics = Diagnostics()
+            diagnostics.add_error('actual failure', 'original stack')
+            with patch('builtins.__import__', side_effect=guarded):
+                prompt = diagnostics.build_prompt()
+            self.assertNotIn('- Torch:', prompt)
+            self.assertNotIn('- CUDA 可用:', prompt)
+            self.assertIn('actual failure', prompt)
+            self.assertIn('original stack', prompt)
+
     def test_detector_import_does_not_capture_an_unrelated_utils_package(self):
         script = (
             "import sys, types\n"

@@ -34,6 +34,29 @@ _PREVIEW_RE = re.compile(
 _TITLE_RE = re.compile(r"^(?:第\s*)?[0-9一二三四五六七八九十百]+\s*(?:話|话|章|幕|回|巻|卷)$")
 
 
+def measure_source_lines(polygons):
+    """Return (direction, typical glyph thickness) for a consistent multiline block."""
+    points = np.asarray(polygons, dtype=float)
+    if points.ndim != 3 or points.shape[1:] != (4, 2) or len(points) < 2:
+        return None
+    # Average opposite edges so a slanted quadrilateral does not inflate the
+    # glyph thickness to the width of its axis-aligned bounding box.
+    horizontal = (points[:, 1] - points[:, 0] + points[:, 2] - points[:, 3]) / 2
+    vertical = (points[:, 3] - points[:, 0] + points[:, 2] - points[:, 1]) / 2
+    edges = np.stack((horizontal, vertical), axis=1)
+    lengths = np.linalg.norm(edges, axis=2)
+    thickness = lengths.min(axis=1)
+    primary_axis = np.abs(edges[np.arange(len(points)), lengths.argmax(axis=1)])
+    elongated = (thickness >= 2) & (lengths.max(axis=1) >= thickness * 1.6)
+    for direction in (0, 1):
+        aligned = elongated & (primary_axis[:, direction] >= 1.6 * primary_axis[:, 1 - direction])
+        # Two independent lines and agreement from at least two thirds of the block.
+        votes = np.count_nonzero(aligned)
+        if votes >= 2 and votes * 3 >= len(points) * 2:
+            return direction, round(float(np.median(thickness[aligned])))
+    return None
+
+
 def choose_layout_direction(
     detected_vertical: bool,
     width: int,

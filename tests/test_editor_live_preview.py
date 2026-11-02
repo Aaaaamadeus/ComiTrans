@@ -131,6 +131,32 @@ class EditorLivePreviewTests(unittest.TestCase):
         restored.apply_changes()
         self.assertEqual(restored._rendered.tobytes(), expected)
 
+    def test_word_reflow_changes_preview_but_keeps_text_through_save_and_reload(self):
+        for direction in (0, 1):
+            with self.subTest(direction=direction):
+                output, layout = self.page(f'word-reflow-{direction}')
+                editor = self.editor(output)
+                editor._direction_combo.setCurrentIndex(editor._direction_combo.findData(direction))
+                editor._text_input.setPlainText('去图书馆看书')
+                editor.apply_changes()
+                original = editor._mask_box(editor.items[0])
+                # At 24 px, a 78 px line/column fits 图书馆 but not 去图书馆.
+                width, height = (78, 180) if direction == 0 else (180, 78)
+                editor._resize_region_from_canvas((100, 90, 100 + width, 90 + height))
+                editor.apply_changes()
+                narrow = editor._rendered.tobytes()
+                editor._resize_region_from_canvas(original)
+                editor.apply_changes()
+                self.assertNotEqual(editor._rendered.tobytes(), narrow)
+                editor._resize_region_from_canvas((100, 90, 100 + width, 90 + height))
+                editor.apply_changes()
+                self.assertEqual(editor._rendered.tobytes(), narrow)
+                self.assertTrue(editor.save_image())
+                self.assertEqual(json.loads(layout.read_text(encoding='utf-8'))[0]['text'], '去图书馆看书')
+                restored = self.editor(output)
+                restored.apply_changes()
+                self.assertEqual(restored._rendered.tobytes(), narrow)
+
     def test_insert_break_button_replaces_selection_and_preserves_blank_lines(self):
         output, _ = self.page()
         editor = self.editor(output)
@@ -164,6 +190,46 @@ class EditorLivePreviewTests(unittest.TestCase):
             editor._effect_combo.setCurrentIndex(editor._effect_combo.findData('auto'))
             self.wait_preview(editor)
             self.assertNotEqual(editor._rendered.tobytes(), hollow)
+
+    def test_text_color_invalidates_cache_saves_immediately_and_is_per_block(self):
+        output, layout = self.page('colored-text', two_blocks=True)
+        editor = self.editor(output)
+        self.assertIsNone(editor._text_color.color)
+        for direction, color in ((0, '#e33457'), (1, '#206ac2')):
+            editor._direction_combo.setCurrentIndex(editor._direction_combo.findData(direction))
+            editor._text_color.set_color(color, emit=True)
+            # Saving must flush a color change that is still waiting for the preview timer.
+            self.assertTrue(editor.save_image())
+            expected = editor._rendered.tobytes()
+            with Image.open(output) as saved:
+                self.assertEqual(saved.tobytes(), expected)
+            saved_layout = json.loads(layout.read_text(encoding='utf-8'))
+            self.assertEqual(saved_layout[0]['text_color'], color)
+            self.assertNotIn('text_color', saved_layout[1])
+            restored = self.editor(output)
+            restored.apply_changes()
+            self.assertEqual(restored._text_color.color, color)
+            self.assertEqual(restored._rendered.tobytes(), expected)
+        editor.block_list.setCurrentRow(1)
+        self.assertIsNone(editor._text_color.color)
+        editor.block_list.setCurrentRow(0)
+        self.assertEqual(editor._text_color.color, '#206ac2')
+        editor._text_color.reset_button.click()
+        self.wait_preview(editor)
+        self.assertIsNone(editor.items[0]['text_color'])
+        self.assertNotEqual(editor._rendered.tobytes(), expected)
+
+    def test_canceling_color_dialog_keeps_draft_and_legacy_colors_unchanged(self):
+        from PySide6.QtGui import QColor
+        output, layout = self.page('cancel-color')
+        editor = self.editor(output)
+        editor.apply_changes()
+        before = (output.read_bytes(), layout.read_bytes(), editor._rendered.tobytes())
+        with patch('comic_translate_desktop.ui.color_picker.QColorDialog.getColor', return_value=QColor()):
+            editor._text_color.choose_button.click()
+        self.assertFalse(editor._dirty)
+        self.assertFalse(editor._preview_timer.isActive())
+        self.assertEqual((output.read_bytes(), layout.read_bytes(), editor._rendered.tobytes()), before)
 
     def test_vertical_alignment_preview_cache_save_reload_and_per_block_choice(self):
         output, layout = self.page(two_blocks=True)
@@ -526,6 +592,67 @@ class EditorLivePreviewTests(unittest.TestCase):
             restored.apply_changes()
             self.assertEqual(restored._vertical_alignment_combo.currentData(), alignment)
             self.assertEqual(restored._rendered.tobytes(), Image.open(output).tobytes())
+
+    def test_source_outline_survives_automatic_lettering_and_editor_round_trip(self):
+        import cv2
+        import numpy as np
+        output, layout = self.page('outlined')
+        typesetter = self.editor(output).typesetter
+        from comic_translator_pipeline import ComicTranslatorPipeline
+        seed = np.zeros((160, 240), np.uint8)
+        cv2.putText(seed, 'Hi', (68, 99), cv2.FONT_HERSHEY_SIMPLEX, 1.4, 255, 4)
+        outline = cv2.dilate(seed, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15)))
+        image = np.full((*seed.shape, 3), 175, np.uint8)
+        image[outline > 0] = 255
+        image[seed > 0] = 20
+        pipeline = ComicTranslatorPipeline.__new__(ComicTranslatorPipeline)
+        pipeline.multimodal = pipeline.watermark_enabled = False
+        pipeline.cancel_callback = pipeline.progress_callback = None
+        pipeline.typesetter = typesetter
+        box = [52, 40, 162, 116]
+        prepared = dict(img_cv=image, mask=seed, ocr_texts=['Hi'],
+            bubbles_data=[(*box, 0, 'dialogue', 40, 0)],
+            bubble_metadata=[dict(raw='Hi', box=box, style='dialogue', direction=0,
+                                  target_font_size=40, non_bubble=False)])
+        pipeline.finish_comic_page(output, prepared, ['你好'])
+        item = json.loads(layout.read_text(encoding='utf-8'))[0]
+        self.assertEqual(item['text_effect'], 'outlined')
+        self.assertAlmostEqual(item['source_outline_ratio'], 7 / 40, delta=.04)
+        editor = self.editor(output)
+        self.assertTrue(editor.apply_changes())
+        with Image.open(output) as saved:
+            self.assertEqual(editor._rendered.tobytes(), saved.tobytes())
+            self.assertTrue(np.any(np.all(np.asarray(saved) == 255, axis=2)))
+        editor._effect_combo.setCurrentIndex(editor._effect_combo.findData('auto'))
+        self.assertTrue(editor.save_image())
+        self.assertFalse(np.any(np.all(np.asarray(editor._rendered) == 255, axis=2)))
+        self.assertEqual(self.editor(output)._effect_combo.currentData(), 'auto')
+
+    def test_translation_color_is_snapshotted_and_restored_in_editor(self):
+        import numpy as np
+        from comic_translator_pipeline import ComicTranslatorPipeline
+        output, layout = self.page('pipeline-color')
+        image = Image.new('RGB', (600, 700), '#ffeedd')
+        pipeline = ComicTranslatorPipeline.__new__(ComicTranslatorPipeline)
+        pipeline.source_language = 'ja'
+        pipeline.multimodal = pipeline.watermark_enabled = False
+        pipeline.progress_callback = pipeline.cancel_callback = None
+        pipeline.text_color = '#2B7ABC'
+        pipeline.current_mask_image = Image.new('L', image.size, 0)
+        pipeline.typesetter = self.editor(output).typesetter
+        pipeline.inpaint_bubbles = lambda *_: image.copy()
+        prepared = dict(img_cv=np.asarray(image)[:, :, ::-1],
+            bubbles_data=[(100, 90, 290, 340, 1, 'dialogue', 28, 0)],
+            bubble_metadata=[dict(raw='Beginning', box=[100, 90, 290, 340], style='dialogue',
+                direction=1, target_font_size=28, non_bubble=False, source_language='ja')], ocr_texts=['Beginning'])
+        pipeline.finish_comic_page(output, prepared, ['彩色漫畫'])
+        self.assertEqual(json.loads(layout.read_text(encoding='utf-8'))[0]['text_color'], '#2b7abc')
+        config.save_ai_config({'text_color': '#ee0000'})
+        restored = self.editor(output)
+        restored.apply_changes()
+        self.assertEqual(restored._text_color.color, '#2b7abc')
+        with Image.open(output) as saved:
+            self.assertEqual(restored._rendered.tobytes(), saved.tobytes())
 
     def test_new_pipeline_region_reproduces_original_typesetting_in_editor(self):
         import numpy as np

@@ -19,7 +19,7 @@ MODEL_FILES = [
     "ppocr/en_PP-OCRv5_rec_mobile.onnx",
 ]
 MODEL_DIRS = ["baberu-ocr", "manga-ocr-onnx"]
-SKIP_DIRS = {"models", "user_fonts", "Log", "logs", "__pycache__", ".cache"}
+SKIP_DIRS = {"models", "gpu-runtime", "user_fonts", "Log", "logs", "__pycache__", ".cache"}
 
 
 def collect_app(dist: Path):
@@ -35,6 +35,7 @@ def collect_app(dist: Path):
                 "_internal/assets/ui/illustrations/studio-editor-v1.png",
                 "_internal/licenses/comic-text-detector/LICENSE",
                 "_internal/opencc/config/s2t.json",
+                "_internal/jieba/dict.txt",
                 "_internal/opencc/config/t2s.json",
                 "_internal/opencc/dictionary/STCharacters.txt",
                 "_internal/opencc/dictionary/STPhrases.txt",
@@ -60,6 +61,9 @@ def collect_app(dist: Path):
             continue
         if path.name in {"config.yaml", MANIFEST_NAME, "Apply-Update.ps1", "Update-ComiTrans.bat"} or path.name.startswith('.env') or path.suffix == ".log":
             continue
+        if path.suffix.lower() == '.dll' and path.name.lower().startswith(
+                ('cublas', 'cudnn', 'cudart', 'cufft', 'nvrtc', 'nvjitlink', 'curand', 'cusolver', 'cusparse')):
+            continue  # NVIDIA runtimes are installed by users, never released here.
         files.append((path, "ComiTrans/" + rel.as_posix()))
     for path, name in ((ROOT / f"docs/RELEASE-v{__version__}.md", "README-release.md"),
                        (ROOT / "CHANGELOG.md", "CHANGELOG.md"),
@@ -133,6 +137,9 @@ def main():
             write_archive(target, files)
         archives.append(target)
     write_checksums(args.metadata_dir, [*archives, baseline_path])
+    # Keep the downloadable checksum file identical to repository metadata.
+    (args.output / 'SHA256SUMS.txt').write_bytes((args.metadata_dir / 'SHA256SUMS.txt').read_bytes())
+    (args.output / 'baseline.json').write_bytes(baseline_path.read_bytes())
     print(f'Release baseline: {baseline["build_id"]}', flush=True)
     print(f'Repository metadata: {args.metadata_dir}', flush=True)
 

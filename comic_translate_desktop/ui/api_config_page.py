@@ -112,6 +112,8 @@ class ApiConfigPage(QWidget):
         self._style_form(runtime_form)
 
         self._gpu_check = QCheckBox(tr('使用 GPU（需要本机 CUDA 可用）'))
+        self._gpu_help = QPushButton(tr('GPU 安装说明与下载'))
+        self._gpu_help.clicked.connect(self._show_gpu_setup)
         self._ocr_backend = QComboBox()
         self._source_language = QComboBox()
         for code, label in SOURCE_LANGUAGES:
@@ -134,6 +136,7 @@ class ApiConfigPage(QWidget):
         self._model_info.setProperty("muted", True)
 
         runtime_form.addRow(tr('硬件'), self._gpu_check)
+        runtime_form.addRow('', self._gpu_help)
         runtime_form.addRow(tr('输出目录'), output_row)
         runtime_form.addRow(tr('Issue 链接'), self._issue_input)
         runtime_root.addWidget(runtime_group)
@@ -265,6 +268,12 @@ class ApiConfigPage(QWidget):
     def _toggle_key_visibility(self, checked: bool) -> None:
         self._key_input.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password)
 
+    def _show_gpu_setup(self) -> None:
+        from .gpu_setup_dialog import GpuSetupDialog
+        dialog = GpuSetupDialog(self)
+        dialog.exec()
+        dialog.deleteLater()
+
     def _browse_output(self) -> None:
         path = QFileDialog.getExistingDirectory(self, tr('选择输出目录'), self._output_input.text())
         if path:
@@ -314,7 +323,7 @@ class ApiConfigPage(QWidget):
         self._multimodal_check.setChecked(bool(config.get("multimodal", False)))
         self._font_probe_check.setChecked(bool(config.get("multimodal_font_probe", False)))
         self._no_thinking_check.setChecked(bool(config.get("disable_thinking", True)))
-        self._gpu_check.setChecked(bool(config.get("use_gpu", False)))
+        self._gpu_check.setChecked(bool(config.get("use_gpu", True)))
         self._source_language.setCurrentIndex(max(0, self._source_language.findData(config.get("source_language", "ja"))))
         self._refresh_ocr_choices()
         backend = str(config.get("ocr_backend") or "auto")

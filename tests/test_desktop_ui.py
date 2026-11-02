@@ -351,9 +351,10 @@ class DesktopUiTests(unittest.TestCase):
         self.assertEqual(saved[0]['custom_metadata'], 'keep')
         self.assertFalse(editor._dirty)
         missing = self.root / 'missing.png'
-        editor.load_page(missing)
-        self.assertIsNone(editor._rendered)
-        self.assertFalse(editor._save_btn.isEnabled())
+        previous = editor._rendered
+        self.assertFalse(editor.load_page(missing))
+        self.assertIs(editor._rendered, previous)
+        self.assertTrue(editor._save_btn.isEnabled())
 
     def test_parallel_worker_events_use_thread_local_page_identity(self):
         worker = BatchWorker([], self.root, {})

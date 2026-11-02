@@ -1,0 +1,219 @@
+{
+  "version": "2.5.0",
+  "date": "2026-11-02",
+  "tests": {
+    "command": "python -m unittest discover -s tests -q",
+    "passed": 394,
+    "seconds": 100.798
+  },
+  "packaging": {
+    "archives": [
+      {
+        "name": "ComiTrans-v2.5.0-app.zip",
+        "size": 636740393,
+        "sha256": "63ec01bcb95aa1d12dd89560faabd9ef2dd11248edafb6ec06ce2a61f7ffc7c0",
+        "files": 993,
+        "crc_and_manifest_verified": true,
+        "no_nvidia_runtime_libraries": true
+      },
+      {
+        "name": "ComiTrans-v2.5.0-models.zip",
+        "size": 485652354,
+        "sha256": "91ab483d147caab5ea1ea18a1d9ac6f5c4719291bf7adbdbe3876332b34c1c32",
+        "files": 22,
+        "crc_and_manifest_verified": true,
+        "no_nvidia_runtime_libraries": true
+      }
+    ],
+    "build_id": "6c0ddf1047639a6ef7f6429f684eeddec9ccaae2a1c69f6ea0fd04e6d8f2342e"
+  },
+  "runtime_distribution": "No CUDA/cuDNN archives or DLLs published; official setup links in Settings.",
+  "gpu_verification_environment": {
+    "qt_platform": "windows",
+    "path": "Windows system directories only",
+    "external_runtime": "CUDA_PATH and CUDNN_PATH point to a test-only runtime directory outside the app",
+    "runtime_packages": {
+      "nvidia-cublas-cu12": "12.8.4.1",
+      "nvidia-cuda-runtime-cu12": "12.8.90",
+      "nvidia-cuda-nvrtc-cu12": "12.8.93",
+      "nvidia-cufft-cu12": "11.3.3.83",
+      "nvidia-cudnn-cu12": "9.10.2.21",
+      "nvidia-nvjitlink-cu12": "12.8.93"
+    },
+    "paid_api_requests": 0
+  },
+  "smoke": {
+    "gpu": {
+      "version": "2.5.0",
+      "frozen": true,
+      "pipeline_ready": true,
+      "brand_font": "Skribble",
+      "log_font": "Aa今日花晴 春懒猫困",
+      "missing_glyphs": [],
+      "svg_valid": true,
+      "window_visible": true,
+      "providers": {
+        "detector": [
+          "CUDAExecutionProvider",
+          "CPUExecutionProvider"
+        ],
+        "inpainting": [
+          "CUDAExecutionProvider",
+          "CPUExecutionProvider"
+        ],
+        "ocr_vision": [
+          "CPUExecutionProvider"
+        ],
+        "ocr_decoder_prefill": [
+          "CPUExecutionProvider"
+        ],
+        "ocr_decoder_step": [
+          "CPUExecutionProvider"
+        ]
+      },
+      "ocr_cpu_expected": true,
+      "gpu_active": true,
+      "real_detection_and_ocr": true,
+      "native_repair_pixels": true,
+      "no_torch_import": true,
+      "translation_preferences_collapsed": true,
+      "translation_preferences_expand": true,
+      "default_alignment_persisted": true,
+      "default_alignment_models_reused": true,
+      "traditional_conversion": true,
+      "simplified_conversion": true,
+      "target_language_persisted": true,
+      "target_language_models_reused": true,
+      "font_imported": true,
+      "font_choice_persisted": true,
+      "font_pipeline_updated": true,
+      "font_models_reused": true,
+      "font_editor_updated": true,
+      "word_wrap_dictionary": true,
+      "manga_font_pairs_bundled": true,
+      "manual_line_breaks": true,
+      "hollow_lettering": true,
+      "vertical_top_alignment": true,
+      "vertical_bottom_alignment": true,
+      "screenshot_saved": true,
+      "gpu_setup_zh-CN_saved": true,
+      "gpu_setup_en_saved": true,
+      "gpu_setup_ja_saved": true,
+      "catalog_families": 2056,
+      "font_search_enabled": true,
+      "catalog_search_results": 1,
+      "font_library_screenshot_saved": true,
+      "star_probability": 0.15,
+      "star_idle_ms": 8000,
+      "star_prompt_behavior": true,
+      "onboarding_default_chinese": true,
+      "onboarding_japanese_preview": true,
+      "en_catalog_bundled": true,
+      "en_navigation_translated": true,
+      "en_settings_language": true,
+      "en_star_prompt_visible": true,
+      "en_screenshot_saved": true,
+      "en_star_prompt_closed": true,
+      "ja_catalog_bundled": true,
+      "ja_navigation_translated": true,
+      "ja_settings_language": true,
+      "ja_star_prompt_visible": true,
+      "ja_screenshot_saved": true,
+      "ja_star_prompt_closed": true,
+      "success": true
+    },
+    "cpu": {
+      "version": "2.5.0",
+      "frozen": true,
+      "pipeline_ready": true,
+      "brand_font": "Skribble",
+      "log_font": "Aa今日花晴 春懒猫困",
+      "missing_glyphs": [],
+      "svg_valid": true,
+      "window_visible": true,
+      "providers": {
+        "detector": [
+          "CPUExecutionProvider"
+        ],
+        "inpainting": [
+          "CPUExecutionProvider"
+        ],
+        "ocr_vision": [
+          "CPUExecutionProvider"
+        ],
+        "ocr_decoder_prefill": [
+          "CPUExecutionProvider"
+        ],
+        "ocr_decoder_step": [
+          "CPUExecutionProvider"
+        ]
+      },
+      "ocr_cpu_expected": true,
+      "gpu_active": false,
+      "real_detection_and_ocr": true,
+      "native_repair_pixels": true,
+      "no_torch_import": true,
+      "translation_preferences_collapsed": true,
+      "translation_preferences_expand": true,
+      "default_alignment_persisted": true,
+      "default_alignment_models_reused": true,
+      "traditional_conversion": true,
+      "simplified_conversion": true,
+      "target_language_persisted": true,
+      "target_language_models_reused": true,
+      "font_imported": true,
+      "font_choice_persisted": true,
+      "font_pipeline_updated": true,
+      "font_models_reused": true,
+      "font_editor_updated": true,
+      "word_wrap_dictionary": true,
+      "manga_font_pairs_bundled": true,
+      "manual_line_breaks": true,
+      "hollow_lettering": true,
+      "vertical_top_alignment": true,
+      "vertical_bottom_alignment": true,
+      "screenshot_saved": true,
+      "gpu_setup_zh-CN_saved": true,
+      "gpu_setup_en_saved": true,
+      "gpu_setup_ja_saved": true,
+      "catalog_families": 2056,
+      "font_search_enabled": true,
+      "catalog_search_results": 1,
+      "font_library_screenshot_saved": true,
+      "star_probability": 0.15,
+      "star_idle_ms": 8000,
+      "star_prompt_behavior": true,
+      "onboarding_default_chinese": true,
+      "onboarding_japanese_preview": true,
+      "en_catalog_bundled": true,
+      "en_navigation_translated": true,
+      "en_settings_language": true,
+      "en_star_prompt_visible": true,
+      "en_screenshot_saved": true,
+      "en_star_prompt_closed": true,
+      "ja_catalog_bundled": true,
+      "ja_navigation_translated": true,
+      "ja_settings_language": true,
+      "ja_star_prompt_visible": true,
+      "ja_screenshot_saved": true,
+      "ja_star_prompt_closed": true,
+      "success": true
+    }
+  },
+  "visual_review": {
+    "platform": "Windows native Qt",
+    "screenshots": [
+      "release-v2.5.0-startup.png",
+      "release-v2.5.0-gpu-setup-zh-CN.png",
+      "release-v2.5.0-gpu-setup-en.png",
+      "release-v2.5.0-gpu-setup-ja.png"
+    ],
+    "checked": [
+      "text readable",
+      "official download actions visible",
+      "scrolling available at smaller sizes",
+      "correct bundled fonts",
+      "Chinese English Japanese resources"
+    ]
+  }
+}
