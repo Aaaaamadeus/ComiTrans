@@ -40,19 +40,6 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ![ComiTrans 自动处理界面](docs/ui-review/automatic-style-review.png)
 
-<details>
-<summary>查看处理中、蒙版精修与字体库界面</summary>
-
-处理中截图来自真实本地管线的无文字测试页，未调用外部翻译 API。
-
-![处理中与节点轨道](docs/ui-review/automatic-processing.png)
-
-![蒙版拖拽与实时精修预览](docs/ui-review/editor-mask-drag-style-review.png)
-
-![字体库与名称检索](docs/ui-review/font-library-search-style-review.png)
-
-</details>
-
 **快速逐字日志（实际 Qt 录屏，界面测试文本）**
 
 日志正文使用 Aa今日花晴 春懒猫困，以约每秒 250 字快速展开，积压时自动加速；复制、导出与任务结束时补齐全文。支持级别筛选、搜索、字号调整、暂停跟随和选区保留，显示最近 5,000 条记录，完整日志保存在磁盘。
