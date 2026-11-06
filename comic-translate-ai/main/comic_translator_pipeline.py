@@ -288,6 +288,7 @@ class ComicTranslatorPipeline:
         height, width = img_cv.shape[:2]
         canvas = _rgb_image(img_cv)
         lama_mask = None
+        white_box_overlays = []
         layout_mask = np.zeros((height, width), np.uint8)
         erase_mask = np.zeros((height, width), np.uint8)
         generator = getattr(self, 'text_mask_generator', None) or AdaptiveTextMask()
@@ -315,15 +316,20 @@ class ComicTranslatorPipeline:
             size = int(data[6]) if len(data) > 6 and data[6] else 16
             request = MaskRequest(crop, (x1-left, y1-top, x2-left, y2-top), seed, size)
             result = validate_result(generator.generate(request), crop.shape[:2])
+            fallback = getattr(result, 'box_fill_mask', None)
+            restore_mask = result.erase_mask
+            if fallback is not None:
+                restore_mask = np.maximum(result.erase_mask, fallback)
+                white_box_overlays.append((left, top, fallback, result.box_fill_color))
             box_key = (x1, y1, x2, y2)
             if result.source_outline_ratio is not None:
                 self.current_outline_ratios[box_key] = result.source_outline_ratio
             self.current_bubble_restore_regions[box_key] = make_region(
-                data[:4], (width, height), (left, top, right, bottom), Image.fromarray(result.erase_mask))
+                data[:4], (width, height), (left, top, right, bottom), Image.fromarray(restore_mask))
             diagnostics = dict(result.diagnostics)
             self.last_mask_diagnostics.append(diagnostics)
             layout_mask[top:bottom, left:right] |= result.layout_mask
-            erase_mask[top:bottom, left:right] |= result.erase_mask
+            erase_mask[top:bottom, left:right] |= restore_mask
             if result.fill_color is None:
                 reconstruction = reconstruct_background(crop, result.erase_mask)
                 if reconstruction is None:
@@ -342,6 +348,11 @@ class ComicTranslatorPipeline:
         self.current_erase_mask = Image.fromarray(erase_mask)
         if lama_mask is not None and np.any(lama_mask):
             canvas = self.inpainter(canvas, Image.fromarray(lama_mask))
+        # Apply the white-paper fallback after normal repair so it can remove
+        # missed marks without retracting the original detector-guided mask.
+        for left, top, mask, colour in white_box_overlays:
+            canvas.paste(tuple(reversed(colour)), (left, top, left+mask.shape[1], top+mask.shape[0]),
+                         Image.fromarray(mask))
         return canvas
 
     def translate_page_batch(self, ocr_texts, image_input):

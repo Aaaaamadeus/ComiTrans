@@ -91,7 +91,7 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 
 - **Native desktop UI**: PySide6 app with a manga magazine design and a clean editing canvas.
 - **Source languages and OCR**: Japanese, Korean, English, or a custom language; independent HTTP and compatible vision OCR endpoints.
-- **All-ONNX inference**: text detection, Baberu/manga-ocr, and LaMa inpainting all use ONNX; no PyTorch required.
+- **All-ONNX inference**: text detection, Japanese/Korean/English local OCR, and LaMa inpainting all use ONNX; no PyTorch required.
 - **Split release packages**: models ship separately, so app updates do not require re-downloading models.
 - **Startup warmup**: the AI pipeline loads automatically when the app opens.
 - **GPU inference**: new installations prefer NVIDIA CUDA. Settings provide official CUDA/cuDNN installation links; a compatible NVIDIA driver is required; logs report the actual device. Existing CPU preferences are preserved.
@@ -121,7 +121,7 @@ A fully successful translation batch has a 15% chance of showing a small reposit
 
 Upgrading from v2.3.0: reuse your existing models. From v2.2.2, existing Japanese models can be reused; merge the new model archive to add Korean/English recognition. Keep your existing `config.yaml`, entire `user_fonts` folder, and output files.
 
-Release users do not need Python, PyTorch, or pip. GPU acceleration requires a compatible NVIDIA driver, CUDA 12 and cuDNN 9. Open Settings → Runtime & Output → GPU setup and downloads for official installation links. Reuse a compatible environment; CPU users do not need GPU libraries. [Setup guide](docs/GPU_SETUP.md). New installations prefer GPU; if CUDA cannot start, the app reports its CPU fallback. Existing CPU preferences are preserved.
+Release users do not need Python, PyTorch, or pip. GPU acceleration requires a compatible NVIDIA driver, CUDA 12 and cuDNN 9. Open Settings → Runtime & Output → GPU setup and downloads to install the portable runtime in the patched v2.5.0 or v2.5.1 app, or to open official installer links. Reuse a compatible environment; CPU users do not need GPU libraries. [Setup guide](docs/GPU_SETUP.md). New installations prefer GPU; if CUDA cannot start, the app reports its CPU fallback. Existing CPU preferences are preserved.
 
 To upgrade to v2.5.0, close the app and extract `ComiTrans-v2.5.0-app.zip` into a new folder. Copy `config.yaml`, `user_fonts/` and `comic-translate-ai/models/` from the old installation to the same relative locations. Keep output images and their companion `_cleaned` and `_layout` folders together. Keep the old installation until the new one works. This version uses the full app archive; see the [update guide](docs/RELEASE-v2.5.0.md).
 
@@ -152,7 +152,7 @@ You can also double-click `start.bat`. The AI pipeline warms up automatically af
 ## Usage
 
 1. Click "Add Files" or "Add Folder", or drag images, PDFs, or folders into the window.
-2. Configure the translation API in Settings, then choose Source Language on the workbench. Japanese Auto uses Baberu with manga-ocr fallback; Korean/English use PP-OCRv5. Choose Custom OCR for another language or provider.
+2. Configure the translation API in Settings, then choose Source Language on the workbench. Japanese Auto uses CharSpot Small in the v2.5.1 preview and supports Baberu/manga-ocr in older model packs; Korean/English use PP-OCRv5. Choose Custom OCR for another language or provider.
 3. Enable "Multimodal Translation" to send the full page image to the AI; disable it for pure-text translation. Both modes use local font selection and typesetting by default.
 4. Expand "Preferences" on the translation page to fill in background prompts and Chinese character names (one per line; the AI maps them automatically).
 5. Click "Start Translation" and watch the live step/status logs.
@@ -191,7 +191,7 @@ Choose the source language and engine in Settings. OCR credentials, endpoint, an
 
 | Engine | Configuration |
 | --- | --- |
-| Japanese local | Auto tries Baberu, then manga-ocr; either engine can also be selected explicitly |
+| Japanese local | Auto uses CharSpot Small, with Baberu and manga-ocr supported in older installations |
 | Korean / English local | PP-OCRv5 ONNX; both models are included in the v2.3.0 model archive |
 | Standard HTTP | Full POST endpoint; receives a PNG text-region crop as Base64 and returns the original text |
 | Compatible vision API | OpenAI-compatible Base URL, independent key, and an image-capable model; uses `chat.completions` for OCR |
@@ -244,7 +244,7 @@ Typesetting renders text on a local 3x supersampled surface and downsamples it w
 ## Translation Pipeline
 
 1. **Bubble & text detection**: an ONNX detector outputs bubbles, text masks, and text lines.
-2. **Source-language OCR**: Japanese uses Baberu/manga-ocr, Korean and English use PP-OCRv5 text-line recognition, or a custom OCR service can be selected. The English-skip rule applies only to Japanese local mode. Empty source/translation regions retain the original artwork.
+2. **Source-language OCR**: Japanese uses CharSpot Small with the v2.5.1 pack, Korean and English use PP-OCRv5 text-line recognition, or a custom OCR service can be selected. The English-skip rule applies only to Japanese local mode. Empty source/translation regions retain the original artwork.
 3. **LLM translation**: pure-text mode sends OCR results; multimodal mode sends the page image. Local role, glyph, and box heuristics select fonts by default. With experimental font comparison explicitly enabled, the AI identifies a font family among three local candidates, subject to local gates. Size and orientation always stay local.
 4. **Background inpainting**: erases only the detector text mask; solid regions retain their actual background color; verified screentones/gradients use local reconstruction, and complex backgrounds use native-resolution tiled LaMa.
 5. **Chinese typesetting**: font size is estimated from the mask area, text is centered on the mask centroid, orientation adapts automatically, and long text gets tighter sizing.
@@ -257,11 +257,12 @@ When the translation provider returns 401/403 (authentication), 402 (insufficien
 
 | Purpose | Model | Source |
 | --- | --- | --- |
-| Bubble & text detection | `comic-text-detector.onnx` | [mayocream/comic-text-detector-onnx](https://huggingface.co/mayocream/comic-text-detector-onnx), exported from [dmMaze/comic-text-detector](https://github.com/dmMaze/comic-text-detector) |
-| Japanese OCR (default) | `baberu-ocr/` | [genshiai-daichi/baberu-ocr](https://huggingface.co/genshiai-daichi/baberu-ocr), Apache-2.0, 121 MB quantized ONNX tier |
-| Japanese OCR (fallback) | `manga-ocr-onnx/` | [l0wgear/manga-ocr-2025-onnx](https://huggingface.co/l0wgear/manga-ocr-2025-onnx), based on [kha-white/manga-ocr](https://github.com/kha-white/manga-ocr) |
+| Comic text regions and lines | ogkalu Small INT8 + PP-OCRv6 manga | [Pinned sources, licenses and SHA256](docs/models/split-detector.json) |
+| Japanese OCR | CharSpot Small | [Model, vocabulary and license](docs/models/charspot-small.json) |
 | Korean / English OCR | `korean_PP-OCRv5_rec_mobile.onnx` / `en_PP-OCRv5_rec_mobile.onnx` | [Pinned sources and checksums](docs/MULTILINGUAL_OCR.md#韩语和英语模型) |
-| LaMa inpainting | `lama-manga-dynamic.onnx` | manga-lama |
+| LaMa inpainting | `lama-manga-dynamic.onnx` | [Pinned source and license audit](docs/MODEL_UPGRADE-v2.5.1.md) |
+
+The v2.5.1 local preview ships only CharSpot Small for Japanese OCR and supports existing legacy model directories. Default detection uses Small with manga line-based box refinement. The full model set is 284.712 MB (48.71% of v2.5.0). On 22 crops from three pages, character errors fell from 12 to 5. [Evaluation](docs/MODEL_UPGRADE-v2.5.1.md) · [Upgrade and rollback](docs/RELEASE-v2.5.1.md)
 
 More model sources, alternative ONNX versions, and better detection candidates: [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md).
 
@@ -285,20 +286,20 @@ By default the app is built without models. For local testing with models:
 ### Generate release packages
 
 ```powershell
-python package_release.py --output release/v2.5.0
+python package_release.py --output release/v2.5.1
 ```
 
-This Release provides the full app and model archives:
+The local build produces two v2.5.1 archives.
 
-- `ComiTrans-v2.5.0-app.zip`: program only, no models
-- [ComiTrans-v2.5.0-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.5.0/ComiTrans-v2.5.0-models.zip): ONNX models including Japanese, Korean, and English OCR; existing models can be reused
+- `ComiTrans-v2.5.1-app.zip`: program only, no models
+- `ComiTrans-v2.5.1-models.zip`: ONNX models including Japanese, Korean, and English OCR; existing models can be reused
 
 CUDA/cuDNN libraries are not distributed in this release. GPU users can open official installation links from Settings. The release includes `SHA256SUMS.txt` and `baseline.json`.
 
 Version metadata is stored and committed in the source repository:
 
-- [docs/releases/v2.5.0/baseline.json](docs/releases/v2.5.0/baseline.json): v2.5.0 target build fingerprint
-- [docs/releases/v2.5.0/SHA256SUMS.txt](docs/releases/v2.5.0/SHA256SUMS.txt): v2.5.0 app, models and target baseline checksums
+- [docs/releases/v2.5.1/baseline.json](docs/releases/v2.5.1/baseline.json): v2.5.1 target build fingerprint
+- [docs/releases/v2.5.1/SHA256SUMS.txt](docs/releases/v2.5.1/SHA256SUMS.txt): v2.5.1 app, models and target baseline checksums
 
 - [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json): file hashes and build fingerprint for generating future patches
 - [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt): checksums for the app, models and baseline
@@ -315,7 +316,7 @@ ComiTrans
 │   │   ├── comic_translator_pipeline.py
 │   │   ├── onnx_text_detector.py  # ONNX text detection
 │   │   ├── onnx_manga_ocr.py      # ONNX Japanese OCR
-│   │   ├── onnx_baberu_ocr.py     # Baberu ONNX OCR (default)
+│   │   ├── onnx_baberu_ocr.py     # Baberu ONNX OCR (legacy)
 │   │   ├── manga_lama.py          # ONNX inpainting
 │   │   └── vertical_typesetter.py # Chinese typesetting
 │   ├── models/                    # model weights (beside exe in releases)
@@ -472,4 +473,4 @@ Report issues at [GitHub Issues](https://github.com/Aaaaamadeus/ComiTrans/issues
 - Project code is released under the license in the repository.
 - Fonts: Smiley Sans, LXGW WenKai, LXGW Marker Gothic (SIL OFL 1.1), Klee One, Source Han Sans/Serif, setofont (SetoFont), and 851tegakizatsu are free for commercial use, each under its own license.
 - UI fonts Skribble and Aa retain their embedded copyright information; see [font provenance](assets/ui/fonts/README.md).
-- Models: comic-text-detector, manga-ocr, and manga-lama are open-source; see [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md).
+- Models: CharSpot Small weights use CC BY-NC-SA 4.0. For attribution, terms, and sources of each model see [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md).

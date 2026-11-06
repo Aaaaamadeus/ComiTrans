@@ -1,0 +1,3 @@
+db635ca8b83f6e645a5891d9c323a7078f3b7b40d3b00da61301680f7c0ac100  ComiTrans-v2.5.0-hotfix-app.zip
+eb0339208ab6768bbb47c6d969056cd3a844fec8132923a77d1b56c0ed27bd23  ComiTrans-v2.5.0-hotfix-models.zip
+84601a7fd981c1aed66b462b0d7f6e5dca9c366c4a50852b4482a5d7f8807ce6  baseline.json

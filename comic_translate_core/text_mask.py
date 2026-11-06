@@ -22,6 +22,8 @@ class MaskResult:
     fill_color: tuple[int, int, int] | None = None  # BGR; None = textured repair
     diagnostics: dict = field(default_factory=dict)
     source_outline_ratio: float | None = None  # white stroke width / original font size
+    box_fill_mask: np.ndarray | None = None  # optional final, bounded white-paper overlay
+    box_fill_color: tuple[int, int, int] | None = None
 
 
 class TextMaskGenerator(Protocol):
@@ -37,6 +39,14 @@ def validate_result(result: MaskResult, shape) -> MaskResult:
     if result.fill_color is not None:
         if len(result.fill_color) != 3 or any(type(v) is not int or not 0 <= v <= 255 for v in result.fill_color):
             raise ValueError('fill_color must contain three BGR integers in [0, 255]')
+    fallback = getattr(result, 'box_fill_mask', None)
+    if fallback is not None:
+        if (fallback.shape != tuple(shape) or fallback.dtype != np.uint8
+                or np.any((fallback != 0) & (fallback != 255))):
+            raise ValueError('box_fill_mask must be a binary uint8 mask with the crop dimensions')
+        colour = result.box_fill_color
+        if colour is None or len(colour) != 3 or any(type(v) is not int or not 0 <= v <= 255 for v in colour):
+            raise ValueError('box_fill_color must contain three BGR integers')
     ratio = result.source_outline_ratio
     if ratio is not None and (type(ratio) not in (float, int) or not 0 < ratio <= .3):
         raise ValueError('source_outline_ratio must be in (0, 0.3]')
@@ -49,6 +59,144 @@ def _ellipse(radius):
 
 def _dilate(mask, radius):
     return cv2.dilate(mask.astype(np.uint8), _ellipse(radius)) > 0
+
+
+def _white_box_fallback(image, inside, seeds, erase, size):
+    """Repaint a plain balloon interior, including marks the detector missed.
+
+    The decision must be local to this box: the detector domain is dilated by up
+    to 8px, so `np.any(seeds)` can be satisfied by a neighbouring balloon while
+    this box holds no text at all. Paper colour and uniformity are measured on
+    untouched original pixels only, so strokes and already-replaced pixels can
+    neither supply the colour nor fake a flat background.
+    """
+    box = inside.astype(bool)
+    area = int(np.count_nonzero(box))
+    if area < 50:
+        return None
+    local_seeds = seeds & box
+    seed_pixels = int(np.count_nonzero(local_seeds))
+    if seed_pixels < max(8, round(size * .4)):
+        return None
+    seed_count = cv2.connectedComponentsWithStats(
+        local_seeds.astype(np.uint8), connectivity=8)[0]
+    if seed_count - 1 < 2 and seed_pixels < size * size * .5:
+        return None  # one stray mark is not a text block
+    free = box & ~_dilate(erase, 1)
+    pixels = image[free].astype(np.int16)
+    if len(pixels) < 50:
+        return None
+    # Two dials. A box with plenty of untouched paper is judged generously; a
+    # box where only a tenth is paper (dense vertical text) is judged strictly,
+    # because the whole-box colour then rests on a thin, fragile sample.
+    free_share = len(pixels) / area
+    if free_share < .10:
+        return None
+    light = (pixels.min(axis=1) >= 230) & (np.ptp(pixels, axis=1) <= 12)
+    if np.mean(light) < .80:
+        return None
+    paper = np.median(pixels[light], axis=0).astype(np.int16)
+    if min(paper) < 240 or np.ptp(paper) > 8:
+        return None
+    loose = free_share < .25
+    if loose and (np.mean(light) < .95 or min(paper) < 252 or np.ptp(paper) > 4):
+        return None
+    distance = np.max(np.abs(image.astype(np.int16) - paper), axis=2)
+    paper_values = distance[free & (distance <= 20)]
+    if len(paper_values) < len(pixels) * .75 or np.percentile(paper_values, 90) > 8:
+        return None
+    ink = distance > 20
+    # A plain box is one whose untouched paper is uniform and whose ink is only
+    # a minority of the area. Only such a box may repaint glyph-shaped blocks
+    # that the strict rule would keep as artwork.
+    density = int(np.count_nonzero(ink & box)) / area
+    plain = float(np.percentile(distance[free], 99)) <= 10 and density < .50
+    # A nearly white gradient still carries shading. Compare spatial samples,
+    # again ignoring strokes: a quadrant that is mostly glyph must not fake a
+    # uniform paper.
+    yy, xx = np.nonzero(box)
+    mid_y, mid_x = (yy.min()+yy.max())//2, (xx.min()+xx.max())//2
+    medians = []
+    for ys in (slice(yy.min(),mid_y+1),slice(mid_y+1,yy.max()+1)):
+        for xs in (slice(xx.min(),mid_x+1),slice(mid_x+1,xx.max()+1)):
+            local = image[ys,xs][distance[ys,xs] <= 20]
+            if len(local) >= 8:
+                medians.append(np.median(local,axis=0))
+    if len(medians) < 4 or np.max(np.ptp(medians,axis=0)) > 4:
+        return None
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(ink.astype(np.uint8), connectivity=8)
+    relevant = set(np.unique(labels[box])) - {0}
+    tiny = sum(stats[i,cv2.CC_STAT_AREA] <= 9 and min(stats[i,2:4]) <= 3 for i in relevant)
+    if tiny >= 20 and tiny > len(relevant) * .6:
+        return None
+    supported = set(np.unique(labels[local_seeds]))
+    protected = np.zeros(count,bool)
+    for i in relevant:
+        x,y,w,h,component_area = stats[i]
+        touching = x == 0 or y == 0 or x+w == image.shape[1] or y+h == image.shape[0]
+        ys, xs = slice(y,y+h), slice(x,x+w)
+        component = labels[ys,xs] == i
+        contained = np.all(box[ys,xs][component])
+        thin, long = min(w,h), max(w,h)
+        # A long vowel mark is a thin dash about one glyph long. When the
+        # detector has no seed on it, its aspect ratio alone would look like an
+        # art line and the mark would survive the fill. Admit the dash shape by
+        # geometry, but keep longer strokes (speed lines) protected.
+        dash_shape = (contained and thin <= max(3, size * .35)
+                      and long <= max(8, size * 2.6)
+                      and long >= 2.5 * max(1, thin)
+                      and component_area <= size * size * 4)
+        text_dash = (contained and thin <= max(3,size*.3)
+                     and component_area <= size*size*3
+                     and (i in supported or dash_shape))
+        if touching or (not text_dash and (component_area > size*size*1.5
+                                           or long > max(12,size*2.4))):
+            # On a plain box a compact glyph-shaped block is text even when it
+            # is large, so a mark glued to the balloon border is still removed.
+            # Artwork boxes keep the strict rule, and anything touching the crop
+            # edge is always kept. A long stroke (speed line) stays protected.
+            compact = (component_area <= size*size*4 and thin <= size*1.2
+                       and long <= max(12, size*2.4))
+            if plain and not touching and compact:
+                continue
+            protected[i] = True
+    protect = _dilate(protected[labels],2)
+    protect_pixels = int(np.count_nonzero(protect & box))
+    # A box that is mostly artwork must keep the normal path. A plain box may
+    # carry a large protected block (a border glued to the text) and still be
+    # safe to repaint, so the plain verdict overrides this veto.
+    if protect_pixels > area * .30 and not plain:
+        return None
+    mask = box & ~protect
+    # Leave visibly coloured artwork to the colour-aware normal path.
+    chroma = np.ptp(image.astype(np.int16),axis=2)
+    if np.mean(chroma[box] > 20) > .005:
+        return None
+    return mask,tuple(map(int,paper)),protect_pixels,('loose' if loose else 'strict'),plain
+
+
+def _white_paper_fill(image, inside, erase, background):
+    """Recognize paper inside a printed balloon, ignoring glyph-edge JPEG ringing."""
+    if min(background) < 235 or np.ptp(background) > 8:
+        return None
+    # Use the final mask, including outline expansion. Require substantial
+    # untouched paper as well as agreement just outside the strokes.
+    expanded = _dilate(erase, 1)
+    paper = inside.astype(bool) & ~expanded
+    pixels = image[paper]
+    if len(pixels) < max(50, .20 * np.count_nonzero(inside)):
+        return None
+    colour = np.median(pixels, axis=0).astype(np.int16)
+    if np.max(np.abs(colour - background)) > 4:
+        return None
+    deviation = np.max(np.abs(pixels.astype(np.int16) - colour), axis=1)
+    if np.mean(deviation <= 3) < .90 or np.mean(deviation <= 10) < .99:
+        return None
+    collar = _dilate(expanded, 2) & ~expanded
+    nearby = image[collar]
+    if len(nearby) < 16 or np.mean(np.max(np.abs(nearby.astype(np.int16) - colour), axis=1) <= 10) < .90:
+        return None
+    return tuple(map(int, colour))
 
 
 def _white_outline(image, seeds, size):
@@ -102,7 +250,7 @@ class AdaptiveTextMask:
     a connected dark glyph cannot be separated reliably by intensity alone.
     Growth is therefore bounded on textured regions, even for huge components.
     """
-    version = 'adaptive-v3'
+    version = 'adaptive-v5'
 
     def generate(self, request: MaskRequest) -> MaskResult:
         image = request.image
@@ -256,13 +404,21 @@ class AdaptiveTextMask:
                 erase |= edge
                 if outline_pixels:
                     fill = None  # the old flat-colour collar no longer bounds this mask
-                if outline_pixels:
-                    fill = None  # the old flat-colour collar no longer bounds this mask
+        if fill is None and has_seeds:
+            fill = _white_paper_fill(image, inside, erase, background)
+        box_fill = _white_box_fallback(image, inside, seeds, erase, size)
         return validate_result(MaskResult(
             erase.astype(np.uint8) * 255, layout.astype(np.uint8) * 255, fill,
             {'algorithm': self.version, 'detector_guided': bool(np.any(seeds)),
+             'white_box_fallback': box_fill is not None,
+             'box_fill_dial': box_fill[3] if box_fill else None,
+             'box_fill_plain': bool(box_fill[4]) if box_fill else None,
+             'protected_box_pixels': box_fill[2] if box_fill else 0,
+             'box_fill_pixels': int(np.count_nonzero(box_fill[0])) if box_fill else 0,
              'background': list(map(int, background)), 'ring_consensus': consensus,
              'inner_consensus': inner_consensus, 'strategy': 'flat' if fill is not None else 'texture',
              'erase_pixels': int(np.count_nonzero(erase)), 'edge_radius': radius,
              'extra_outline_pixels': outline_pixels}, source_outline_ratio=outline_ratio,
+            box_fill_mask=box_fill[0].astype(np.uint8)*255 if box_fill else None,
+            box_fill_color=box_fill[1] if box_fill else None,
         ), (height, width))
