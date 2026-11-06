@@ -1,7 +1,7 @@
 """Shared monochrome tokens; UI fonts never enter the typesetter config."""
 from __future__ import annotations
 from functools import lru_cache
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QFontInfo, QPalette
 from ..config import AI_ROOT, ICON_PATH
 from ..i18n import ui_language
 
@@ -9,11 +9,42 @@ COLORS = dict(paper='#FFFFFF', workspace='#F8F8F8', muted='#EFEFEF', ink='#17171
 SPACING = (4, 8, 12, 16, 24, 32)
 UI_FAMILIES = ['Source Han Sans SC', '思源黑体 CN', 'Noto Sans CJK SC', 'Microsoft YaHei UI', 'Microsoft YaHei']
 JP_FAMILIES = ['Source Han Sans JP', 'Noto Sans CJK JP', 'Yu Gothic', 'Meiryo']
+# Shipped with the app; registered only when the OS has no usable CJK UI face.
+UI_FALLBACK_FONT = 'CN/SourceHanSansSC-Medium-2.otf'
+# A UI label may only resolve to these; screenshot review scripts assert it.
+UI_FONT_ALLOWLIST = frozenset(UI_FAMILIES + JP_FAMILIES)
+
+
+def _ui_families(available):
+    # A bundled display-only Heavy face must not become the body-text fallback.
+    return [name for name in UI_FAMILIES if name in available and
+            QFontDatabase.styles(name) != ['Heavy']]
+
+
+def _register_ui_fallback():
+    """Never let the handwritten log face become the interface font.
+
+    Without an OS CJK sans (headless screenshots, stripped Windows installs),
+    Qt picks any registered font that has the glyphs - in this app that is the
+    bundled handwriting face, which is only meant for log lines.
+    """
+    return _bundled_font_families(UI_FALLBACK_FONT)
+
+
+def resolved_ui_font_family(size=14):
+    return QFontInfo(ui_font(size)).family()
+
 
 def ui_font(size=14, weight=QFont.Normal, *, mono=False, japanese=False):
     available = set(QFontDatabase.families())
-    preferred = (['JetBrains Mono', 'Consolas'] if mono else []) + (JP_FAMILIES if japanese or ui_language() == 'ja' else []) + UI_FAMILIES
-    # A bundled display-only Heavy face must not become the body-text fallback.
+    preferred_ui = _ui_families(available)
+    if not preferred_ui:
+        _register_ui_fallback()
+        available = set(QFontDatabase.families())
+        preferred_ui = _ui_families(available)
+    preferred = ((['JetBrains Mono', 'Consolas'] if mono else [])
+                 + (JP_FAMILIES if japanese or ui_language() == 'ja' else [])
+                 + (preferred_ui or UI_FAMILIES))
     families = [name for name in preferred if name in available and
                 QFontDatabase.styles(name) != ['Heavy']]
     font = QFont()
