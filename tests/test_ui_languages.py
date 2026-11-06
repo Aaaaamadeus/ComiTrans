@@ -113,10 +113,12 @@ class UiLanguageTests(unittest.TestCase):
         dialog = InterfaceLanguageDialog()
         self.addCleanup(destroy_widget, dialog)
         self.assertEqual(dialog.selected_language, 'zh-CN')
-        self.assertEqual([dialog.language_combo.itemText(i) for i in range(3)], ['中文', 'English', '日本語'])
+        self.assertEqual([radio.text() for radio in dialog._radios.values()],
+                         ['中文', 'English', '日本語'])
         self.assertEqual(dialog.continue_button.text(), '继续')
         for code, expected in (('en', 'Continue'), ('ja', '続行')):
-            dialog.language_combo.setCurrentIndex(dialog.language_combo.findData(code))
+            dialog._radios[code].setChecked(True)
+            self.assertEqual(dialog.selected_language, code)
             self.assertEqual(dialog.continue_button.text(), expected)
         self.assertEqual(ui_language(), 'zh-CN')
 

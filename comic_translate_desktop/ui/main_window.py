@@ -64,6 +64,7 @@ from .editor_page import EditorPage
 from .error_log_page import ErrorLogPage
 from .step_panel import StepPanel
 from .theme import apply_theme, brand_font, refresh_style
+from .window_chrome import apply_window_chrome, watch_window_chrome
 from .preview import ImagePreview
 from .log_panel import LogPanel
 from .font_picker import TranslationFontPicker
@@ -108,6 +109,7 @@ class MainWindow(QMainWindow):
         self._prompt_refresh_timer.timeout.connect(self._refresh_error_page)
 
         self._build_ui()
+        watch_window_chrome(self)
         self._star_prompt = StarPrompt(self.centralWidget())
         self._append_log(tr('本地客户端已就绪。'))
         if self.config["api_key"] and self.config["api_key"] == self.config["translation_model"]:
@@ -1173,6 +1175,10 @@ class MainWindow(QMainWindow):
         self._file_selection_label.setVisible(not compact)
         self._drop_hint.setVisible(not compact)
         self._drop_title.setVisible(self.height() >= 580)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        apply_window_chrome(self)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

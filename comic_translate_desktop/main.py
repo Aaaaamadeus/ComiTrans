@@ -6,7 +6,9 @@ import argparse
 from PySide6.QtWidgets import QApplication
 
 from .i18n import initialize_ui_language
-from .ui.theme import install_ui_font
+from .config import load_ai_config
+from .ui.theme import apply_theme, install_ui_font
+from .ui.window_chrome import install_window_chrome
 
 
 def main() -> int:
@@ -18,7 +20,9 @@ def main() -> int:
     app.setApplicationName("ComiTrans")
     app.setOrganizationName("ComiTrans")
     app.setStyle("Fusion")
+    install_window_chrome(app)
     install_ui_font(app)
+    apply_theme(app, load_ai_config().get('ui_theme', 'auto'))
     if args.smoke_test:
         from .smoke_test import run_smoke_test
         return run_smoke_test(app, args.smoke_test, require_gpu=args.smoke_test_require_gpu)
