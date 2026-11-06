@@ -15,8 +15,8 @@
     "width": 1440,
     "scale": "1",
     "canvas_width": 852,
-    "canvas_height": 606,
-    "visible_text_height": 175,
+    "canvas_height": 603,
+    "visible_text_height": 166,
     "desired_panels": [
       true,
       true
@@ -40,7 +40,7 @@
     "width": 850,
     "scale": "1",
     "canvas_width": 490,
-    "canvas_height": 346,
+    "canvas_height": 343,
     "visible_text_height": 180,
     "desired_panels": [
       true,
@@ -65,8 +65,8 @@
     "width": 1440,
     "scale": "1",
     "canvas_width": 852,
-    "canvas_height": 605,
-    "visible_text_height": 172,
+    "canvas_height": 603,
+    "visible_text_height": 166,
     "desired_panels": [
       true,
       true
@@ -80,7 +80,7 @@
     "width": 850,
     "scale": "1",
     "canvas_height": 144,
-    "preference_height": 129,
+    "preference_height": 132,
     "actual_width": 850,
     "actual_height": 620
   },
@@ -90,7 +90,7 @@
     "width": 850,
     "scale": "1",
     "canvas_width": 490,
-    "canvas_height": 345,
+    "canvas_height": 343,
     "visible_text_height": 180,
     "desired_panels": [
       true,
@@ -115,8 +115,8 @@
     "width": 1440,
     "scale": "1",
     "canvas_width": 852,
-    "canvas_height": 606,
-    "visible_text_height": 175,
+    "canvas_height": 603,
+    "visible_text_height": 166,
     "desired_panels": [
       true,
       true
@@ -140,7 +140,7 @@
     "width": 850,
     "scale": "1",
     "canvas_width": 490,
-    "canvas_height": 346,
+    "canvas_height": 343,
     "visible_text_height": 180,
     "desired_panels": [
       true,
