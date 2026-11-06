@@ -276,10 +276,12 @@ QPlainTextEdit#logContent, QPlainTextEdit#logContent:focus { border: none; backg
 QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QPlainTextEdit:disabled { background: @workspace; color: @disabled; border-color: transparent; }
 QComboBox::drop-down { width: 24px; border: none; }
 QComboBox::down-arrow { image: url("@icons/chevron-down.svg"); width: 16px; height: 16px; }
-QFrame#controlCard QLineEdit, QFrame#controlCard QComboBox { min-height: 22px; padding: 3px 8px; border-color: transparent; font-size: 13px; }
+QFrame#controlCard QLineEdit, QFrame#controlCard QComboBox { min-height: 28px; padding: 4px 10px; border-color: transparent; font-size: 13px; }
 QFrame#controlCard QLineEdit:focus, QFrame#controlCard QComboBox:focus { border-color: @ruleStrong; }
-QFrame#controlCard QPushButton, QFrame#controlCard QToolButton { min-height: 24px; padding: 3px 10px; border-color: transparent; font-size: 13px; }
-QFrame#controlCard QPushButton[role="primary"] { border-radius: 10px; }
+QFrame#controlCard QPushButton, QFrame#controlCard QToolButton { min-height: 28px; padding: 4px 12px; border-color: transparent; font-size: 13px; }
+QFrame#controlCard QPushButton[role="primary"] { border-radius: 10px; min-height: 32px; }
+QFrame#optionDivider { background: @rule; border: none; margin: 6px 0; }
+QLabel#optionArrow { color: @secondary; padding: 0 2px; }
 QComboBox QLineEdit#fontSearchEditor, QComboBox QLineEdit#fontSearchEditor:focus { padding: 0; min-height: 0; border: none; border-radius: 0; background: transparent; }
 QLineEdit#fontSearchEditor QToolButton { padding: 0; min-height: 0; min-width: 0; border: none; border-radius: 0; background: transparent; }
 QSpinBox::up-button, QSpinBox::down-button { width: 20px; border: none; background: transparent; }

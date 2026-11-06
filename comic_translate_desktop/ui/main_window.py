@@ -318,8 +318,12 @@ class MainWindow(QMainWindow):
         self._source_language.setToolTip(tr('其它语言可在设置中接入自定义 OCR'))
         self._source_language.currentIndexChanged.connect(self._change_source_language)
         control_row.addWidget(self._source_language, 0, 1)
+        self._language_arrow = QLabel('→')
+        self._language_arrow.setProperty('muted', True)
+        self._language_arrow.setAccessibleName(tr('翻译方向'))
+        control_row.addWidget(self._language_arrow, 0, 2)
         self._target_caption = QLabel(tr('译文'))
-        control_row.addWidget(self._target_caption, 0, 2)
+        control_row.addWidget(self._target_caption, 0, 3)
         self._target_language = QComboBox()
         self._target_language.setAccessibleName(tr('译文简繁切换'))
         self._target_language.setMinimumWidth(170 if ui_language() == 'en' else 140 if ui_language() == 'ja' else 110)
@@ -329,15 +333,18 @@ class MainWindow(QMainWindow):
         self._target_language.setCurrentIndex(max(0, self._target_language.findData(self.config.get('target_language', 'zh-Hans'))))
         self._target_language.setToolTip(tr('选择简体中文或繁體中文，自动保存并用于后续翻译。'))
         self._target_language.currentIndexChanged.connect(self._change_target_language)
-        control_row.addWidget(self._target_language, 0, 3)
+        control_row.addWidget(self._target_language, 0, 4)
         self._pref_toggle = QToolButton()
         self._pref_toggle.setText(tr('翻译偏好'))
         self._pref_toggle.setCheckable(True)
         self._pref_toggle.setArrowType(Qt.RightArrow)
         self._pref_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self._pref_toggle.setProperty("role", "quiet")
-        control_row.addWidget(self._pref_toggle, 0, 4)
         control_row.setColumnStretch(5, 1)
+        self._control_divider = QFrame()
+        self._control_divider.setObjectName('optionDivider')
+        self._control_divider.setFrameShape(QFrame.VLine)
+        self._control_divider.setFixedWidth(1)
         self._language_stacked = False
         self._start_btn = QPushButton(tr('开始翻译'))
         self._start_btn.setProperty("role", "primary")
@@ -1131,8 +1138,8 @@ class MainWindow(QMainWindow):
             self._preference_context_layout.setDirection(QHBoxLayout.TopToBottom if self._pref_container.width() < 580 else QHBoxLayout.LeftToRight)
         self._brand_title.setFont(brand_font(28 if self.width() < 960 else 36 if self.width() < 1180 else 40))
         self._header_layout.setContentsMargins(12 if self.width() < 1120 else 20, 8, 12 if self.width() < 1120 else 20, 8)
-        self._nav_auto.setText(tr('自动处理') if self.width() < 1120 else tr('01  自动处理'))
-        self._nav_editor.setText(tr('嵌字精修') if self.width() < 1120 else tr('02  嵌字精修'))
+        self._nav_auto.setText(tr('自动处理') if (self.width() < 1120 or ui_language() != 'zh-CN') else tr('01  自动处理'))
+        self._nav_editor.setText(tr('嵌字精修') if (self.width() < 1120 or ui_language() != 'zh-CN') else tr('02  嵌字精修'))
         narrow = self.width() < 1120
         self._more_btn.setVisible(narrow)
         self._output_btn.setVisible(not narrow)
@@ -1143,26 +1150,48 @@ class MainWindow(QMainWindow):
         stacked = not inline and ui_language() != 'zh-CN'
         if stacked != self._language_stacked:
             self._language_stacked = stacked
-            fields = (self._source_caption, self._source_language, self._target_caption,
-                      self._target_language, self._pref_toggle)
+            fields = (self._source_caption, self._source_language, self._language_arrow,
+                      self._target_caption, self._target_language)
             for widget in fields:
                 self._language_grid.removeWidget(widget)
-            positions = ((0, 0), (1, 0), (0, 1), (1, 1), (1, 2)) if stacked else tuple((0, i) for i in range(5))
-            for widget, (row, column) in zip(fields, positions):
-                self._language_grid.addWidget(widget, row, column)
-            self._language_grid.setColumnStretch(5, 0 if stacked else 1)
+            if stacked:
+                self._language_grid.addWidget(self._source_caption, 0, 0)
+                self._language_grid.addWidget(self._source_language, 0, 1)
+                self._language_grid.addWidget(self._target_caption, 1, 0)
+                self._language_grid.addWidget(self._target_language, 1, 1)
+                self._language_arrow.setVisible(False)
+            else:
+                self._language_grid.addWidget(self._source_caption, 0, 0)
+                self._language_grid.addWidget(self._source_language, 0, 1)
+                self._language_grid.addWidget(self._language_arrow, 0, 2)
+                self._language_grid.addWidget(self._target_caption, 0, 3)
+                self._language_grid.addWidget(self._target_language, 0, 4)
+                self._language_arrow.setVisible(True)
+            self._language_grid.setColumnStretch(5, 1)
         if inline != self._controls_inline:
             self._controls_inline = inline
-            for widget in (self._language_controls, self._output_controls, self._start_btn):
+            for widget in (self._language_controls, self._output_controls, self._start_btn,
+                           self._pref_toggle, self._control_divider):
                 self._control_grid.removeWidget(widget)
-            self._control_grid.addWidget(self._language_controls, 0, 0, 1, 1 if inline else 2)
-            self._control_grid.addWidget(self._output_controls, 0 if inline else 1, 1 if inline else 0, 1, 1 if inline else 3)
-            self._control_grid.addWidget(self._start_btn, 0, 2)
-            self._control_grid.setColumnStretch(1, 1)
+            if inline:
+                self._control_grid.addWidget(self._language_controls, 0, 0)
+                self._control_grid.addWidget(self._control_divider, 0, 1)
+                self._control_grid.addWidget(self._output_controls, 0, 2)
+                self._control_grid.addWidget(self._pref_toggle, 0, 3)
+                self._control_grid.addWidget(self._start_btn, 0, 4)
+                self._control_divider.setVisible(True)
+            else:
+                self._control_grid.addWidget(self._language_controls, 0, 0, 1, 3)
+                self._control_grid.addWidget(self._pref_toggle, 0, 3, 1, 2, Qt.AlignRight)
+                self._control_grid.addWidget(self._output_controls, 1, 0, 1, 3)
+                self._control_grid.addWidget(self._start_btn, 1, 3, 1, 2, Qt.AlignRight)
+                self._control_divider.setVisible(False)
+            self._control_grid.setColumnStretch(1, 0)
+            self._control_grid.setColumnStretch(2, 1)
         editing_preferences = compact and self._pref_toggle.isChecked()
         self._output_controls.setVisible(self.height() >= 580 and not editing_preferences)
         self.step_panel.setVisible((self.file_list.count() > 0 or self.worker is not None) and not editing_preferences)
-        self._elapsed_label.setVisible(not compact)
+        self._elapsed_label.setVisible(not compact and self.width() >= 1200)
         self.step_panel.set_compact(compact)
         self.preview_tabs.setVisible(True)
         self._log_panel.setMaximumHeight(100 if compact else 16777215)

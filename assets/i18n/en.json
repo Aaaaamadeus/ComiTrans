@@ -609,5 +609,6 @@
   "纸白（浅色）": "Paper (light)",
   "夜墨（深色）": "Night ink (dark)",
   "切换后立即生效；夜墨只改变界面与画布周围，不改漫画像素与导出结果。": "Applies immediately. Night ink changes only the UI and the area around the canvas; manga pixels and exports are untouched.",
-  "跟随系统会随 Windows 深浅色自动切换。": "Follow system tracks the Windows light/dark setting."
+  "跟随系统会随 Windows 深浅色自动切换。": "Follow system tracks the Windows light/dark setting.",
+  "翻译方向": "Translation direction"
 }
