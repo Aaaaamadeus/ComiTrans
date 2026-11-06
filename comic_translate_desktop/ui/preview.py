@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScroll
 from ..pdf_utils import render_pdf_preview
 from ..config import ICON_PATH
 from .halftone import COMPACT_BREAKPOINT, draw_corner_tones, draw_tone
-from .theme import display_font
+from .theme import color, display_font, theme_name
 
 
 @lru_cache(maxsize=4)
@@ -29,6 +29,11 @@ class MangaIllustration(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         if not self._pixmap.isNull():
+            if theme_name() == 'dark':
+                # The line art is ink on transparency; give it a paper card to sit on.
+                p.setPen(Qt.NoPen)
+                p.setBrush(QColor('#F2F1EC'))
+                p.drawRoundedRect(QRectF(self.rect()), 12, 12)
             p.setRenderHint(QPainter.SmoothPixmapTransform)
             source = QRectF(self._pixmap.rect())
             scale = min(self.width() / source.width(), self.height() / source.height())
@@ -39,10 +44,10 @@ class MangaIllustration(QWidget):
             return
         # Keep a small offline fallback if an installation omits the optional art.
         p.translate((self.width() - 180) / 2, (self.height() - 104) / 2)
-        p.setPen(QPen(QColor('#111111'), 2))
-        p.setBrush(QColor('#111111'))
+        p.setPen(QPen(QColor(color('ink')), 2))
+        p.setBrush(QColor(color('ink')))
         p.drawRect(54, 11, 82, 86)
-        p.setBrush(QColor('#FFFFFF'))
+        p.setBrush(QColor(color('paper')))
         p.drawRect(49, 6, 82, 86)
         p.drawRect(57, 14, 28, 29)
         p.drawRect(91, 14, 32, 29)
@@ -62,7 +67,7 @@ class EmptyPreview(QWidget):
     def paintEvent(self, event):
         super().paintEvent(event)
         painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor('#FFFFFF'))
+        painter.fillRect(self.rect(), QColor(color('paper')))
         draw_corner_tones(painter, QRectF(self.rect()),
                           compact=self.window().width() < COMPACT_BREAKPOINT)
 
@@ -372,6 +377,12 @@ class PageCanvas(QLabel):
         painter.setClipRegion(margin)
         draw_corner_tones(painter, QRectF(bounds),
                           compact=self.window().width() < COMPACT_BREAKPOINT)
+        painter.setClipping(False)
+        edge = QPen(QColor(color('pageEdge')), 1)
+        edge.setCosmetic(True)
+        painter.setPen(edge)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawRect(page.adjusted(.5, .5, -.5, -.5))
         if self.regions_visible and self.regions:
             painter.setClipping(False)
             painter.setClipRect(page)
@@ -380,13 +391,16 @@ class PageCanvas(QLabel):
                 rect = self._box_rect(box)
                 if rect.isEmpty() or (self.region is not None and tuple(box) == tuple(self.region)):
                     continue
+                guide = QColor(color('guide'))
                 if index == self._hover_index:
-                    pen = QPen(QColor(44, 110, 150, 220), 1.5, Qt.SolidLine)
+                    guide.setAlpha(220)
+                    pen = QPen(guide, 1.5, Qt.SolidLine)
                     pen.setCosmetic(True)
                     painter.setPen(pen)
-                    painter.setBrush(QColor(44, 110, 150, 28))
+                    painter.setBrush(QColor(guide.red(), guide.green(), guide.blue(), 28))
                 else:
-                    pen = QPen(QColor(44, 110, 150, 90), 1, Qt.DashLine)
+                    guide.setAlpha(90)
+                    pen = QPen(guide, 1, Qt.DashLine)
                     pen.setCosmetic(True)
                     painter.setPen(pen)
                     painter.setBrush(Qt.NoBrush)
@@ -398,15 +412,15 @@ class PageCanvas(QLabel):
             rect = self.region_rect()
             painter.setRenderHint(QPainter.Antialiasing)
             painter.setRenderHint(QPainter.Antialiasing)
-            pen = QPen(QColor('#607D8B'), 1.5, Qt.DashLine)
+            pen = QPen(QColor(color('guide')), 1.5, Qt.DashLine)
             pen.setCosmetic(True)
             painter.setPen(pen)
             painter.setBrush(Qt.NoBrush)
             painter.drawRect(rect)
             if self.region_editable and self.isEnabled():
                 painter.setClipRect(page.adjusted(-5, -5, 5, 5))
-                painter.setPen(QPen(QColor('#607D8B'), 1))
-                painter.setBrush(QColor('#FFFFFF'))
+                painter.setPen(QPen(QColor(color('guide')), 1))
+                painter.setBrush(QColor(color('paper')))
                 for handle in self._region_handles().values():
                     painter.drawRect(QRectF(handle.x() - 3.5, handle.y() - 3.5, 7, 7))
         painter.end()

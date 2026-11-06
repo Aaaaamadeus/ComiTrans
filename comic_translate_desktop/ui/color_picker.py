@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QColorDialog, QHBoxLayout, QPushButton, QToolButto
 
 from comic_translate_core.layout_options import normalize_text_color
 from ..i18n import tr
+from .theme import color
 
 
 class TextColorPicker(QWidget):
@@ -54,7 +55,7 @@ class TextColorPicker(QWidget):
         swatch = QPixmap(20, 20)
         swatch.fill(Qt.transparent)
         painter = QPainter(swatch)
-        painter.setPen(QColor('#888888'))
+        painter.setPen(QColor(color('ruleStrong')))
         painter.setBrush(QColor(self._color or self._default_color))
         painter.drawRoundedRect(1, 1, 18, 18, 3, 3)
         painter.end()

@@ -4,6 +4,7 @@ from ..i18n import tr
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -25,6 +26,7 @@ from ..config import mask_api_key
 from ..i18n import UI_LANGUAGES
 from comic_translate_core.languages import SOURCE_LANGUAGES
 from .manga_components import PanelHeading
+from .theme import apply_theme
 
 
 class ApiConfigPage(QWidget):
@@ -141,6 +143,22 @@ class ApiConfigPage(QWidget):
         runtime_form.addRow(tr('输出目录'), output_row)
         runtime_form.addRow(tr('Issue 链接'), self._issue_input)
         runtime_root.addWidget(runtime_group)
+        appearance_group = QGroupBox(tr('外观'))
+        appearance_form = QFormLayout(appearance_group)
+        self._style_form(appearance_form)
+        self._theme = QComboBox()
+        self._theme.setAccessibleName(tr('界面主题'))
+        for label, value in ((tr('跟随系统'), 'auto'), (tr('纸白（浅色）'), 'light'), (tr('夜墨（深色）'), 'dark')):
+            self._theme.addItem(tr(label), value)
+        self._theme.setToolTip(tr('切换后立即生效；夜墨只改变界面与画布周围，不改漫画像素与导出结果。'))
+        self._theme.currentIndexChanged.connect(
+            lambda: apply_theme(QApplication.instance(), self._theme.currentData()))
+        appearance_form.addRow(tr('主题'), self._theme)
+        appearance_note = QLabel(tr('跟随系统会随 Windows 深浅色自动切换。'))
+        appearance_note.setWordWrap(True)
+        appearance_note.setProperty('muted', True)
+        appearance_form.addRow(tr(appearance_note))
+        runtime_root.addWidget(appearance_group)
         runtime_root.addStretch(1)
         ocr_group = QGroupBox(tr('语言与引擎'))
         ocr_form = QFormLayout(ocr_group)
@@ -353,6 +371,9 @@ class ApiConfigPage(QWidget):
         self._output_input.setToolTip(self._output_input.text())
         self._output_input.setCursorPosition(len(self._output_input.text()))
         self._issue_input.setText(config.get("issue_url", ""))
+        self._theme.blockSignals(True)
+        self._theme.setCurrentIndex(max(0, self._theme.findData(config.get("ui_theme", "auto"))))
+        self._theme.blockSignals(False)
         self._model_info.setText(
             tr('CharSpot Small: {_4}\n检测: {_0}\nBaberu OCR: {_1}\nmanga-ocr: {_2}\n修复: {_3}', _4=config.get('charspot_ocr_model', ''), _0=config.get('detector_model', ''), _1=config.get('baberu_ocr_model', ''), _2=config.get('ocr_model', ''), _3=config.get('lama_model', ''))
         )
@@ -383,6 +404,7 @@ class ApiConfigPage(QWidget):
             "custom_ocr_timeout": self._custom_timeout.value(),
             "page_output_dir": self._output_input.text().strip(),
             "issue_url": self._issue_input.text().strip(),
+            "ui_theme": self._theme.currentData(),
         }
         key = self._key_input.text().strip()
         if key:

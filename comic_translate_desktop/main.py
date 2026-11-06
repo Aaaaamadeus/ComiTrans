@@ -6,7 +6,7 @@ import argparse
 from PySide6.QtWidgets import QApplication
 
 from .i18n import initialize_ui_language
-from .ui.theme import APP_STYLESHEET, install_ui_font
+from .ui.theme import install_ui_font
 
 
 def main() -> int:
@@ -19,7 +19,6 @@ def main() -> int:
     app.setOrganizationName("ComiTrans")
     app.setStyle("Fusion")
     install_ui_font(app)
-    app.setStyleSheet(APP_STYLESHEET)
     if args.smoke_test:
         from .smoke_test import run_smoke_test
         return run_smoke_test(app, args.smoke_test, require_gpu=args.smoke_test_require_gpu)

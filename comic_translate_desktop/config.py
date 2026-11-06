@@ -119,6 +119,9 @@ def load_ai_config() -> dict[str, Any]:
         except Exception:
             pass  # Keep usable built-in fonts when an imported file is missing/corrupt.
     ocr_backend = str(raw.get("ocr_backend") or "auto").strip().lower()
+    ui_theme = str(raw.get("ui_theme") or "auto").strip().lower()
+    if ui_theme not in ("auto", "light", "dark"):
+        ui_theme = "auto"
     ocr_config = {key: raw.get(key, default) for key, default in OCR_DEFAULTS.items()}
     ocr_config["source_language"] = str(raw.get("source_language") or "ja").strip().lower()
 
@@ -126,6 +129,7 @@ def load_ai_config() -> dict[str, Any]:
         **ocr_config,
         "ui_language": normalize_ui_language(raw.get("ui_language")),
         "ui_language_selected": bool(raw.get("ui_language_selected", False)),
+        "ui_theme": ui_theme,
         "api_key": _clean_text(raw.get("api_key")),
         "api_base_url": _clean_text(raw.get("api_base_url")),
         "translation_model": _clean_text(raw.get("translation_model")) or "gemini-2.5-flash",

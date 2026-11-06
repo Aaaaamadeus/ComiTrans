@@ -26,7 +26,7 @@ from comic_translate_desktop.ui.main_window import MainWindow
 from comic_translate_desktop.ui.preview import studio_illustration
 from comic_translate_desktop.font_library import font_reference
 from comic_translate_desktop.ui.theme import (
-    APP_STYLESHEET, UI_FONT_ALLOWLIST, install_ui_font, resolved_ui_font_family)
+    UI_FONT_ALLOWLIST, apply_theme, install_ui_font, resolved_ui_font_family)
 from comic_translate_desktop.ui.font_library_dialog import FontLibraryDialog
 
 
@@ -46,7 +46,7 @@ def main():
     QSettings().clear()
     app.setStyle('Fusion')
     install_ui_font(app)
-    app.setStyleSheet(APP_STYLESHEET)
+    apply_theme(app, 'light')
     ui_font_family = resolved_ui_font_family()
     assert ui_font_family in UI_FONT_ALLOWLIST, (
         f'UI font fell back to {ui_font_family!r}; screenshots would not represent the app')

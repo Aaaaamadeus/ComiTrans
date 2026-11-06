@@ -6,13 +6,12 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QPainter
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
-from .theme import ui_font
+from .theme import color, ui_font
 from .halftone import COMPACT_BREAKPOINT, draw_tone
 
 def label(parent, text, size, *, weight=QFont.Bold):
     result = QLabel(tr(text), parent)
     result.setFont(ui_font(size, weight))
-    result.setStyleSheet('QLabel { color: #111111; background: transparent; }')
     result.setAttribute(Qt.WA_TransparentForMouseEvents)
     return result
 
@@ -28,7 +27,7 @@ class PanelHeading(QWidget):
         self._number = label(self, number, 12, weight=QFont.Normal)
         self._number.setVisible(bool(number))
         self._number.setFont(ui_font(12, mono=True))
-        self._number.setStyleSheet('QLabel { color: #777777; background: transparent; }')
+        self._number.setProperty('muted', True)
         self._number.setAlignment(Qt.AlignCenter)
         self._title = label(self, title, 20 if sidebar else 18, weight=QFont.Bold)
         self._title.setFont(ui_font(20 if sidebar else 18, QFont.Bold))
@@ -44,7 +43,7 @@ class PanelHeading(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         w, h = self.width(), self.height()
-        p.fillRect(self.rect(), QColor('#F8F8F8' if self.sidebar else '#FFFFFF'))
+        p.fillRect(self.rect(), QColor(color('workspace' if self.sidebar else 'paper')))
         end = min(w, self._title.x() + self._title.width() + 10)
         tone_width = min(72 if self.sidebar else 120, max(0, w - end - 12))
         if tone_width > 24:
@@ -67,7 +66,7 @@ class StageFocus(QWidget):
         self._title = label(self, tr('等待任务'), 14, weight=QFont.Bold)
         self._detail = label(self, tr('添加漫画后，开始自动处理'), 12, weight=QFont.Normal)
         self._detail.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-        self._detail.setStyleSheet('QLabel { color: #595959; background: transparent; }')
+        self._detail.setProperty('muted', True)
 
     def set_stage(self, number, title, detail):
         self._number.setText(tr(number))
@@ -93,8 +92,8 @@ class StageFocus(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        p.fillRect(self.rect(), QColor('#FFFFFF'))
+        p.fillRect(self.rect(), QColor(color('paper')))
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor('#EFEFEF'))
+        p.setBrush(QColor(color('muted')))
         p.drawEllipse(QRectF(1, 4, 26, 26))
         p.end()

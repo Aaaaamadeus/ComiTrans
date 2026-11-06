@@ -1,11 +1,11 @@
 """Shared monochrome tokens; UI fonts never enter the typesetter config."""
 from __future__ import annotations
 from functools import lru_cache
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QFontInfo, QPalette
 from ..config import AI_ROOT, ICON_PATH
 from ..i18n import ui_language
 
-COLORS = dict(paper='#FFFFFF', workspace='#F8F8F8', muted='#EFEFEF', ink='#171717', black='#000000', secondary='#595959', disabled='#777777', rule='#DEDEDE', canvas='#F3F3F3')
 SPACING = (4, 8, 12, 16, 24, 32)
 UI_FAMILIES = ['Source Han Sans SC', '思源黑体 CN', 'Noto Sans CJK SC', 'Microsoft YaHei UI', 'Microsoft YaHei']
 JP_FAMILIES = ['Source Han Sans JP', 'Noto Sans CJK JP', 'Yu Gothic', 'Meiryo']
@@ -13,6 +13,45 @@ JP_FAMILIES = ['Source Han Sans JP', 'Noto Sans CJK JP', 'Yu Gothic', 'Meiryo']
 UI_FALLBACK_FONT = 'CN/SourceHanSansSC-Medium-2.otf'
 # A UI label may only resolve to these; screenshot review scripts assert it.
 UI_FONT_ALLOWLIST = frozenset(UI_FAMILIES + JP_FAMILIES)
+
+PALETTES = {
+    'light': dict(
+        paper='#FFFFFF', workspace='#F8F8F8', muted='#EFEFEF', elevated='#FFFFFF',
+        ink='#171717', black='#000000', secondary='#595959', disabled='#777777',
+        rule='#DEDEDE', ruleStrong='#868686', canvas='#F3F3F3', pageEdge='#DEDEDE',
+        guide='#2C6E96', guideHalo='#FFFFFF', tone='#111111', toneAlpha=1.0, toneBlend='multiply',
+        scrollHandle='#B8B8B8', focusRing='#171717', iconDir='icons'),
+    'dark': dict(
+        paper='#17181B', workspace='#111214', muted='#24262B', elevated='#1E2024',
+        ink='#EDEDEF', black='#FFFFFF', secondary='#A3A5AC', disabled='#6C6F76',
+        rule='#34373D', ruleStrong='#7C818B', canvas='#0B0C0E', pageEdge='#3A3E45',
+        guide='#2C6E96', guideHalo='#0B0C0E', tone='#FFFFFF', toneAlpha=0.22, toneBlend='source',
+        scrollHandle='#4A4E57', focusRing='#EDEDEF', iconDir='icons/dark'),
+}
+COLORS = PALETTES['light']
+
+_theme_mode = 'light'
+_theme_request = 'light'
+_theme_watched = False
+
+
+class _ThemeHub(QObject):
+    changed = Signal(str)
+
+
+theme_changed = _ThemeHub()
+
+
+def theme_name():
+    return _theme_mode
+
+
+def theme():
+    return PALETTES[_theme_mode]
+
+
+def color(name):
+    return theme()[name]
 
 
 def _ui_families(available):
@@ -54,6 +93,7 @@ def ui_font(size=14, weight=QFont.Normal, *, mono=False, japanese=False):
     font.setWeight(weight)
     return font
 
+
 @lru_cache(maxsize=8)
 def _bundled_font_families(relative_path, *, ui_asset=False):
     # Register on the GUI thread once; use Qt's actual family names, not filenames.
@@ -91,24 +131,86 @@ def display_font(size, *, italic=False):
     return font
 
 
+def resolve_theme(mode, app=None):
+    if mode in PALETTES:
+        return mode
+    if mode == 'auto' and app is not None:
+        try:
+            scheme = app.styleHints().colorScheme()
+            return 'dark' if scheme == Qt.ColorScheme.Dark else 'light'
+        except Exception:
+            return 'light'
+    return 'light'
+
+
+def build_stylesheet(palette=None):
+    palette = palette or theme()
+    sheet = APP_STYLESHEET_TEMPLATE
+    # Longest first: "@ruleStrong" must not be eaten by "@rule".
+    for token in sorted(palette, key=len, reverse=True):
+        sheet = sheet.replace(f'@{token}', str(palette[token]))
+    icons = (ICON_PATH.parent / 'ui' / palette['iconDir']).as_posix()
+    return sheet.replace('@icons', icons)
+
+
+def apply_palette(app, palette=None):
+    palette = palette or theme()
+    qt_palette = QPalette()
+    roles = {
+        QPalette.Window: 'workspace', QPalette.WindowText: 'ink', QPalette.Base: 'paper',
+        QPalette.AlternateBase: 'workspace', QPalette.Text: 'ink', QPalette.Button: 'paper',
+        QPalette.ButtonText: 'ink', QPalette.Highlight: 'ink', QPalette.HighlightedText: 'paper',
+        QPalette.ToolTipBase: 'elevated', QPalette.ToolTipText: 'ink', QPalette.Link: 'ink',
+        QPalette.LinkVisited: 'secondary', QPalette.Light: 'paper', QPalette.Midlight: 'muted',
+        QPalette.Mid: 'rule', QPalette.Dark: 'secondary', QPalette.Shadow: 'black',
+    }
+    for role, token in roles.items():
+        qt_palette.setColor(role, QColor(palette[token]))
+    for role in (QPalette.Text, QPalette.WindowText, QPalette.ButtonText):
+        qt_palette.setColor(QPalette.Disabled, role, QColor(palette['disabled']))
+    app.setPalette(qt_palette)
+
+
+def apply_theme(app, mode='light'):
+    """Switch the whole app between the paper and night palettes at runtime."""
+    global _theme_mode, _theme_request, _theme_watched
+    if app is None:
+        return _theme_mode
+    _theme_request = mode if mode in ('auto', 'light', 'dark') else 'light'
+    resolved = resolve_theme(mode, app)
+    changed = resolved != _theme_mode
+    _theme_mode = resolved
+    apply_palette(app)
+    app.setStyleSheet(build_stylesheet())
+    if not _theme_watched:
+        _theme_watched = True
+        try:
+            app.styleHints().colorSchemeChanged.connect(
+                lambda *_: apply_theme(app, 'auto') if _theme_request == 'auto' else None)
+        except Exception:
+            pass
+    if changed:
+        for widget in app.allWidgets():
+            widget.update()
+        theme_changed.changed.emit(resolved)
+    return resolved
+
+
 def install_ui_font(app):
     font = ui_font()
     app.setFont(font)
-    palette = QPalette()
-    roles = {QPalette.Window:'workspace', QPalette.WindowText:'ink', QPalette.Base:'paper', QPalette.AlternateBase:'workspace', QPalette.Text:'ink', QPalette.Button:'paper', QPalette.ButtonText:'ink', QPalette.Highlight:'ink', QPalette.HighlightedText:'paper', QPalette.ToolTipBase:'paper', QPalette.ToolTipText:'ink', QPalette.Link:'ink', QPalette.LinkVisited:'secondary', QPalette.Light:'paper', QPalette.Midlight:'muted', QPalette.Mid:'rule', QPalette.Dark:'secondary', QPalette.Shadow:'black'}
-    for role, token in roles.items():
-        palette.setColor(role, QColor(COLORS[token]))
-    for role in (QPalette.Text, QPalette.WindowText, QPalette.ButtonText):
-        palette.setColor(QPalette.Disabled, role, QColor(COLORS['disabled']))
-    app.setPalette(palette)
+    apply_palette(app)
+    app.setStyleSheet(build_stylesheet())
     return font.family()
+
 
 def refresh_style(widget):
     widget.style().unpolish(widget)
     widget.style().polish(widget)
     widget.update()
 
-APP_STYLESHEET = '''
+
+APP_STYLESHEET_TEMPLATE = '''
 QMainWindow, QWidget#appRoot { background: @workspace; color: @ink; }
 QWidget { color: @ink; }
 QFrame#topBar { background: @paper; border: none; }
@@ -125,7 +227,7 @@ QLabel#statusPill[state="error"], QLabel#statusPill[state="warning"] { color: @i
 QPushButton, QToolButton { min-height: 26px; padding: 6px 14px; border: 1px solid transparent; border-radius: 8px; background: transparent; }
 QPushButton:hover, QToolButton:hover { background: @muted; }
 QPushButton:pressed, QToolButton:pressed { background: @rule; }
-QPushButton:focus, QToolButton:focus { border: 1px solid @rule; }
+QPushButton:focus, QToolButton:focus { border: 1px solid @ruleStrong; }
 QPushButton[role="primary"] { background: @ink; color: @paper; border: 1px solid @ink; border-radius: 14px; padding: 8px 20px; font-weight: 700; }
 QPushButton[role="primary"]:focus { border: 1px solid @secondary; }
 QPushButton[role="primary"]:hover { background: @black; }
@@ -137,9 +239,9 @@ QPushButton[role="nav"]:checked:hover { border-bottom-color: @ink; }
 QPushButton[role="utility"] { border: 1px solid transparent; background: transparent; padding: 5px 10px; }
 QPushButton[role="utility"]:checked { background: @muted; color: @ink; border-color: transparent; }
 QPushButton[role="utility"]:hover:!checked { background: @muted; }
-QPushButton[role="utility"]:focus { border: 1px solid @rule; }
+QPushButton[role="utility"]:focus { border: 1px solid @ruleStrong; }
 QPushButton[role="quiet"]:hover, QToolButton[role="quiet"]:hover { background: @muted; }
-QPushButton[role="quiet"]:focus, QToolButton[role="quiet"]:focus { border-color: @rule; }
+QPushButton[role="quiet"]:focus, QToolButton[role="quiet"]:focus { border-color: @ruleStrong; }
 QPushButton[role="nav"]:focus { border-bottom-color: @ink; }
 QPushButton[compact="true"], QToolButton[compact="true"] { min-height: 22px; padding: 3px 8px; }
 QPushButton:disabled, QToolButton:disabled { background: transparent; color: @disabled; border-color: transparent; }
@@ -156,7 +258,7 @@ QFrame#inspectorActions { background: @workspace; border: none; }
 QLabel#editorStatus { background: @workspace; padding: 8px 12px; color: @secondary; font-size: 12px; }
 QFrame#queuePanel { background: @workspace; border: none; }
 QFrame#controlCard { background: @paper; border: none; }
-QFrame#starPrompt { background: @paper; border: 1px solid @rule; border-radius: 14px; }
+QFrame#starPrompt { background: @elevated; border: 1px solid @rule; border-radius: 14px; }
 QFrame#starPrompt QLabel { background: transparent; border: none; }
 QLabel#starPromptTitle { font-weight: 700; font-size: 15px; }
 QFrame#starPrompt QToolButton { padding: 0; min-width: 24px; min-height: 24px; font-size: 20px; }
@@ -165,9 +267,9 @@ QTabWidget::pane { border: none; background: @paper; }
 QTabBar::tab { padding: 7px 14px; min-height: 24px; border: none; border-bottom: 2px solid transparent; background: transparent; color: @secondary; font-weight: 500; }
 QTabBar::tab:selected { background: transparent; color: @ink; border-bottom: 2px solid @ink; font-weight: 700; }
 QTabBar::tab:hover:!selected { background: transparent; color: @ink; border-bottom: 2px solid @rule; }
-QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox { padding: 7px 10px; border: 1px solid transparent; border-radius: 8px; background: @workspace; selection-background-color: @ink; selection-color: @paper; }
+QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox { padding: 7px 10px; border: 1px solid transparent; border-bottom: 1px solid @ruleStrong; border-radius: 8px; background: @workspace; selection-background-color: @ink; selection-color: @paper; }
 QLineEdit, QComboBox, QSpinBox { min-height: 26px; }
-QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: @rule; background: @paper; }
+QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: transparent; border-bottom: 1px solid @focusRing; background: @paper; }
 QPlainTextEdit[readOnly="true"] { border: none; background: transparent; }
 QPlainTextEdit[readOnly="true"]:focus { border: none; background: transparent; }
 QPlainTextEdit#logContent, QPlainTextEdit#logContent:focus { border: none; background: @paper; padding: 8px 10px; }
@@ -175,7 +277,7 @@ QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QPlainTextEdit:disabl
 QComboBox::drop-down { width: 24px; border: none; }
 QComboBox::down-arrow { image: url("@icons/chevron-down.svg"); width: 16px; height: 16px; }
 QFrame#controlCard QLineEdit, QFrame#controlCard QComboBox { min-height: 22px; padding: 3px 8px; border-color: transparent; font-size: 13px; }
-QFrame#controlCard QLineEdit:focus, QFrame#controlCard QComboBox:focus { border-color: @rule; }
+QFrame#controlCard QLineEdit:focus, QFrame#controlCard QComboBox:focus { border-color: @ruleStrong; }
 QFrame#controlCard QPushButton, QFrame#controlCard QToolButton { min-height: 24px; padding: 3px 10px; border-color: transparent; font-size: 13px; }
 QFrame#controlCard QPushButton[role="primary"] { border-radius: 10px; }
 QComboBox QLineEdit#fontSearchEditor, QComboBox QLineEdit#fontSearchEditor:focus { padding: 0; min-height: 0; border: none; border-radius: 0; background: transparent; }
@@ -197,18 +299,17 @@ QSplitter::handle { background: @paper; }
 QSplitter::handle:hover { background: @muted; }
 QScrollBar:vertical { width: 8px; background: transparent; margin: 0; }
 QScrollBar:horizontal { height: 8px; background: transparent; margin: 0; }
-QScrollBar::handle { background: #B8B8B8; border-radius: 4px; min-height: 24px; min-width: 24px; }
+QScrollBar::handle { background: @scrollHandle; border-radius: 4px; min-height: 24px; min-width: 24px; }
 QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
 QScrollBar::add-page, QScrollBar::sub-page { background: none; }
 QCheckBox { spacing: 8px; }
-QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid #B8B8B8; border-radius: 4px; background: @paper; }
+QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid @ruleStrong; border-radius: 4px; background: @paper; }
 QCheckBox::indicator:checked { background: @ink; image: url("@icons/check.svg"); }
 QCheckBox:focus { color: @black; }
-QToolTip { padding: 6px 8px; border: 1px solid @rule; border-radius: 6px; background: @paper; color: @ink; }
-QMenu { background: @paper; border: 1px solid @rule; padding: 4px; }
+QToolTip { padding: 6px 8px; border: 1px solid @rule; border-radius: 6px; background: @elevated; color: @ink; }
+QMenu { background: @elevated; border: 1px solid @rule; padding: 4px; }
 QMenu::item { padding: 8px 20px; }
 QMenu::item:selected { background: @ink; color: @paper; }
 '''
-for _token, _color in COLORS.items():
-    APP_STYLESHEET = APP_STYLESHEET.replace(f'@{_token}', _color)
-APP_STYLESHEET = APP_STYLESHEET.replace('@icons', (ICON_PATH.parent / 'ui' / 'icons').as_posix())
+
+APP_STYLESHEET = build_stylesheet(PALETTES['light'])

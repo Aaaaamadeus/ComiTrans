@@ -601,5 +601,13 @@
   "＋ 添加文件": "＋ Add files",
   "运行库已就绪，请重启 ComiTrans。": "Runtime installed. Restart ComiTrans. ",
   "下载安装便携 GPU 运行库（约 1.53 GB）": "Install portable GPU runtime (1.53 GB)",
-  "从 NVIDIA 发布的 PyPI 软件包下载至程序目录。需要兼容的 NVIDIA 驱动，下载后重启生效。": "Downloads NVIDIA packages from PyPI into the app directory. A compatible NVIDIA driver is required. Restart after installation."
+  "从 NVIDIA 发布的 PyPI 软件包下载至程序目录。需要兼容的 NVIDIA 驱动，下载后重启生效。": "Downloads NVIDIA packages from PyPI into the app directory. A compatible NVIDIA driver is required. Restart after installation.",
+  "外观": "Appearance",
+  "界面主题": "Interface theme",
+  "主题": "Theme",
+  "跟随系统": "Follow system",
+  "纸白（浅色）": "Paper (light)",
+  "夜墨（深色）": "Night ink (dark)",
+  "切换后立即生效；夜墨只改变界面与画布周围，不改漫画像素与导出结果。": "Applies immediately. Night ink changes only the UI and the area around the canvas; manga pixels and exports are untouched.",
+  "跟随系统会随 Windows 深浅色自动切换。": "Follow system tracks the Windows light/dark setting."
 }

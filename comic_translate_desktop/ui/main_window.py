@@ -63,7 +63,7 @@ from .api_config_page import ApiConfigPage
 from .editor_page import EditorPage
 from .error_log_page import ErrorLogPage
 from .step_panel import StepPanel
-from .theme import APP_STYLESHEET, brand_font, refresh_style
+from .theme import apply_theme, brand_font, refresh_style
 from .preview import ImagePreview
 from .log_panel import LogPanel
 from .font_picker import TranslationFontPicker
@@ -116,7 +116,7 @@ class MainWindow(QMainWindow):
         self._start_warmup()
 
     def _build_ui(self) -> None:
-        self.setStyleSheet(APP_STYLESHEET)
+        apply_theme(QApplication.instance(), self.config.get('ui_theme', 'auto'))
         central = QWidget()
         central.setObjectName("appRoot")
         self.setCentralWidget(central)
@@ -1234,6 +1234,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr('设置未保存'), tr('无法保存设置：{error}', error=str(exc)))
             return
         self.api_config_page.load_config(self.config)
+        apply_theme(QApplication.instance(), self.config.get('ui_theme', 'auto'))
         self._font_picker.load_config(self.config)
         self._translation_color.set_color(self.config.get('text_color'))
         self.editor_page.set_watermark_enabled(bool(self.config.get("watermark_enabled", True)))
