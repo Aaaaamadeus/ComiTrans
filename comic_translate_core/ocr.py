@@ -4,6 +4,7 @@ import base64
 import io
 import math
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, Protocol
 
 import httpx
@@ -115,15 +116,26 @@ def create_ocr(config: dict, device: str = "cpu") -> OcrEngine:
         from .onnx_ppocr import OnnxPPOcr
         key = "korean_ocr_model" if source_language(config) == "ko" else "english_ocr_model"
         return LocalOcr("ppocr", OnnxPPOcr(config[key], device), uses_lines=True)
-    from onnx_baberu_ocr import OnnxBaberuOcr
-    from onnx_manga_ocr import OnnxMangaOcr
+    charspot_path = config.get("charspot_ocr_model")
+    if backend == "charspot" or (backend == "auto" and charspot_path and Path(charspot_path).is_dir()):
+        from .onnx_charspot import OnnxCharSpot
+        try:
+            return LocalOcr("charspot", OnnxCharSpot(charspot_path))
+        except Exception as exc:
+            if backend == "charspot" or not any(
+                Path(config[key]).is_dir() for key in ("baberu_ocr_model", "ocr_model") if config.get(key)
+            ):
+                raise OcrError(f"CharSpot Small 模型加载失败: {charspot_path} ({exc})") from exc
+            print(f"[WARNING] CharSpot Small 加载失败，尝试已有日语模型: {exc}")
     if backend in ("auto", "baberu"):
+        from onnx_baberu_ocr import OnnxBaberuOcr
         try:
             return LocalOcr("baberu", OnnxBaberuOcr(config["baberu_ocr_model"], device))
         except Exception:
             if backend == "baberu":
                 raise
             print("[INFO] Baberu 不可用，自动回退 manga-ocr。")
+    from onnx_manga_ocr import OnnxMangaOcr
     return LocalOcr("manga-ocr", OnnxMangaOcr(config["ocr_model"], device))
 
 

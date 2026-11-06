@@ -1,0 +1,108 @@
+{
+  "status": "Local v2.5.1 preview with midpoint split detector",
+  "archives": [
+    {
+      "name": "ComiTrans-v2.5.1-app.zip",
+      "compressed_bytes": 637225214,
+      "uncompressed_bytes": 1132134294,
+      "files": 1000,
+      "sha256": "77505012259995c8f1424d0f30d4bb3e8831bec449e936ee03f4ce17917f460a",
+      "crc_ok": true
+    },
+    {
+      "name": "ComiTrans-v2.5.1-models.zip",
+      "compressed_bytes": 255117495,
+      "uncompressed_bytes": 284712120,
+      "files": 15,
+      "sha256": "29ed3734058966ba3cc0a746831fd4f650f103b9259e415d8242c14b6080498a",
+      "crc_ok": true
+    }
+  ],
+  "frozen_smoke": {
+    "cpu": {
+      "version": "2.5.1",
+      "frozen": true,
+      "success": true,
+      "providers": {
+        "detector": [
+          "CPUExecutionProvider"
+        ],
+        "inpainting": [
+          "CPUExecutionProvider"
+        ],
+        "detector_lines": [
+          "CPUExecutionProvider"
+        ],
+        "ocr_session": [
+          "CPUExecutionProvider"
+        ]
+      },
+      "gpu_active": false,
+      "real_detection_and_ocr": true,
+      "native_repair_pixels": true,
+      "no_torch_import": true,
+      "translation_https_client": true,
+      "jpeg_paper_fill": true,
+      "ocr_backend": "charspot"
+    },
+    "cuda": {
+      "version": "2.5.1",
+      "frozen": true,
+      "success": true,
+      "providers": {
+        "detector": [
+          "CUDAExecutionProvider",
+          "CPUExecutionProvider"
+        ],
+        "inpainting": [
+          "CUDAExecutionProvider",
+          "CPUExecutionProvider"
+        ],
+        "detector_lines": [
+          "CUDAExecutionProvider",
+          "CPUExecutionProvider"
+        ],
+        "ocr_session": [
+          "CPUExecutionProvider"
+        ]
+      },
+      "gpu_active": true,
+      "real_detection_and_ocr": true,
+      "native_repair_pixels": true,
+      "no_torch_import": true,
+      "translation_https_client": true,
+      "jpeg_paper_fill": true,
+      "ocr_backend": "charspot"
+    }
+  },
+  "installation": "Two release ZIPs extracted into an empty directory with only the new model package; native Windows Qt.",
+  "gpu_fixture": "Desktop install, application-discovered per-user NVIDIA runtime. No CUDA_PATH or CUDNN_PATH override.",
+  "tests_passed": 409,
+  "original_model_files_hash_verified": 22,
+  "normal_launcher_check": "Windows desktop account launched start.bat with the existing config and reached model initialization complete. Both detector and CharSpot manifests verified under that account.",
+  "model_installer_access_check": "A split detector installed by a separate account in a shared model library was readable and hash-verified by the desktop account. A private model path was reported by preflight without raising.",
+  "portable_runtime_validation": {
+    "archive": "2.5.1",
+    "cuda_providers": {
+      "detector": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "inpainting": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "detector_lines": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "ocr_session": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "cpu_control_version": "2.5.1",
+    "cpu_control_detection_and_ocr": true,
+    "runtime_source": "Downloaded pinned NVIDIA Windows wheels. Fresh app directory gpu-runtime/nvidia-cu12-v1/bin with empty CUDA and user runtime search paths."
+  },
+  "erase_quality_validation": "docs/models/white-paper-erase-validation.json"
+}

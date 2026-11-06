@@ -1,0 +1,28 @@
+{
+  "directory": "split-detector",
+  "license": "Apache-2.0",
+  "attribution": [
+    "Comic text and bubble detector by ogkalu",
+    "PP-OCRv6 manga detector v0.2 by Kellenok, based on PaddleOCR"
+  ],
+  "files": [
+    {
+      "path": "detector-v4-s_int8.onnx",
+      "bytes": 11120765,
+      "sha256": "5fe9e4f576e49d4e7e8b0e029d6d3cdc252abd4694113e1cae120e62c931ea79",
+      "url": "https://huggingface.co/ogkalu/comic-text-and-bubble-detector/resolve/16e8a622f91fabc6b5b65c96d32d1183f8843546/detector-v4-s_int8.onnx"
+    },
+    {
+      "path": "manga_det_v0.2.onnx",
+      "bytes": 1816954,
+      "sha256": "d132078c46e292b226fb5a2ca52a7612ad319262dfdf493e7d8e3be435295978",
+      "url": "https://huggingface.co/Kellenok/PP-OCRv6_manga/resolve/02af751fcea728fba69ee421a95838f3e549daa2/det/manga_det_v0.2.onnx"
+    },
+    {
+      "path": "LICENSE.txt",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+    }
+  ]
+}

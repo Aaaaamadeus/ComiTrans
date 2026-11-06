@@ -42,14 +42,22 @@ hidden_imports = [
 ]
 
 datas = [
+    ("assets/gpu-runtime-windows.json", "assets"),
     ("comic-translate-ai/font_file", "comic-translate-ai/font_file"),
     ("comic-translate-ai/main/comic_text_detector/LICENSE", "licenses/comic-text-detector"),
     ("comic-translate-ai/main/comic_text_detector/README.md", "licenses/comic-text-detector"),
+    ("docs/licenses/charspot", "licenses/charspot"),
     ("assets/ComiTrans.ico", "assets"),
     ("assets/font_catalog.json", "assets"),
     ("assets/i18n", "assets/i18n"),
     ("assets/ui", "assets/ui"),
 ]
+# Some Python distributions load a sibling distrust list from SSLContext.__new__.
+import ssl
+ssl_policy = Path(ssl.__file__).with_name('codex-rejected-cas.pem')
+if ssl_policy.is_file():
+    datas.append((str(ssl_policy), '.'))
+
 datas += collect_data_files('opencc')
 datas += copy_metadata('opencc-python-reimplemented')
 for language in ('zh_CN', 'ja'):

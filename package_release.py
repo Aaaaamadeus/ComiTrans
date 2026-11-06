@@ -13,17 +13,17 @@ from comic_translate_core.release_patch import MANIFEST_NAME, json_bytes, manife
 ROOT = Path(__file__).resolve().parent
 MODELS_SRC = ROOT / "comic-translate-ai" / "models"
 MODEL_FILES = [
-    "text_detector/comic-text-detector.onnx",
     "manga-lama/lama-manga-dynamic.onnx",
     "ppocr/korean_PP-OCRv5_rec_mobile.onnx",
     "ppocr/en_PP-OCRv5_rec_mobile.onnx",
 ]
-MODEL_DIRS = ["baberu-ocr", "manga-ocr-onnx"]
+MODEL_BASELINE_BYTES = 584_467_185  # v2.5.0 archive members, uncompressed; docs/models/v2.5.0-manifest.json
+MODEL_LIMIT_BYTES = MODEL_BASELINE_BYTES * 3 // 2
 SKIP_DIRS = {"models", "gpu-runtime", "user_fonts", "Log", "logs", "__pycache__", ".cache"}
 
 
 def collect_app(dist: Path):
-    required = ["ComiTrans.exe", "_internal/assets/ui/fonts/Skribble.ttf",
+    required = ["ComiTrans.exe", "_internal/assets/gpu-runtime-windows.json", "_internal/assets/ui/fonts/Skribble.ttf",
                 "_internal/assets/ui/fonts/AaJinRiHuaQing-ChunLanMaoKun.ttf",
                 "_internal/assets/ui/icons/chevron-down.svg",
                 "_internal/assets/font_catalog.json",
@@ -76,18 +76,45 @@ def collect_app(dist: Path):
 
 
 def collect_models():
+    from scripts.model_package import verify
+
     files = [(MODELS_SRC / rel, rel) for rel in MODEL_FILES]
-    for directory in MODEL_DIRS:
-        folder = MODELS_SRC / directory
-        if not folder.is_dir() or not list(folder.rglob("*.onnx")):
-            raise FileNotFoundError(f"Model directory is incomplete: {folder}")
-        files.extend((path, path.relative_to(MODELS_SRC).as_posix())
-                     for path in sorted(folder.rglob("*"))
-                     if path.is_file() and not any(part in SKIP_DIRS for part in path.relative_to(folder).parts))
-    for path, _ in files:
-        if not path.is_file():
-            raise FileNotFoundError(f"Missing model: {path}")
+    for package in ("charspot-small", "split-detector"):
+        manifest_path = ROOT / f"docs/models/{package}.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        folder = MODELS_SRC / manifest["directory"]
+        verify(folder, manifest)
+        if (folder / "model-manifest.json").read_bytes() != manifest_path.read_bytes():
+            raise ValueError(f"{package} package manifest mismatch")
+        names = [entry["path"] for entry in manifest["files"]] + ["model-manifest.json"]
+        files.extend((folder / name, f"{folder.name}/{name}") for name in names)
+    validate_model_budget(files)
     return [(path, "ComiTrans/comic-translate-ai/models/" + rel) for path, rel in files]
+
+
+def validate_model_budget(files):
+    total = sum(path.stat().st_size for path, _ in files)
+    if total > MODEL_LIMIT_BYTES:
+        raise ValueError(f'Model files exceed the uncompressed budget: {total} > {MODEL_LIMIT_BYTES}')
+    return total
+
+
+def verify_reused_models(archive_path, inventory_path):
+    """App-only builds must reuse the audited model set for this release."""
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    expected = {entry["path"]: entry for entry in inventory["files"]}
+    with zipfile.ZipFile(archive_path) as archive:
+        entries = archive.infolist()
+        if (len(entries) != len(expected) or set(archive.namelist()) != set(expected)
+                or sum(info.file_size for info in entries) > MODEL_LIMIT_BYTES):
+            raise ValueError("Reused archive differs from the audited model set")
+        for info in entries:
+            entry = expected[info.filename]
+            if info.file_size != entry["bytes"]:
+                raise ValueError(f"Unexpected model size: {info.filename}")
+            with archive.open(info) as stream:
+                if hashlib.file_digest(stream, "sha256").hexdigest() != entry["sha256"]:
+                    raise ValueError(f"Unexpected model content: {info.filename}")
 
 
 def write_archive(target: Path, files):
@@ -123,7 +150,11 @@ def main():
     model_target = args.output / f'ComiTrans-v{__version__}-models.zip'
     if args.app_only and not model_target.is_file():
         raise FileNotFoundError(f'--app-only requires an existing model archive: {model_target}')
-    model_files = None if args.app_only else collect_models()
+    if args.app_only:
+        verify_reused_models(model_target, ROOT / "docs" / "models" / f"v{__version__}-inventory.json")
+        model_files = None
+    else:
+        model_files = collect_models()
     baseline = manifest_for_files(__version__, app_files)
     args.output.mkdir(parents=True, exist_ok=True)
     args.metadata_dir.mkdir(parents=True, exist_ok=True)

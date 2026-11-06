@@ -39,6 +39,18 @@ class GpuSetupTests(unittest.TestCase):
                 (path / name).touch()
             self.assertEqual(runtime_directories({'ProgramFiles': root}), [cuda.resolve(), cudnn.resolve()])
 
+    def test_portable_app_finds_versioned_and_user_installs_without_path(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            cuda = root / "NVIDIA GPU Computing Toolkit/CUDA/v12.6/bin"
+            cudnn = root / "NVIDIA/CUDNN/v9.14/bin/12.6"
+            user_lib = root / "Local/ComiTrans/gpu-runtime/bin"
+            for directory, dll in ((cuda, "cudart64_12.dll"), (cudnn, "cudnn64_9.dll"), (user_lib, "cudnn64_9.dll")):
+                directory.mkdir(parents=True)
+                (directory / dll).touch()
+            self.assertEqual(runtime_directories({"ProgramFiles": str(root), "LOCALAPPDATA": str(root / "Local")}),
+                             [cuda, cudnn, user_lib])
+
     def test_download_buttons_open_only_the_corresponding_official_link_when_clicked(self):
         app = QApplication.instance() or QApplication([])
         with patch('comic_translate_desktop.ui.gpu_setup_dialog.QDesktopServices.openUrl') as open_url:

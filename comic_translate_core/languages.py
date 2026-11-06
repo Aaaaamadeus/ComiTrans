@@ -16,7 +16,7 @@ OCR_DEFAULTS = {
     "custom_ocr_model": "",
     "custom_ocr_timeout": 60,
 }
-OCR_CONFIG_KEYS = tuple(OCR_DEFAULTS) + ("korean_ocr_model", "english_ocr_model")
+OCR_CONFIG_KEYS = tuple(OCR_DEFAULTS) + ("korean_ocr_model", "english_ocr_model", "charspot_ocr_model")
 
 
 def source_language(config: dict) -> str:
@@ -46,10 +46,10 @@ def validate_ocr_config(config: dict) -> list[str]:
     if not re.fullmatch(r"[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*", code):
         errors.append("请填写有效的源语言代码，例如 fr、de、zh-TW。")
     backend = effective_ocr_backend(config)
-    if backend not in ("auto", "baberu", "manga-ocr", "ppocr", "custom"):
+    if backend not in ("auto", "charspot", "baberu", "manga-ocr", "ppocr", "custom"):
         errors.append("不支持的 OCR 后端。")
-    elif backend in ("auto", "baberu", "manga-ocr") and code != "ja":
-        errors.append("Baberu / manga-ocr 仅用于日语，请选择自动或自定义 OCR。")
+    elif backend in ("auto", "charspot", "baberu", "manga-ocr") and code != "ja":
+        errors.append("该本地 OCR 仅用于日语，请选择自动或自定义 OCR。")
     elif backend == "ppocr" and code not in ("en", "ko"):
         errors.append("内置 PP-OCR 支持韩语、英语，其它语言请接入自定义 OCR。")
     elif backend == "custom":

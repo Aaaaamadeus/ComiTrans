@@ -1,0 +1,161 @@
+{
+  "baseline_tag": "v2.5.0",
+  "bytes": 584467185,
+  "limit_bytes": 876700777,
+  "files": [
+    {
+      "path": "text_detector/comic-text-detector.onnx",
+      "bytes": 94669756,
+      "sha256": "1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f",
+      "source_url": "https://huggingface.co/mayocream/comic-text-detector-onnx/resolve/a5d67ec772adef819ef5b0e7aa701fcf4c8bf74a/comic-text-detector.onnx",
+      "license_note": "Upstream GPL-3.0; exporter Apache label does not supersede upstream"
+    },
+    {
+      "path": "manga-lama/lama-manga-dynamic.onnx",
+      "bytes": 206291843,
+      "sha256": "de31ffa5ba26916b8ea35319f6c12151ff9654d4261bccf0583a69bb095315f9",
+      "source_url": "https://huggingface.co/ogkalu/lama-manga-onnx-dynamic/resolve/ee4ed4a8447b6730fc41d34f90876b6c48af925a/lama-manga-dynamic.onnx",
+      "license_note": "Exporter Apache-2.0; upstream AnimeMangaInpainting MIT"
+    },
+    {
+      "path": "ppocr/korean_PP-OCRv5_rec_mobile.onnx",
+      "bytes": 13488748,
+      "sha256": "cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b",
+      "source_url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile.onnx",
+      "license_note": "Apache-2.0"
+    },
+    {
+      "path": "ppocr/en_PP-OCRv5_rec_mobile.onnx",
+      "bytes": 7872351,
+      "sha256": "c3461add59bb4323ecba96a492ab75e06dda42467c9e3d0c18db5d1d21924be8",
+      "source_url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/rec/en_PP-OCRv5_rec_mobile.onnx",
+      "license_note": "Apache-2.0"
+    },
+    {
+      "path": "baberu-ocr/LICENSE",
+      "bytes": 11348,
+      "sha256": "186332043e82fcfdbeb0b8e0e8d77b63d97ffa3dd9d91ccf7cef1377d8ab345b",
+      "source_url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/d9cc13153e9a1cd8fdfa3b7b1cc329da2020aeae/LICENSE",
+      "license_note": "Apache-2.0"
+    },
+    {
+      "path": "baberu-ocr/onnx/decoder_prefill_int8.onnx",
+      "bytes": 35133596,
+      "sha256": "4f8d28d4e5e8b6c7f3a4510663aa0a9199a7eec06bcb1dc0afb3ca571494e97f",
+      "source_url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/d9cc13153e9a1cd8fdfa3b7b1cc329da2020aeae/onnx/decoder_prefill_int8.onnx",
+      "license_note": "Apache-2.0"
+    },
+    {
+      "path": "baberu-ocr/onnx/decoder_step_int8.onnx",
+      "bytes": 33929034,
+      "sha256": "2eaf792ca70b67e55140ef0bcfbfc3c3b1e07d72ca277dcc46aae27c81f27ac8",
+      "source_url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/d9cc13153e9a1cd8fdfa3b7b1cc329da2020aeae/onnx/decoder_step_int8.onnx",
+      "license_note": "Apache-2.0"
+    },
+    {
+      "path": "baberu-ocr/onnx/vision_int4.onnx",
+      "bytes": 52293486,
+      "sha256": "9526bcf99eb8de805df7ea2f66b385cfcbcb5dff0e99a5dcfb02bdb2d4182bde",
+      "source_url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/d9cc13153e9a1cd8fdfa3b7b1cc329da2020aeae/onnx/vision_int4.onnx",
+      "license_note": "Apache-2.0"
+    },
+    {
+      "path": "baberu-ocr/onnx_infer.py",
+      "bytes": 4843,
+      "sha256": "1a7737e6583715be2359807bda92f53ea16091ed186569c7a85f8b82d294373f",
+      "source_url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/d9cc13153e9a1cd8fdfa3b7b1cc329da2020aeae/onnx_infer.py",
+      "license_note": "Apache-2.0"
+    },
+    {
+      "path": "baberu-ocr/README.md",
+      "bytes": 8359,
+      "sha256": "7597b886caa9ee202679598d49469b5d275711afe2ebe4c3f341da7193305d93",
+      "source_url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/d9cc13153e9a1cd8fdfa3b7b1cc329da2020aeae/README.md",
+      "license_note": "Apache-2.0"
+    },
+    {
+      "path": "baberu-ocr/tokenizer/tokenizer_config.json",
+      "bytes": 937,
+      "sha256": "c6c8004b1d310bd7c56455387c25cdf4da28594bbd5713aaa3fddfd5eac8f483",
+      "source_url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/d9cc13153e9a1cd8fdfa3b7b1cc329da2020aeae/tokenizer/tokenizer_config.json",
+      "license_note": "Apache-2.0"
+    },
+    {
+      "path": "baberu-ocr/tokenizer/vocab.json",
+      "bytes": 130761,
+      "sha256": "681de4eb83154a397af49e2ddae4705041b12a22e16fe00860b829e889e5f47c",
+      "source_url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/d9cc13153e9a1cd8fdfa3b7b1cc329da2020aeae/tokenizer/vocab.json",
+      "license_note": "Apache-2.0"
+    },
+    {
+      "path": "manga-ocr-onnx/config.json",
+      "bytes": 74852,
+      "sha256": "cb53957d90b8469961b3a64f9b2ebe472d803bf1308e3505b51916aa4341c547",
+      "source_url": "https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/config.json",
+      "license_note": "Upstream fine-tune Apache-2.0; exporter has no separate license field"
+    },
+    {
+      "path": "manga-ocr-onnx/decoder_model.onnx",
+      "bytes": 118053454,
+      "sha256": "6b1fb216d542c4b2a4fa5b9d7ae3522081eb85fb959d2cecd28055af956a8a5e",
+      "source_url": "https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/decoder_model.onnx",
+      "license_note": "Upstream fine-tune Apache-2.0; exporter has no separate license field"
+    },
+    {
+      "path": "manga-ocr-onnx/encoder_model.onnx",
+      "bytes": 22356885,
+      "sha256": "f87668ae0f62d6f032dac6b213e8c0fea84cd15895ac8cab624cc9a2f49d4a27",
+      "source_url": "https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/encoder_model.onnx",
+      "license_note": "Upstream fine-tune Apache-2.0; exporter has no separate license field"
+    },
+    {
+      "path": "manga-ocr-onnx/generation_config.json",
+      "bytes": 231,
+      "sha256": "394166c379c675a6b044ee391bfdf7acbb58b7de68541e66e50607cf56576979",
+      "source_url": "https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/generation_config.json",
+      "license_note": "Upstream fine-tune Apache-2.0; exporter has no separate license field"
+    },
+    {
+      "path": "manga-ocr-onnx/preprocessor_config.json",
+      "bytes": 351,
+      "sha256": "445c77049d082004aa07593344d5e1f521f1198228bf586196f70ce7ae021414",
+      "source_url": "https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/preprocessor_config.json",
+      "license_note": "Upstream fine-tune Apache-2.0; exporter has no separate license field"
+    },
+    {
+      "path": "manga-ocr-onnx/README.md",
+      "bytes": 2292,
+      "sha256": "dc5b1fda5d000b796915d5c5c3189fba06ab6a18ef806793189745d26c4aef70",
+      "source_url": "https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/README.md",
+      "license_note": "Upstream fine-tune Apache-2.0; exporter has no separate license field"
+    },
+    {
+      "path": "manga-ocr-onnx/special_tokens_map.json",
+      "bytes": 695,
+      "sha256": "5d5b662e421ea9fac075174bb0688ee0d9431699900b90662acd44b2a350503a",
+      "source_url": "https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/special_tokens_map.json",
+      "license_note": "Upstream fine-tune Apache-2.0; exporter has no separate license field"
+    },
+    {
+      "path": "manga-ocr-onnx/tokenizer.json",
+      "bytes": 117755,
+      "sha256": "d6e7ab606c20f90d9878e82710badbe6e7b9f7a9a5e71f9da082a73c338cc557",
+      "source_url": "https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/tokenizer.json",
+      "license_note": "Upstream fine-tune Apache-2.0; exporter has no separate license field"
+    },
+    {
+      "path": "manga-ocr-onnx/tokenizer_config.json",
+      "bytes": 1536,
+      "sha256": "89f3300b1b071e0a007da1ec0abdf540a8e016ae937139b34367334681be22ca",
+      "source_url": "https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/tokenizer_config.json",
+      "license_note": "Upstream fine-tune Apache-2.0; exporter has no separate license field"
+    },
+    {
+      "path": "manga-ocr-onnx/vocab.txt",
+      "bytes": 24072,
+      "sha256": "344fbb6b8bf18c57839e924e2c9365434697e0227fac00b88bb4899b78aa594d",
+      "source_url": "https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/vocab.txt",
+      "license_note": "Upstream fine-tune Apache-2.0; exporter has no separate license field"
+    }
+  ]
+}

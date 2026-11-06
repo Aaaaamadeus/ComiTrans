@@ -1,0 +1,454 @@
+{
+  "revision": "16e8a622f91fabc6b5b65c96d32d1183f8843546",
+  "source": "https://huggingface.co/ogkalu/comic-text-and-bubble-detector",
+  "scope": "Only FP32 detector.onnx vs current comic-text-detector.onnx. Three locally authorized Japanese pages; images/coordinates stay private.",
+  "method": "Fresh processes sequentially. 3 warm passes per page, median per page. Native page dimensions retained. Each model uses its own standard preprocessing (candidate 640x640 RGB bilinear /255; current 1024 letterbox BGR->RGB). Candidate threshold 0.5; 0.3/0.7 exploratory. orig_target_sizes is [width,height], checked against ONNX Tile scaling and visual overlays. Current callable includes line grouping and mask refinement. No disk IO, OCR, translation or inpainting timed.",
+  "runs": {
+    "legacy-cpu": {
+      "load_s": 0.3486198000000513,
+      "first_inference_s": 1.0773349999999482,
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "memory": {
+        "working_set_bytes": 1070600192,
+        "peak_working_set_bytes": 1104031744,
+        "peak_commit_bytes": 1743953920
+      },
+      "torch_imported": false,
+      "pages": [
+        {
+          "network_median_s": 0.880895799999962,
+          "dimensions": [
+            1220,
+            1762
+          ],
+          "warm_s": [
+            0.9513249000001451,
+            0.9930212999997821,
+            0.9739630000003672
+          ],
+          "warm_median_s": 0.9739630000003672
+        },
+        {
+          "network_median_s": 0.8426626000000397,
+          "dimensions": [
+            1220,
+            1756
+          ],
+          "warm_s": [
+            0.9855909999996584,
+            0.9383333999994647,
+            0.9600893999995606
+          ],
+          "warm_median_s": 0.9600893999995606
+        },
+        {
+          "network_median_s": 0.8392725999992763,
+          "dimensions": [
+            800,
+            1138
+          ],
+          "warm_s": [
+            0.892189099999996,
+            0.9100872000008167,
+            0.9359643000007054
+          ],
+          "warm_median_s": 0.9100872000008167
+        }
+      ],
+      "geometry_only": {
+        "0.3": {
+          "tp": 24,
+          "fp": 0,
+          "fn": 8,
+          "coverage80": 15
+        },
+        "0.5": {
+          "tp": 24,
+          "fp": 0,
+          "fn": 8,
+          "coverage80": 15
+        },
+        "0.7": {
+          "tp": 24,
+          "fp": 0,
+          "fn": 8,
+          "coverage80": 15
+        }
+      },
+      "mean_page_s": 0.9480465333335815,
+      "mean_network_s": 0.8542769999997594
+    },
+    "candidate-cpu": {
+      "load_s": 1.3763583999998446,
+      "first_inference_s": 0.42119999999977153,
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "memory": {
+        "working_set_bytes": 384389120,
+        "peak_working_set_bytes": 419635200,
+        "peak_commit_bytes": 1186840576
+      },
+      "torch_imported": false,
+      "pages": [
+        {
+          "network_median_s": 0.4043295000001308,
+          "dimensions": [
+            1220,
+            1762
+          ],
+          "warm_s": [
+            0.3992484999998851,
+            0.4214133999994374,
+            0.5997622000004412
+          ],
+          "warm_median_s": 0.4214133999994374
+        },
+        {
+          "network_median_s": 0.37810110000009445,
+          "dimensions": [
+            1220,
+            1756
+          ],
+          "warm_s": [
+            0.4319377000001623,
+            0.393398299999717,
+            0.38923030000023573
+          ],
+          "warm_median_s": 0.393398299999717
+        },
+        {
+          "network_median_s": 0.39013100000011036,
+          "dimensions": [
+            800,
+            1138
+          ],
+          "warm_s": [
+            0.38613879999957135,
+            0.40029839999988326,
+            0.41165430000000924
+          ],
+          "warm_median_s": 0.40029839999988326
+        }
+      ],
+      "geometry_only": {
+        "0.3": {
+          "tp": 22,
+          "fp": 7,
+          "fn": 10,
+          "coverage80": 26
+        },
+        "0.5": {
+          "tp": 21,
+          "fp": 4,
+          "fn": 11,
+          "coverage80": 25
+        },
+        "0.7": {
+          "tp": 20,
+          "fp": 4,
+          "fn": 12,
+          "coverage80": 25
+        }
+      },
+      "mean_page_s": 0.40503669999967923,
+      "mean_network_s": 0.3908538666667785
+    },
+    "legacy-cuda": {
+      "load_s": 1.572100400000636,
+      "first_inference_s": 0.5028504999991128,
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "memory": {
+        "working_set_bytes": 1100222464,
+        "peak_working_set_bytes": 1138028544,
+        "peak_commit_bytes": 3327930368
+      },
+      "torch_imported": false,
+      "pages": [
+        {
+          "network_median_s": 0.05284100000062608,
+          "dimensions": [
+            1220,
+            1762
+          ],
+          "warm_s": [
+            0.12879199999952107,
+            0.1275898000003508,
+            0.11939110000002984
+          ],
+          "warm_median_s": 0.1275898000003508
+        },
+        {
+          "network_median_s": 0.04797150000013062,
+          "dimensions": [
+            1220,
+            1756
+          ],
+          "warm_s": [
+            0.15580620000037015,
+            0.15136700000039127,
+            0.15274240000053396
+          ],
+          "warm_median_s": 0.15274240000053396
+        },
+        {
+          "network_median_s": 0.047107299999879615,
+          "dimensions": [
+            800,
+            1138
+          ],
+          "warm_s": [
+            0.11646190000010392,
+            0.11856919999991078,
+            0.12117850000049657
+          ],
+          "warm_median_s": 0.11856919999991078
+        }
+      ],
+      "geometry_only": {
+        "0.3": {
+          "tp": 24,
+          "fp": 0,
+          "fn": 8,
+          "coverage80": 15
+        },
+        "0.5": {
+          "tp": 24,
+          "fp": 0,
+          "fn": 8,
+          "coverage80": 15
+        },
+        "0.7": {
+          "tp": 24,
+          "fp": 0,
+          "fn": 8,
+          "coverage80": 15
+        }
+      },
+      "mean_page_s": 0.13296713333359853,
+      "mean_network_s": 0.04930660000021211
+    },
+    "candidate-cuda": {
+      "load_s": 2.511656099999527,
+      "first_inference_s": 0.4437502000000677,
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "memory": {
+        "working_set_bytes": 1015545856,
+        "peak_working_set_bytes": 1025302528,
+        "peak_commit_bytes": 2681176064
+      },
+      "torch_imported": false,
+      "pages": [
+        {
+          "network_median_s": 0.03944580000006681,
+          "dimensions": [
+            1220,
+            1762
+          ],
+          "warm_s": [
+            0.05503790000057052,
+            0.04984549999971932,
+            0.053454599999895436
+          ],
+          "warm_median_s": 0.053454599999895436
+        },
+        {
+          "network_median_s": 0.038139700000101584,
+          "dimensions": [
+            1220,
+            1756
+          ],
+          "warm_s": [
+            0.05162259999997332,
+            0.05491660000006959,
+            0.05069019999973534
+          ],
+          "warm_median_s": 0.05162259999997332
+        },
+        {
+          "network_median_s": 0.04687180000018998,
+          "dimensions": [
+            800,
+            1138
+          ],
+          "warm_s": [
+            0.06296650000058435,
+            0.06201199999941309,
+            0.05825339999955759
+          ],
+          "warm_median_s": 0.06201199999941309
+        }
+      ],
+      "geometry_only": {
+        "0.3": {
+          "tp": 22,
+          "fp": 7,
+          "fn": 10,
+          "coverage80": 26
+        },
+        "0.5": {
+          "tp": 21,
+          "fp": 4,
+          "fn": 11,
+          "coverage80": 25
+        },
+        "0.7": {
+          "tp": 20,
+          "fp": 4,
+          "fn": 12,
+          "coverage80": 25
+        }
+      },
+      "mean_page_s": 0.055696399999760615,
+      "mean_network_s": 0.04148576666678613
+    }
+  },
+  "models": {
+    "current": {
+      "bytes": 94669756,
+      "sha256": "1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f",
+      "inputs": [
+        {
+          "name": "images",
+          "shape": [
+            1,
+            3,
+            1024,
+            1024
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "blk",
+          "shape": [
+            1,
+            64512,
+            7
+          ]
+        },
+        {
+          "name": "seg",
+          "shape": [
+            1,
+            1,
+            1024,
+            1024
+          ]
+        },
+        {
+          "name": "det",
+          "shape": [
+            1,
+            2,
+            1024,
+            1024
+          ]
+        }
+      ],
+      "external_weights": []
+    },
+    "candidate": {
+      "bytes": 168481531,
+      "sha256": "065744e91c0594ad8663aa8b870ce3fb27222942eded5a3cc388ce23421bd195",
+      "inputs": [
+        {
+          "name": "images",
+          "shape": [
+            "N",
+            3,
+            "H",
+            "W"
+          ]
+        },
+        {
+          "name": "orig_target_sizes",
+          "shape": [
+            "N",
+            2
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "labels",
+          "shape": [
+            "Sublabels_dim_0",
+            "Sublabels_dim_1"
+          ]
+        },
+        {
+          "name": "boxes",
+          "shape": [
+            "GatherElementsboxes_dim_0",
+            "GatherElementsboxes_dim_1",
+            "Sublabels_dim_0"
+          ]
+        },
+        {
+          "name": "scores",
+          "shape": [
+            "GatherElementsboxes_dim_0",
+            "GatherElementsboxes_dim_1"
+          ]
+        }
+      ],
+      "external_weights": []
+    }
+  },
+  "visual_review": {
+    "reference_regions_per_page": [
+      6,
+      10,
+      16
+    ],
+    "current_text_boxes_per_page": [
+      5,
+      9,
+      10
+    ],
+    "candidate_text_boxes_per_page": [
+      5,
+      9,
+      11
+    ],
+    "current_regions_located_per_page": [
+      6,
+      9,
+      10
+    ],
+    "candidate_regions_located_per_page": [
+      6,
+      9,
+      11
+    ],
+    "unambiguous_spurious_text_boxes_at_0_5": {
+      "current": 0,
+      "candidate": 0
+    },
+    "common_misses": "One large stylized SFX on page 2 and five cicada SFX on page 3. Two bottom lines on page 1 merged into one region by both detectors.",
+    "candidate_gain": "Black-background shop sign on page 3. Some caption/edge boxes include more strokes; candidate has more margin around dialogue.",
+    "annotation": "Assistant rectangle annotation and visual review, not independent gold; grouping/padding affects strict IoU matches. Located regions may share one predicted box."
+  },
+  "gpu_memory": "Per-process VRAM peak not measured. Host working set recorded. CUDA/cuDNN supplied via process-local existing dev DLL paths; no torch import; ORT unchanged.",
+  "cpu_cuda_text_counts_at_0_5": {
+    "legacy": [
+      5,
+      9,
+      10
+    ],
+    "candidate": [
+      5,
+      9,
+      11
+    ]
+  }
+}

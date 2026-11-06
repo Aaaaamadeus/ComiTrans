@@ -1,4 +1,7 @@
 {
+  "自动（使用已安装的日语模型）": "Auto (use installed Japanese OCR)",
+  "该本地 OCR 仅用于日语，请选择自动或自定义 OCR。": "This local OCR supports Japanese only. Choose Auto or custom OCR.",
+  "CharSpot Small: {_4}\n检测: {_0}\nBaberu OCR: {_1}\nmanga-ocr: {_2}\n修复: {_3}": "CharSpot Small: {_4}\nDetector: {_0}\nBaberu OCR: {_1}\nmanga-ocr: {_2}\nInpainting: {_3}",
   "\n未导入：": "\nNot imported: ",
   " · 已下载": " · Downloaded",
   " 秒": " s",
@@ -368,7 +371,7 @@
   "正在停止": "Stopping",
   "正在准备背景修复与排版": "Preparing inpainting and typesetting",
   "正在加载本地模型，可先添加待处理文件": "Loading local models. You can add files now",
-  "正在取消下载…": "Cancelling download…",
+  "正在取消下载…": "Canceling download…",
   "正在后台保存图片与布局…": "Saving image and layout…",
   "正在后台加载页面：{_0}": "Loading page: {_0}",
   "正在后台导出 PDF…": "Exporting PDF in the background…",
@@ -593,5 +596,8 @@
   "＋ 导入字体": "＋ Import font",
   "＋ 导入已翻译图片": "＋ Import translated images",
   "＋ 导入译图 / PDF": "＋ Import images / PDF",
-  "＋ 添加文件": "＋ Add files"
+  "＋ 添加文件": "＋ Add files",
+  "运行库已就绪，请重启 ComiTrans。": "Runtime installed. Restart ComiTrans. ",
+  "下载安装便携 GPU 运行库（约 1.53 GB）": "Install portable GPU runtime (1.53 GB)",
+  "从 NVIDIA 发布的 PyPI 软件包下载至程序目录。需要兼容的 NVIDIA 驱动，下载后重启生效。": "Downloads NVIDIA packages from PyPI into the app directory. A compatible NVIDIA driver is required. Restart after installation."
 }

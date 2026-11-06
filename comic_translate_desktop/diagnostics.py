@@ -74,6 +74,7 @@ class Diagnostics:
                 f"- 韩语 OCR: {config.get('korean_ocr_model', '')}",
                 f"- 英语 OCR: {config.get('english_ocr_model', '')}",
                 f"- Baberu OCR: {config.get('baberu_ocr_model', '')}",
+                f"- CharSpot Small: {config.get('charspot_ocr_model', '')}",
                 f"- manga-ocr: {config.get('ocr_model', '')}",
                 f"- 修复模型: {config.get('lama_model', '')}",
                 f"- 输出目录: {config.get('page_output_dir', '')}",

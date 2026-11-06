@@ -60,12 +60,15 @@ def run_smoke_test(app, output_dir, *, require_gpu=False):
                     'detector': pipeline.detector.session.get_providers(),
                     'inpainting': pipeline.inpainter.onnx_session.get_providers(),
                 }
+                if hasattr(pipeline.detector, "line_session"):
+                    result['providers']['detector_lines'] = pipeline.detector.line_session.get_providers()
                 for name, value in vars(pipeline.ocr).items():
                     if hasattr(value, 'get_providers'):
                         result['providers']['ocr_' + name] = value.get_providers()
-                # The bundled Baberu int4/int8 models deliberately use CPU.
+                result['ocr_backend'] = pipeline.ocr_backend_active
                 # Require CUDA for every stage that actually requests it.
-                result['ocr_cpu_expected'] = getattr(pipeline.ocr, 'vision_name', '') == 'vision_int4.onnx'
+                result['ocr_cpu_expected'] = (pipeline.ocr_backend_active == 'charspot' or
+                    getattr(pipeline.ocr, 'vision_name', '') == 'vision_int4.onnx')
                 result['gpu_active'] = all('CUDAExecutionProvider' in p
                     for name, p in result['providers'].items()
                     if not (name.startswith('ocr_') and result['ocr_cpu_expected']))

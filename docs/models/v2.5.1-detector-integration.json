@@ -1,0 +1,191 @@
+{
+  "method": "Three authorized Japanese pages. Fixed source resolution. Detection warmed then median of three per page. One production CharSpot OCR and one original-size repair per page. No API, translation or I/O timed. Old and new use the same OCR and LaMa. Concurrent build/packaging may affect timings.",
+  "runs": {
+    "final-new-cpu": {
+      "device": "cpu",
+      "backend": "new",
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "load_s": 0.3926126000005752,
+      "first_s": 0.23109340000155498,
+      "pages": [
+        {
+          "boxes": 6,
+          "match": 4,
+          "coverage": 6,
+          "detect_s": 0.23643970000193804,
+          "ocr_s": 0.15589399999953457,
+          "repair_s": 18.350976400000945,
+          "nonempty": 6,
+          "ink": 124026
+        },
+        {
+          "boxes": 9,
+          "match": 9,
+          "coverage": 9,
+          "detect_s": 0.25835730000108015,
+          "ocr_s": 0.22427369999786606,
+          "repair_s": 25.632216599999083,
+          "nonempty": 9,
+          "ink": 129565
+        },
+        {
+          "boxes": 10,
+          "match": 10,
+          "coverage": 10,
+          "detect_s": 0.24128750000090804,
+          "ocr_s": 0.259981199997128,
+          "repair_s": 10.567997500002093,
+          "nonempty": 10,
+          "ink": 33805
+        }
+      ],
+      "memory": {
+        "working_set_bytes": 2104500224,
+        "peak_working_set_bytes": 2167427072,
+        "peak_commit_bytes": 3636789248
+      }
+    },
+    "final-new-cuda": {
+      "device": "cuda",
+      "backend": "new",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "load_s": 0.6405348999978742,
+      "first_s": 2.5124325999968278,
+      "pages": [
+        {
+          "boxes": 6,
+          "match": 4,
+          "coverage": 6,
+          "detect_s": 0.23779690000083065,
+          "ocr_s": 0.18251040000177454,
+          "repair_s": 3.4661637999997765,
+          "nonempty": 6,
+          "ink": 124026
+        },
+        {
+          "boxes": 9,
+          "match": 9,
+          "coverage": 9,
+          "detect_s": 0.214972999998281,
+          "ocr_s": 0.25264289999904577,
+          "repair_s": 3.711240499997075,
+          "nonempty": 9,
+          "ink": 129565
+        },
+        {
+          "boxes": 10,
+          "match": 10,
+          "coverage": 10,
+          "detect_s": 0.3034356999996817,
+          "ocr_s": 0.254412999998749,
+          "repair_s": 1.8230736999976216,
+          "nonempty": 10,
+          "ink": 33805
+        }
+      ],
+      "memory": {
+        "working_set_bytes": 1628295168,
+        "peak_working_set_bytes": 1688948736,
+        "peak_commit_bytes": 5576380416
+      }
+    },
+    "final-old-cpu": {
+      "device": "cpu",
+      "backend": "old",
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "load_s": 0.24371869999959017,
+      "first_s": 1.0148111999988032,
+      "pages": [
+        {
+          "boxes": 5,
+          "match": 4,
+          "coverage": 6,
+          "detect_s": 0.8183671999977378,
+          "ocr_s": 0.1261597000011534,
+          "repair_s": 17.482697900002677,
+          "nonempty": 5,
+          "ink": 110283
+        },
+        {
+          "boxes": 9,
+          "match": 9,
+          "coverage": 7,
+          "detect_s": 0.8542959000005794,
+          "ocr_s": 0.21936839999762014,
+          "repair_s": 24.71832269999868,
+          "nonempty": 9,
+          "ink": 143819
+        },
+        {
+          "boxes": 10,
+          "match": 10,
+          "coverage": 7,
+          "detect_s": 0.8943448999998509,
+          "ocr_s": 0.2473411999999371,
+          "repair_s": 11.152970999999525,
+          "nonempty": 10,
+          "ink": 49173
+        }
+      ],
+      "memory": {
+        "working_set_bytes": 2740576256,
+        "peak_working_set_bytes": 2809503744,
+        "peak_commit_bytes": 4278538240
+      }
+    },
+    "final-old-cuda": {
+      "device": "cuda",
+      "backend": "old",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "load_s": 0.17330690000017057,
+      "first_s": 0.6104529999975057,
+      "pages": [
+        {
+          "boxes": 5,
+          "match": 4,
+          "coverage": 6,
+          "detect_s": 0.11661969999840949,
+          "ocr_s": 0.13524820000020554,
+          "repair_s": 2.4478639000008116,
+          "nonempty": 5,
+          "ink": 110283
+        },
+        {
+          "boxes": 9,
+          "match": 9,
+          "coverage": 7,
+          "detect_s": 0.12011970000094152,
+          "ocr_s": 0.21604089999891585,
+          "repair_s": 2.9742478000007395,
+          "nonempty": 9,
+          "ink": 143819
+        },
+        {
+          "boxes": 10,
+          "match": 10,
+          "coverage": 7,
+          "detect_s": 0.09359860000040499,
+          "ocr_s": 0.27062300000034156,
+          "repair_s": 1.6891042999995989,
+          "nonempty": 10,
+          "ink": 49173
+        }
+      ],
+      "memory": {
+        "working_set_bytes": 1507676160,
+        "peak_working_set_bytes": 1568735232,
+        "peak_commit_bytes": 6035628032
+      }
+    }
+  }
+}

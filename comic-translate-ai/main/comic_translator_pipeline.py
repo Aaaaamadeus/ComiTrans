@@ -31,7 +31,7 @@ from comic_translate_core.chinese import (
 from comic_translate_core.ocr import create_ocr, recognize_regions
 from comic_translate_core.layout_options import normalize_text_color, normalize_vertical_alignment
 from comic_translate_core.watermark import apply_watermark
-from onnx_text_detector import OnnxTextDetector
+from onnx_text_detector import create_text_detector
 import font_probe
 from text_style import (
     FONT_STYLES,
@@ -132,6 +132,7 @@ class ComicTranslatorPipeline:
         self.ocr_config = {
             "source_language": "ja", "ocr_backend": self.ocr_backend_requested,
             "ocr_model": self.ocr_model_path, "baberu_ocr_model": self.baberu_ocr_model_path,
+            "charspot_ocr_model": str(Path(current_dir).parent / "models/charspot-small"),
             "korean_ocr_model": str(Path(current_dir).parent / "models/ppocr/korean_PP-OCRv5_rec_mobile.onnx"),
             "english_ocr_model": str(Path(current_dir).parent / "models/ppocr/en_PP-OCRv5_rec_mobile.onnx"),
             **(ocr_config or {}),
@@ -143,7 +144,7 @@ class ComicTranslatorPipeline:
         print("初始化管线")
 
         print("[INFO] 加载 Comic Text Detector...")
-        self.detector = OnnxTextDetector(model_path=det_model_path, input_size=1024, device=self.device)
+        self.detector = create_text_detector(det_model_path, self.device, self.source_language)
 
         self.ocr_engine = create_ocr(self.ocr_config, self.device)
         self.ocr_backend_active = self.ocr_engine.name

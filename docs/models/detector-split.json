@@ -1,0 +1,1098 @@
+{
+  "scope": "Three Japanese pages (32 approximate region labels, locally authorized), four synthetic Japanese controls. Real images and coordinates private. Revision hashes and measurement protocol in DETECTOR_SPLIT.md.",
+  "source_page_sha256": [
+    "7a46413e26c327391c512ce9c2a8cd1747763645a12c76814ea81512383debb1",
+    "53b962648865be4aad60d55778eed2a5ce601cba29ec0a005a056e9724783f86",
+    "eb283a1ce6bdaf55ac89b52e409e694bd695e19a07f1a98a619e9739268b8934"
+  ],
+  "model_files": {
+    "detector-v4-s_int8.onnx": {
+      "bytes": 11120765,
+      "sha256": "5fe9e4f576e49d4e7e8b0e029d6d3cdc252abd4694113e1cae120e62c931ea79"
+    },
+    "detector.onnx": {
+      "bytes": 168481531,
+      "sha256": "065744e91c0594ad8663aa8b870ce3fb27222942eded5a3cc388ce23421bd195"
+    },
+    "detector_int8.onnx": {
+      "bytes": 43838857,
+      "sha256": "b5022ad46416b6fe4f88b0cc082cfd2ff5b1cfc624088c2f19879485493f5913"
+    },
+    "manga_det_v0.2.onnx": {
+      "bytes": 1816954,
+      "sha256": "d132078c46e292b226fb5a2ca52a7612ad319262dfdf493e7d8e3be435295978"
+    },
+    "old-seg-det.onnx": {
+      "bytes": 82223519,
+      "sha256": "82ab98a5b03fbf8139521ae09809ddd13daaf8c2354154544639a7b9b5349cf0"
+    }
+  },
+  "residue_patch_source_dark_pixels": 2571,
+  "runs": {
+    "fp32-lines-cpu": {
+      "backend": "fp32-lines-cpu",
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [
+        "CPUExecutionProvider"
+      ],
+      "pages": [
+        {
+          "boxes": 5,
+          "lines": 11,
+          "assigned_lines": 9,
+          "detect_s": 0.46203779999996186,
+          "repair_s_one_pass": 16.9894037999984,
+          "masked_pixels": 114618,
+          "matches": 3,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": 26,
+          "assigned_lines": 21,
+          "detect_s": 0.5488705999996455,
+          "repair_s_one_pass": 24.08043220000036,
+          "masked_pixels": 127104,
+          "matches": 7,
+          "coverage80": 9
+        },
+        {
+          "boxes": 11,
+          "lines": 24,
+          "assigned_lines": 20,
+          "detect_s": 0.515956000002916,
+          "repair_s_one_pass": 10.137156199998572,
+          "masked_pixels": 37765,
+          "matches": 11,
+          "coverage80": 11
+        },
+        {
+          "boxes": 4,
+          "lines": 56,
+          "assigned_lines": 10,
+          "detect_s": 0.48006310000346275,
+          "repair_s_one_pass": 0.6166178999992553,
+          "masked_pixels": 11979,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6662839647914274,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6616915422885572,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.06659012629161883,
+              "ink_mae": 143.83161117489476,
+              "changed_background_pixels": 129
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 0.8484295999987808,
+      "first_detection_s": 0.4515959999989718,
+      "process_memory": {
+        "working_set_bytes": 2161004544,
+        "peak_working_set_bytes": 2180284416,
+        "peak_commit_bytes": 3822723072
+      },
+      "vram_device_mib_before_after": [
+        null,
+        null
+      ],
+      "real_page_mean_detect_ms": 508.95480000084115,
+      "real_page_mean_detect_plus_repair_s": 17.577952199999952,
+      "patch_dark_pixels_after": 0
+    },
+    "fp32-lines-cuda": {
+      "backend": "fp32-lines-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "pages": [
+        {
+          "boxes": 5,
+          "lines": 11,
+          "assigned_lines": 9,
+          "detect_s": 0.06901300000026822,
+          "repair_s_one_pass": 2.3971601000012015,
+          "masked_pixels": 114618,
+          "matches": 3,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": 26,
+          "assigned_lines": 21,
+          "detect_s": 0.07263420000163023,
+          "repair_s_one_pass": 3.11694179999904,
+          "masked_pixels": 127104,
+          "matches": 7,
+          "coverage80": 9
+        },
+        {
+          "boxes": 11,
+          "lines": 24,
+          "assigned_lines": 20,
+          "detect_s": 0.0628218999991077,
+          "repair_s_one_pass": 1.5417218000002322,
+          "masked_pixels": 37765,
+          "matches": 11,
+          "coverage80": 11
+        },
+        {
+          "boxes": 4,
+          "lines": 56,
+          "assigned_lines": 10,
+          "detect_s": 0.08044020000306773,
+          "repair_s_one_pass": 0.38877880000291043,
+          "masked_pixels": 11979,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6662839647914274,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6616915422885572,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.06659012629161883,
+              "ink_mae": 143.83161117489476,
+              "changed_background_pixels": 129
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 0.8021451999993587,
+      "first_detection_s": 0.538272900001175,
+      "process_memory": {
+        "working_set_bytes": 1533571072,
+        "peak_working_set_bytes": 1596641280,
+        "peak_commit_bytes": 5759123456
+      },
+      "vram_device_mib_before_after": [
+        2254,
+        5304
+      ],
+      "real_page_mean_detect_ms": 68.15636666700205,
+      "real_page_mean_detect_plus_repair_s": 2.4200976000004935,
+      "patch_dark_pixels_after": 0
+    },
+    "int8-lines-cpu": {
+      "backend": "int8-lines-cpu",
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [
+        "CPUExecutionProvider"
+      ],
+      "pages": [
+        {
+          "boxes": 6,
+          "lines": 11,
+          "assigned_lines": 11,
+          "detect_s": 0.7341498999994656,
+          "repair_s_one_pass": 18.98059690000082,
+          "masked_pixels": 126125,
+          "matches": 4,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": 26,
+          "assigned_lines": 21,
+          "detect_s": 0.6772773000011512,
+          "repair_s_one_pass": 26.46105979999993,
+          "masked_pixels": 127104,
+          "matches": 7,
+          "coverage80": 9
+        },
+        {
+          "boxes": 10,
+          "lines": 24,
+          "assigned_lines": 18,
+          "detect_s": 0.7047015999996802,
+          "repair_s_one_pass": 10.89016929999707,
+          "masked_pixels": 35878,
+          "matches": 10,
+          "coverage80": 10
+        },
+        {
+          "boxes": 4,
+          "lines": 56,
+          "assigned_lines": 10,
+          "detect_s": 0.6485622000000149,
+          "repair_s_one_pass": 0.7848740999979782,
+          "masked_pixels": 11979,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6662839647914274,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6616915422885572,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.06659012629161883,
+              "ink_mae": 143.83161117489476,
+              "changed_background_pixels": 129
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 1.4327412999991793,
+      "first_detection_s": 0.739620799999102,
+      "process_memory": {
+        "working_set_bytes": 2184929280,
+        "peak_working_set_bytes": 2201722880,
+        "peak_commit_bytes": 3565641728
+      },
+      "vram_device_mib_before_after": [
+        null,
+        null
+      ],
+      "real_page_mean_detect_ms": 705.3762666667657,
+      "real_page_mean_detect_plus_repair_s": 19.48265159999937,
+      "patch_dark_pixels_after": 0
+    },
+    "int8-lines-cuda": {
+      "backend": "int8-lines-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "pages": [
+        {
+          "boxes": 6,
+          "lines": 11,
+          "assigned_lines": 11,
+          "detect_s": 0.3705922000008286,
+          "repair_s_one_pass": 2.788843899998028,
+          "masked_pixels": 126125,
+          "matches": 4,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": 26,
+          "assigned_lines": 21,
+          "detect_s": 0.34295230000134325,
+          "repair_s_one_pass": 2.7389897000030032,
+          "masked_pixels": 127104,
+          "matches": 7,
+          "coverage80": 9
+        },
+        {
+          "boxes": 10,
+          "lines": 24,
+          "assigned_lines": 18,
+          "detect_s": 0.33851729999878444,
+          "repair_s_one_pass": 1.533412299999327,
+          "masked_pixels": 35878,
+          "matches": 10,
+          "coverage80": 10
+        },
+        {
+          "boxes": 4,
+          "lines": 56,
+          "assigned_lines": 10,
+          "detect_s": 0.36661649999950896,
+          "repair_s_one_pass": 0.2634297000004153,
+          "masked_pixels": 11979,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6662839647914274,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6616915422885572,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.06659012629161883,
+              "ink_mae": 143.83161117489476,
+              "changed_background_pixels": 129
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 1.3500717999995686,
+      "first_detection_s": 1.776627399998688,
+      "process_memory": {
+        "working_set_bytes": 1681186816,
+        "peak_working_set_bytes": 1744486400,
+        "peak_commit_bytes": 5650878464
+      },
+      "vram_device_mib_before_after": [
+        2322,
+        5009
+      ],
+      "real_page_mean_detect_ms": 350.6872666669854,
+      "real_page_mean_detect_plus_repair_s": 2.7044359000004383,
+      "patch_dark_pixels_after": 0
+    },
+    "legacy-cpu": {
+      "backend": "legacy-cpu",
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [],
+      "pages": [
+        {
+          "boxes": 5,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.7787521000027482,
+          "repair_s_one_pass": 17.39782969999942,
+          "masked_pixels": 110283,
+          "matches": 4,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.8166044000026886,
+          "repair_s_one_pass": 23.210354999999254,
+          "masked_pixels": 143819,
+          "matches": 9,
+          "coverage80": 7
+        },
+        {
+          "boxes": 10,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.7900417999990168,
+          "repair_s_one_pass": 10.425877099998615,
+          "masked_pixels": 49173,
+          "matches": 10,
+          "coverage80": 7
+        },
+        {
+          "boxes": 2,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.7753398000022571,
+          "repair_s_one_pass": 0.013393699999141973,
+          "masked_pixels": 19306,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 2.345197091465748,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 2.430156907768848,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 143.83161117489476,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 0.21050059999834048,
+      "first_detection_s": 0.9033333999977913,
+      "process_memory": {
+        "working_set_bytes": 2631573504,
+        "peak_working_set_bytes": 2714529792,
+        "peak_commit_bytes": 4128473088
+      },
+      "vram_device_mib_before_after": [
+        null,
+        null
+      ],
+      "real_page_mean_detect_ms": 795.1327666681512,
+      "real_page_mean_detect_plus_repair_s": 17.80648670000058,
+      "patch_dark_pixels_after": 0
+    },
+    "legacy-cuda": {
+      "backend": "legacy-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [],
+      "pages": [
+        {
+          "boxes": 5,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.09259390000079293,
+          "repair_s_one_pass": 2.02135410000119,
+          "masked_pixels": 110283,
+          "matches": 4,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.10521850000077393,
+          "repair_s_one_pass": 2.52760649999982,
+          "masked_pixels": 143819,
+          "matches": 9,
+          "coverage80": 7
+        },
+        {
+          "boxes": 10,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.08930749999854015,
+          "repair_s_one_pass": 1.463815600000089,
+          "masked_pixels": 49173,
+          "matches": 10,
+          "coverage80": 7
+        },
+        {
+          "boxes": 2,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.06734510000023874,
+          "repair_s_one_pass": 0.011283799998636823,
+          "masked_pixels": 19306,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 2.345197091465748,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 2.430156907768848,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 143.83161117489476,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 0.09941249999974389,
+      "first_detection_s": 0.3854189999983646,
+      "process_memory": {
+        "working_set_bytes": 1426784256,
+        "peak_working_set_bytes": 1493360640,
+        "peak_commit_bytes": 5904429056
+      },
+      "vram_device_mib_before_after": [
+        2127,
+        5336
+      ],
+      "real_page_mean_detect_ms": 95.706633333369,
+      "real_page_mean_detect_plus_repair_s": 2.099965366667069,
+      "patch_dark_pixels_after": 0
+    },
+    "small-cpu": {
+      "backend": "small-cpu",
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [],
+      "pages": [
+        {
+          "boxes": 6,
+          "lines": 0,
+          "assigned_lines": 0,
+          "detect_s": 0.13739120000172989,
+          "repair_s_one_pass": 19.08623549999902,
+          "masked_pixels": 27450,
+          "matches": 3,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": 0,
+          "assigned_lines": 0,
+          "detect_s": 0.14728950000062468,
+          "repair_s_one_pass": 24.20332039999994,
+          "masked_pixels": 98288,
+          "matches": 7,
+          "coverage80": 9
+        },
+        {
+          "boxes": 10,
+          "lines": 0,
+          "assigned_lines": 0,
+          "detect_s": 0.1441783000009309,
+          "repair_s_one_pass": 10.180811999998696,
+          "masked_pixels": 41356,
+          "matches": 10,
+          "coverage80": 10
+        },
+        {
+          "boxes": 2,
+          "lines": 0,
+          "assigned_lines": 0,
+          "detect_s": 0.19320750000042608,
+          "repair_s_one_pass": 0.019466899997496512,
+          "masked_pixels": 4892,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6662839647914274,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6616915422885572,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 143.83161117489476,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 0.36810930000137887,
+      "first_detection_s": 0.13858869999967283,
+      "process_memory": {
+        "working_set_bytes": 1846812672,
+        "peak_working_set_bytes": 1933340672,
+        "peak_commit_bytes": 3307720704
+      },
+      "vram_device_mib_before_after": [
+        null,
+        null
+      ],
+      "real_page_mean_detect_ms": 142.95300000109515,
+      "real_page_mean_detect_plus_repair_s": 17.96640896666698,
+      "patch_dark_pixels_after": 0
+    },
+    "small-cuda": {
+      "backend": "small-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [],
+      "pages": [
+        {
+          "boxes": 6,
+          "lines": 0,
+          "assigned_lines": 0,
+          "detect_s": 0.12545160000081523,
+          "repair_s_one_pass": 2.7245523999990837,
+          "masked_pixels": 27454,
+          "matches": 3,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": 0,
+          "assigned_lines": 0,
+          "detect_s": 0.12707339999906253,
+          "repair_s_one_pass": 2.5298299999994924,
+          "masked_pixels": 96728,
+          "matches": 7,
+          "coverage80": 9
+        },
+        {
+          "boxes": 10,
+          "lines": 0,
+          "assigned_lines": 0,
+          "detect_s": 0.1222431999995024,
+          "repair_s_one_pass": 1.4481261000000814,
+          "masked_pixels": 41390,
+          "matches": 10,
+          "coverage80": 10
+        },
+        {
+          "boxes": 3,
+          "lines": 0,
+          "assigned_lines": 0,
+          "detect_s": 0.11252529999910621,
+          "repair_s_one_pass": 0.015355899999121903,
+          "masked_pixels": 9768,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6662839647914274,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6616915422885572,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 143.83161117489476,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 0.41667669999878854,
+      "first_detection_s": 0.25064580000253045,
+      "process_memory": {
+        "working_set_bytes": 1414103040,
+        "peak_working_set_bytes": 1485000704,
+        "peak_commit_bytes": 5118062592
+      },
+      "vram_device_mib_before_after": [
+        2147,
+        4577
+      ],
+      "real_page_mean_detect_ms": 124.92273333312671,
+      "real_page_mean_detect_plus_repair_s": 2.3590922333326794,
+      "patch_dark_pixels_after": 963
+    },
+    "small-lines-cpu": {
+      "backend": "small-lines-cpu",
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [
+        "CPUExecutionProvider"
+      ],
+      "pages": [
+        {
+          "boxes": 6,
+          "lines": 11,
+          "assigned_lines": 11,
+          "detect_s": 0.2521252000005916,
+          "repair_s_one_pass": 19.46878149999975,
+          "masked_pixels": 124203,
+          "matches": 3,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": 26,
+          "assigned_lines": 21,
+          "detect_s": 0.25397910000174306,
+          "repair_s_one_pass": 25.915153300000384,
+          "masked_pixels": 127104,
+          "matches": 7,
+          "coverage80": 9
+        },
+        {
+          "boxes": 10,
+          "lines": 24,
+          "assigned_lines": 18,
+          "detect_s": 0.2416975000014645,
+          "repair_s_one_pass": 11.062510699997802,
+          "masked_pixels": 35878,
+          "matches": 10,
+          "coverage80": 10
+        },
+        {
+          "boxes": 2,
+          "lines": 56,
+          "assigned_lines": 8,
+          "detect_s": 0.2675073999998858,
+          "repair_s_one_pass": 0.6442916999985755,
+          "masked_pixels": 7103,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6662839647914274,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6616915422885572,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.06659012629161883,
+              "ink_mae": 143.83161117489476,
+              "changed_background_pixels": 129
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 0.4465362000009918,
+      "first_detection_s": 0.28638649999993504,
+      "process_memory": {
+        "working_set_bytes": 2077618176,
+        "peak_working_set_bytes": 2096074752,
+        "peak_commit_bytes": 3529363456
+      },
+      "vram_device_mib_before_after": [
+        null,
+        null
+      ],
+      "real_page_mean_detect_ms": 249.26726666793306,
+      "real_page_mean_detect_plus_repair_s": 19.06474910000058,
+      "patch_dark_pixels_after": 0
+    },
+    "small-lines-cuda": {
+      "backend": "small-lines-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "pages": [
+        {
+          "boxes": 6,
+          "lines": 11,
+          "assigned_lines": 11,
+          "detect_s": 0.1533939000000828,
+          "repair_s_one_pass": 2.3065246000005573,
+          "masked_pixels": 124203,
+          "matches": 3,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": 26,
+          "assigned_lines": 21,
+          "detect_s": 0.14674920000106795,
+          "repair_s_one_pass": 2.604596799999854,
+          "masked_pixels": 127104,
+          "matches": 7,
+          "coverage80": 9
+        },
+        {
+          "boxes": 10,
+          "lines": 24,
+          "assigned_lines": 18,
+          "detect_s": 0.15952420000030543,
+          "repair_s_one_pass": 1.6719293999994989,
+          "masked_pixels": 35878,
+          "matches": 10,
+          "coverage80": 10
+        },
+        {
+          "boxes": 3,
+          "lines": 56,
+          "assigned_lines": 10,
+          "detect_s": 0.1651400000009744,
+          "repair_s_one_pass": 0.3212485999974888,
+          "masked_pixels": 11979,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6662839647914274,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 1.6616915422885572,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.06659012629161883,
+              "ink_mae": 143.83161117489476,
+              "changed_background_pixels": 129
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 0.43982859999960056,
+      "first_detection_s": 0.7581457999986014,
+      "process_memory": {
+        "working_set_bytes": 1529856000,
+        "peak_working_set_bytes": 1597558784,
+        "peak_commit_bytes": 5491912704
+      },
+      "vram_device_mib_before_after": [
+        2138,
+        4978
+      ],
+      "real_page_mean_detect_ms": 153.2224333338187,
+      "real_page_mean_detect_plus_repair_s": 2.3475727000004554,
+      "patch_dark_pixels_after": 0
+    },
+    "small-pruned-cpu": {
+      "backend": "small-pruned-cpu",
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [],
+      "pages": [
+        {
+          "boxes": 5,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.9132667999983823,
+          "repair_s_one_pass": 16.679289299998345,
+          "masked_pixels": 112435,
+          "matches": 3,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.8354717000001983,
+          "repair_s_one_pass": 24.134977299996535,
+          "masked_pixels": 146506,
+          "matches": 7,
+          "coverage80": 9
+        },
+        {
+          "boxes": 10,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.8252755000030447,
+          "repair_s_one_pass": 10.242311800000607,
+          "masked_pixels": 54916,
+          "matches": 10,
+          "coverage80": 10
+        },
+        {
+          "boxes": 3,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 1.0791652000007161,
+          "repair_s_one_pass": 0.8337070000015956,
+          "masked_pixels": 34411,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 2.345197091465748,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 2.430156907768848,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.8270187523918867,
+              "extra_pixels_per_ink": 4.617298124760811,
+              "ink_mae": 43.3043755581069,
+              "changed_background_pixels": 9647
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 0.3926742999974522,
+      "first_detection_s": 1.0709814000001643,
+      "process_memory": {
+        "working_set_bytes": 2388836352,
+        "peak_working_set_bytes": 2805506048,
+        "peak_commit_bytes": 4427849728
+      },
+      "vram_device_mib_before_after": [
+        null,
+        null
+      ],
+      "real_page_mean_detect_ms": 858.0046666672084,
+      "real_page_mean_detect_plus_repair_s": 17.876864133332372,
+      "patch_dark_pixels_after": 0
+    },
+    "small-pruned-cuda": {
+      "backend": "small-pruned-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "line_providers": [],
+      "pages": [
+        {
+          "boxes": 5,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.216433199999301,
+          "repair_s_one_pass": 1.983703499998228,
+          "masked_pixels": 112435,
+          "matches": 3,
+          "coverage80": 6
+        },
+        {
+          "boxes": 9,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.24411110000073677,
+          "repair_s_one_pass": 2.628296099999716,
+          "masked_pixels": 146437,
+          "matches": 7,
+          "coverage80": 9
+        },
+        {
+          "boxes": 10,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.2042481000025873,
+          "repair_s_one_pass": 1.4803782000017236,
+          "masked_pixels": 54932,
+          "matches": 10,
+          "coverage80": 10
+        },
+        {
+          "boxes": 3,
+          "lines": null,
+          "assigned_lines": null,
+          "detect_s": 0.19002850000106264,
+          "repair_s_one_pass": 0.26133479999771225,
+          "masked_pixels": 34411,
+          "controls": [
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 2.345197091465748,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 1.0,
+              "extra_pixels_per_ink": 2.430156907768848,
+              "ink_mae": 0.0,
+              "changed_background_pixels": 0
+            },
+            {
+              "stroke_coverage": 0.8270187523918867,
+              "extra_pixels_per_ink": 4.617298124760811,
+              "ink_mae": 43.29621125143513,
+              "changed_background_pixels": 9652
+            },
+            {
+              "stroke_coverage": 0.0,
+              "extra_pixels_per_ink": 0.0,
+              "ink_mae": 110.63451970914657,
+              "changed_background_pixels": 0
+            }
+          ]
+        }
+      ],
+      "detector_load_s": 0.468852699999843,
+      "first_detection_s": 1.0385128000016266,
+      "process_memory": {
+        "working_set_bytes": 1559601152,
+        "peak_working_set_bytes": 1627009024,
+        "peak_commit_bytes": 6360276992
+      },
+      "vram_device_mib_before_after": [
+        2154,
+        5594
+      ],
+      "real_page_mean_detect_ms": 221.59746666754168,
+      "real_page_mean_detect_plus_repair_s": 2.252390066667431,
+      "patch_dark_pixels_after": 0
+    }
+  }
+}

@@ -23,6 +23,19 @@ _STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 _PAST_NAMES = [f"past_k{i}" for i in range(6)] + [f"past_v{i}" for i in range(6)]
 
 
+def generation_profile(root: Path) -> dict:
+    """Unmarked legacy packages keep v2.5.0 decoding exactly as before."""
+    path = root / "comitrans-model.json"
+    if not path.is_file():
+        return {"max_new_tokens": 128, "max_symbol_run": 0}
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    expected = {"format": 1, "model": "baberu", "revision": "v1.2",
+                "max_new_tokens": 256, "max_symbol_run": 16}
+    if profile != expected:
+        raise ValueError(f"不支持的 Baberu 模型配置: {path}")
+    return profile
+
+
 def preprocess(image: Image.Image) -> np.ndarray:
     image = image.convert("RGB").resize((224, 224), Image.Resampling.BICUBIC)
     pixels = (np.asarray(image, dtype=np.float32) / 255.0 - _MEAN) / _STD
@@ -69,11 +82,12 @@ class OnnxBaberuOcr:
         self,
         model_dir: str | Path,
         device: str = "cpu",
-        max_new_tokens: int = 128,
+        max_new_tokens: int | None = None,
     ):
         root = Path(model_dir)
         if not self.is_complete(root):
             raise FileNotFoundError(f"Baberu OCR ONNX 模型不完整: {root}")
+        profile = generation_profile(root)
 
         onnx_dir = root / "onnx"
         vision_name = (
@@ -93,8 +107,27 @@ class OnnxBaberuOcr:
         self.vision = make_session(onnx_dir / vision_name)
         self.decoder_prefill = make_session(onnx_dir / "decoder_prefill_int8.onnx")
         self.decoder_step = make_session(onnx_dir / "decoder_step_int8.onnx")
+        expected_outputs = ["logits"] + [name.replace("past_", "present_") for name in _PAST_NAMES]
+        for session, inputs, outputs in (
+            (self.vision, {"pixel_values"}, ["vision_embeds"]),
+            (self.decoder_prefill, {"vision_embeds", "input_ids"}, expected_outputs),
+            (self.decoder_step, {"input_ids", "position_ids", *_PAST_NAMES}, expected_outputs),
+        ):
+            if ({item.name for item in session.get_inputs()} != inputs
+                    or [item.name for item in session.get_outputs()] != outputs):
+                raise ValueError("Baberu ONNX 输入、输出或 KV cache 顺序不兼容，请使用完整的同版本模型包")
+        expected_outputs = ["logits"] + [name.replace("past_", "present_") for name in _PAST_NAMES]
+        for session, inputs, outputs in (
+            (self.vision, {"pixel_values"}, ["vision_embeds"]),
+            (self.decoder_prefill, {"vision_embeds", "input_ids"}, expected_outputs),
+            (self.decoder_step, {"input_ids", "position_ids", *_PAST_NAMES}, expected_outputs),
+        ):
+            if ({item.name for item in session.get_inputs()} != inputs
+                    or [item.name for item in session.get_outputs()] != outputs):
+                raise ValueError("Baberu ONNX 输入、输出或 KV cache 顺序不兼容，请使用完整的同版本模型包")
         self.vocab = Vocab(root / "tokenizer/vocab.json")
-        self.max_new_tokens = max(16, int(max_new_tokens))
+        self.max_new_tokens = max(16, int(profile["max_new_tokens"] if max_new_tokens is None else max_new_tokens))
+        self.max_symbol_run = profile["max_symbol_run"]
         self.vision_name = vision_name
 
     def __call__(
@@ -137,14 +170,16 @@ class OnnxBaberuOcr:
                         if score < 0
                         else score / repetition_penalty
                     )
-            if max_content_run and tokens and tokens[-1] in vocab.content_ids:
+            last = tokens[-1] if tokens else 0
+            cap = max_content_run if last in vocab.content_ids else self.max_symbol_run if last > 3 else 0
+            if cap:
                 last_token = tokens[-1]
                 run_length = 0
                 for token_id in reversed(tokens):
                     if token_id != last_token:
                         break
                     run_length += 1
-                if run_length >= max_content_run:
+                if run_length >= cap:
                     logits[last_token] = -np.inf
 
             next_token = int(np.argmax(logits))

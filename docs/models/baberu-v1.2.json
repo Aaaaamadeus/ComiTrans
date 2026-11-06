@@ -1,0 +1,58 @@
+{
+  "id": "baberu-v1.2-int4",
+  "revision": "b9868433dbda3ed9ba1357d008599ff4ada873d5",
+  "license": "Apache-2.0",
+  "source": "https://huggingface.co/genshiai-daichi/baberu-ocr",
+  "directory": "baberu-ocr-v1.2",
+  "profile": {
+    "format": 1,
+    "model": "baberu",
+    "revision": "v1.2",
+    "max_new_tokens": 256,
+    "max_symbol_run": 16
+  },
+  "files": [
+    {
+      "path": "LICENSE",
+      "bytes": 11348,
+      "sha256": "186332043e82fcfdbeb0b8e0e8d77b63d97ffa3dd9d91ccf7cef1377d8ab345b",
+      "url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/LICENSE"
+    },
+    {
+      "path": "onnx/decoder_prefill_int8.onnx",
+      "bytes": 35133596,
+      "sha256": "187a59cb61d3870f1f97c9eb027eb34ff19d023fba801cda113a13870be0b724",
+      "url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/onnx/decoder_prefill_int8.onnx"
+    },
+    {
+      "path": "onnx/decoder_step_int8.onnx",
+      "bytes": 34715466,
+      "sha256": "46640b0b3db77f0f0eef660bbe5dc9126a5e0fb49eb2786b2edba7b0371d9769",
+      "url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/onnx/decoder_step_int8.onnx"
+    },
+    {
+      "path": "onnx/vision_int4.onnx",
+      "bytes": 52293486,
+      "sha256": "1967ecef502e4c1e1e7c512ea0a2e06396b39ded87a8a9cc77bd7db2e981a361",
+      "url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/onnx/vision_int4.onnx"
+    },
+    {
+      "path": "README.md",
+      "bytes": 17798,
+      "sha256": "d31cd71973dc91247ab791cb376890101a13e32cc1e41b8ebf991c919a75c416",
+      "url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/README.md"
+    },
+    {
+      "path": "tokenizer/tokenizer_config.json",
+      "bytes": 937,
+      "sha256": "c6c8004b1d310bd7c56455387c25cdf4da28594bbd5713aaa3fddfd5eac8f483",
+      "url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/tokenizer/tokenizer_config.json"
+    },
+    {
+      "path": "tokenizer/vocab.json",
+      "bytes": 130761,
+      "sha256": "681de4eb83154a397af49e2ddae4705041b12a22e16fe00860b829e889e5f47c",
+      "url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/tokenizer/vocab.json"
+    }
+  ]
+}

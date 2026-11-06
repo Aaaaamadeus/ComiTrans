@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 from ..i18n import tr
 
 from PySide6.QtCore import Qt, Signal
@@ -290,7 +291,14 @@ class ApiConfigPage(QWidget):
         self._ocr_backend.clear()
         language = self._source_language.currentData()
         if language == "ja":
-            choices = [(tr('自动（优先 Baberu，缺失时回退）'), "auto"), ("Baberu OCR", "baberu"), ("manga-ocr", "manga-ocr")]
+            choices = [(tr('自动（使用已安装的日语模型）'), "auto")]
+            selected = self._config.get("ocr_backend")
+            for label, value, key in (("CharSpot Small", "charspot", "charspot_ocr_model"),
+                                      ("Baberu OCR", "baberu", "baberu_ocr_model"),
+                                      ("manga-ocr", "manga-ocr", "ocr_model")):
+                directory = self._config.get(key)
+                if (directory and Path(directory).is_dir()) or selected == value or (value == "manga-ocr" and selected == "manga"):
+                    choices.append((label, value))
         elif language in ("ko", "en"):
             choices = [(tr('自动（PP-OCRv5 本地识别）'), "auto")]
         else:
@@ -346,7 +354,7 @@ class ApiConfigPage(QWidget):
         self._output_input.setCursorPosition(len(self._output_input.text()))
         self._issue_input.setText(config.get("issue_url", ""))
         self._model_info.setText(
-            tr('检测: {_0}\nBaberu OCR: {_1}\nmanga-ocr: {_2}\n修复: {_3}', _0=config.get('detector_model', ''), _1=config.get('baberu_ocr_model', ''), _2=config.get('ocr_model', ''), _3=config.get('lama_model', ''))
+            tr('CharSpot Small: {_4}\n检测: {_0}\nBaberu OCR: {_1}\nmanga-ocr: {_2}\n修复: {_3}', _4=config.get('charspot_ocr_model', ''), _0=config.get('detector_model', ''), _1=config.get('baberu_ocr_model', ''), _2=config.get('ocr_model', ''), _3=config.get('lama_model', ''))
         )
         self._loading_config = False
         self._save_status.setText(tr('修改后点击保存，下次任务生效'))
