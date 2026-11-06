@@ -30,6 +30,7 @@ class StripPreview(ImagePreview):
 
     def __init__(self, *args, **kwargs):
         self._continuous = False
+        self._regions = ([], True)
         super().__init__(*args, **kwargs)
         self._single_label = self._label
         self._active_path = None
@@ -78,6 +79,7 @@ class StripPreview(ImagePreview):
             label.installEventFilter(self)
             label.region_edited.connect(self.region_edited)
             label.region_edit_finished.connect(self.region_edit_finished)
+            label.region_clicked.connect(self.region_clicked)
         label.setToolTip(Path(key).name)
         self._pages[key][0] = label
         self._canvas_keys[label] = key
@@ -122,6 +124,7 @@ class StripPreview(ImagePreview):
         self._label.image_size = self._original.size()
         self._label.region_creation = creation
         self.set_region(region, editable=editable)
+        self._apply_regions()
         if not self._original.isNull():
             self.set_pixmap(self._original)
         if enabled:
@@ -142,6 +145,16 @@ class StripPreview(ImagePreview):
             self._label.clear()
         self._active_path = key
         self._label = self._mount(key) if self._continuous else self._single_label
+        self._apply_regions()
+
+    def set_regions(self, regions, visible=True):
+        self._regions = (list(regions or ()), bool(visible))
+        super().set_regions(regions, visible)
+
+    def _apply_regions(self):
+        regions, visible = getattr(self, '_regions', ([], True))
+        if self._label is not None:
+            self._label.set_regions(regions, visible)
 
     def set_image(self, path):
         self.activate_page(path)

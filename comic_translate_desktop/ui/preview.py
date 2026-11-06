@@ -71,6 +71,7 @@ class PageCanvas(QLabel):
     """Screentone lives in the canvas margin, outside the displayed page."""
     region_edited = Signal(object)
     region_edit_finished = Signal()
+    region_clicked = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -79,11 +80,20 @@ class PageCanvas(QLabel):
         self.region_creation = False
         self.stretch_pixmap = False
         self.space_pan = False
+        self.regions = []
+        self.regions_visible = True
+        self._hover_index = -1
         self._region_drag = None
         self._view_pixmap = None
         self._view_scale = 1.0
         self.setMouseTracking(True)
         self.setAccessibleName(tr('漫画画布'))
+
+    def set_regions(self, regions, visible=True):
+        self.regions = list(regions or ())
+        self.regions_visible = bool(visible)
+        self._hover_index = -1
+        self.update()
 
     def set_view(self, pixmap, scale, viewport):
         """Draw the page from its source pixmap; only the exposed rect is sampled."""
@@ -117,15 +127,32 @@ class PageCanvas(QLabel):
                       bounds.center().y() + .5 - size.height() / 2,
                       size.width(), size.height())
 
-    def region_rect(self):
+    def _box_rect(self, box):
         page = self.page_rect()
-        if self.region is None or self.image_size is None or page.isEmpty():
+        if box is None or self.image_size is None or page.isEmpty():
             return QRectF()
-        x1, y1, x2, y2 = self.region
+        x1, y1, x2, y2 = box
         scale_x = page.width() / self.image_size.width()
         scale_y = page.height() / self.image_size.height()
         return QRectF(page.left() + x1 * scale_x, page.top() + y1 * scale_y,
                       (x2 - x1) * scale_x, (y2 - y1) * scale_y)
+
+    def region_rect(self):
+        return self._box_rect(self.region)
+
+    def _region_at(self, point):
+        """Topmost text box under the cursor; inner (smaller) boxes win."""
+        if not self.regions_visible or not self.regions or self.image_size is None:
+            return None
+        page = self.page_rect()
+        if page.isEmpty() or not page.adjusted(-4, -4, 4, 4).contains(point):
+            return None
+        hits = []
+        for index, box in self.regions:
+            rect = self._box_rect(box)
+            if not rect.isEmpty() and rect.adjusted(-2, -2, 2, 2).contains(point):
+                hits.append((rect.width() * rect.height(), index))
+        return min(hits)[1] if hits else None
 
     def _region_handles(self):
         rect = self.region_rect()
@@ -200,6 +227,13 @@ class PageCanvas(QLabel):
                 self._region_cursor(hit)
             event.accept()
             return
+        if event.button() == Qt.LeftButton and hit is None and not self.region_creation:
+            index = self._region_at(event.position())
+            if index is not None:
+                self.setFocus(Qt.MouseFocusReason)
+                self.region_clicked.emit(index)
+                event.accept()
+                return
         super().mousePressEvent(event)
 
     def _drag_region_to(self, point):
@@ -246,7 +280,14 @@ class PageCanvas(QLabel):
             self._drag_region_to(event.position())
             event.accept()
             return
-        self._region_cursor(self._region_hit(event.position()))
+        hover = self._region_at(event.position())
+        if hover != self._hover_index:
+            self._hover_index = hover
+            self.update()
+        hit = self._region_hit(event.position())
+        self._region_cursor(hit)
+        if hit is None and hover is not None:
+            self.setCursor(Qt.PointingHandCursor)
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -272,6 +313,9 @@ class PageCanvas(QLabel):
         super().keyPressEvent(event)
 
     def leaveEvent(self, event):
+        if self._hover_index != -1:
+            self._hover_index = -1
+            self.update()
         if self._region_drag is None:
             self.unsetCursor()
         super().leaveEvent(event)
@@ -328,10 +372,31 @@ class PageCanvas(QLabel):
         painter.setClipRegion(margin)
         draw_corner_tones(painter, QRectF(bounds),
                           compact=self.window().width() < COMPACT_BREAKPOINT)
+        if self.regions_visible and self.regions:
+            painter.setClipping(False)
+            painter.setClipRect(page)
+            painter.setRenderHint(QPainter.Antialiasing)
+            for index, box in self.regions:
+                rect = self._box_rect(box)
+                if rect.isEmpty() or (self.region is not None and tuple(box) == tuple(self.region)):
+                    continue
+                if index == self._hover_index:
+                    pen = QPen(QColor(44, 110, 150, 220), 1.5, Qt.SolidLine)
+                    pen.setCosmetic(True)
+                    painter.setPen(pen)
+                    painter.setBrush(QColor(44, 110, 150, 28))
+                else:
+                    pen = QPen(QColor(44, 110, 150, 90), 1, Qt.DashLine)
+                    pen.setCosmetic(True)
+                    painter.setPen(pen)
+                    painter.setBrush(Qt.NoBrush)
+                painter.drawRect(rect)
+            painter.setBrush(Qt.NoBrush)
         if self.region is not None:
             painter.setClipping(False)
             painter.setClipRect(page)
             rect = self.region_rect()
+            painter.setRenderHint(QPainter.Antialiasing)
             painter.setRenderHint(QPainter.Antialiasing)
             pen = QPen(QColor('#607D8B'), 1.5, Qt.DashLine)
             pen.setCosmetic(True)
@@ -351,6 +416,7 @@ class ImagePreview(QWidget):
     import_requested = Signal()
     region_edited = Signal(object)
     region_edit_finished = Signal()
+    region_clicked = Signal(int)
     zoom_changed = Signal(object)
 
     MIN_ZOOM, MAX_ZOOM = 0.05, 8.0
@@ -405,6 +471,7 @@ class ImagePreview(QWidget):
         self._label = PageCanvas()
         self._label.region_edited.connect(self.region_edited)
         self._label.region_edit_finished.connect(self.region_edit_finished)
+        self._label.region_clicked.connect(self.region_clicked)
         self._label.installEventFilter(self)
         self._label.setObjectName('previewLabel')
         self._label.setAlignment(Qt.AlignCenter)
@@ -521,6 +588,7 @@ class ImagePreview(QWidget):
     def clear(self, text=tr('等待预览')):
         self._original = QPixmap()
         self.set_region(None)
+        self._label.set_regions([])
         self._label.clear()
         self._label.clear_view()
         self._empty_title.setText(tr(text))
@@ -580,6 +648,10 @@ class ImagePreview(QWidget):
         self.cancel_region_drag()
         self._label.region_creation = enabled
         self.set_region(None)
+
+    def set_regions(self, regions, visible=True):
+        """All text boxes of the page, in image coordinates; click to select."""
+        self._label.set_regions(regions, visible)
 
     def set_region(self, box=None, *, editable=False):
         """Canvas-only selection guide; never alter the rendered/exported pixels."""

@@ -7,7 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 from PySide6.QtCore import Qt, QSize, QSettings, QTimer, QEvent, QPoint
 from PySide6.QtGui import QPixmap, QIcon, QImageReader, QShortcut, QKeySequence
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QGroupBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QGroupBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView)
 from ..config import load_ai_config, MAIN_DIR
 from ..font_library import available_fonts, font_description, font_display_name, font_reference, inspect_font, resolve_font_reference
 from comic_translate_core.page_compositor import compose_page, layer_bounds
@@ -301,6 +301,7 @@ class EditorPage(QWidget):
         self.preview.import_requested.connect(self._import_pages)
         self.preview.region_edited.connect(self._resize_region_from_canvas)
         self.preview.region_edit_finished.connect(self.apply_changes)
+        self.preview.region_clicked.connect(self._select_block)
         repair_toolbar = QHBoxLayout()
         self._repair_mode = QPushButton(tr('框选背景'))
         self._repair_mode.setCheckable(True)
@@ -1135,6 +1136,9 @@ class EditorPage(QWidget):
         return [left, top, left + width, top + height]
 
     def _update_region_guide(self):
+        self.preview.set_regions(
+            [(index, tuple(self._mask_box(item))) for index, item in enumerate(self.items)],
+            visible=self._show_mask.isChecked() and not self._repair_mode.isChecked())
         if self._repair_mode.isChecked():
             self.preview.set_region(self._repair_box, editable=self._repair_box is not None)
             return
@@ -1149,6 +1153,15 @@ class EditorPage(QWidget):
             box = list(self.items[self._loaded_row]['box'][:4])
             self._box_label.setText(tr('原图区域：{_0}', _0=', '.join(map(str, box))))
         self.preview.set_region(box if self._show_mask.isChecked() else None, editable=box is not None and not restored)
+
+    def _select_block(self, index):
+        """A click on a box in the canvas is the same as picking it in the list."""
+        if not 0 <= index < len(self.items) or index == self._loaded_row:
+            return
+        self.block_list.setCurrentRow(index)
+        item = self.block_list.item(index)
+        if item is not None:
+            self.block_list.scrollToItem(item, QAbstractItemView.PositionAtCenter)
 
     def _resize_region_from_canvas(self, box):
         if self._repair_mode.isChecked():
@@ -1201,6 +1214,7 @@ class EditorPage(QWidget):
             self._font_choice_dirty = False
             self._set_editable(False)
             self.preview.set_region(None)
+            self.preview.set_regions([])
             return
         if not self._loading:
             self._store_properties()
