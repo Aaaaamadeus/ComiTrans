@@ -46,9 +46,9 @@ class PanelHeading(QWidget):
         w, h = self.width(), self.height()
         p.fillRect(self.rect(), QColor('#F8F8F8' if self.sidebar else '#FFFFFF'))
         end = min(w, self._title.x() + self._title.width() + 10)
-        tone_width = min(96 if self.sidebar else 168, max(0, w - end - 12))
+        tone_width = min(72 if self.sidebar else 120, max(0, w - end - 12))
         if tone_width > 24:
-            p.setOpacity(.46)
+            p.setOpacity(.30)
             draw_tone(p, QRectF(w - tone_width, 0, tone_width, h - 4),
                       compact=self.window().width() < COMPACT_BREAKPOINT,
                       profile='section', direction='right')

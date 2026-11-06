@@ -21,7 +21,7 @@ class MangaIllustration(QWidget):
     """Original studio art in empty states; page art itself is never decorated."""
     def __init__(self, parent=None, *, asset_name='studio-import-v1.png'):
         super().__init__(parent)
-        self.setFixedSize(300, 210)
+        self.setFixedSize(240, 168)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
         self._pixmap = studio_illustration(asset_name)
 
