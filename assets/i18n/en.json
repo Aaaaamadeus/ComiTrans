@@ -444,7 +444,7 @@
   "继续": "Continue",
   "编辑面板": "Editor panel",
   "缩放预览；放大后可使用滚动条浏览": "Zoom the preview; use scrollbars when zoomed in",
-  "缩放：Ctrl+滚轮以光标为中心，Ctrl+0/1/2 适应页面/100%/适应宽度": "Zoom: Ctrl+wheel zooms at the cursor; Ctrl+0/1/2 fit page / 100% / fit width",
+  "缩放：Alt+滚轮以光标为中心，空格+拖动平移；Ctrl+0/1/2 适应页面/100%/适应宽度": "Zoom: Alt+wheel zooms at the cursor, Space+drag pans; Ctrl+0/1/2 fit page / 100% / fit width",
   "缺少处理前原图，请先关联原图。": "Original image missing. Link the original image first.",
   "缺少配套清理底图或布局 JSON，请在自动处理中重新生成。": "Cleaned base image or layout JSON is missing. Regenerate using automatic translation.",
   "缺少配套清理底图，请重新导入页面": "Cleaned base image missing. Import the page again",

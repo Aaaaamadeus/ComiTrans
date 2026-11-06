@@ -78,6 +78,7 @@ class PageCanvas(QLabel):
         self.region_editable = False
         self.region_creation = False
         self.stretch_pixmap = False
+        self.space_pan = False
         self._region_drag = None
         self._view_pixmap = None
         self._view_scale = 1.0
@@ -159,6 +160,9 @@ class PageCanvas(QLabel):
         return 'move' if rect.contains(point) and page.contains(point) else None
 
     def _region_cursor(self, hit):
+        if self.space_pan:
+            self.setCursor(Qt.OpenHandCursor)
+            return
         cursors = {'nw': Qt.SizeFDiagCursor, 'se': Qt.SizeFDiagCursor,
                    'ne': Qt.SizeBDiagCursor, 'sw': Qt.SizeBDiagCursor,
                    'n': Qt.SizeVerCursor, 's': Qt.SizeVerCursor,
@@ -358,6 +362,7 @@ class ImagePreview(QWidget):
         self._fit_width = False
         self._scale = 1.0
         self._pan = None
+        self._space_pan = False
         self.setMinimumSize(120, 100)
         self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self._stack = QStackedLayout(self)
@@ -422,7 +427,7 @@ class ImagePreview(QWidget):
         elif watched is not self._label:
             return super().eventFilter(watched, event)
         if event.type() == QEvent.Wheel:
-            if event.modifiers() & Qt.ControlModifier:
+            if event.modifiers() & (Qt.ControlModifier | Qt.AltModifier):
                 step = 1.12 if event.angleDelta().y() > 0 else 1 / 1.12
                 self._zoom_at(self._scale * step, self._viewport_position(watched, event))
             else:
@@ -434,11 +439,9 @@ class ImagePreview(QWidget):
                 return super().eventFilter(watched, event)
             self.set_zoom(None if self._zoom is not None or self._fit_width else 1.0)
             return True
-        if event.type() == QEvent.MouseButtonPress and event.button() in (Qt.MiddleButton, Qt.LeftButton):
-            if watched is self._label and event.button() == Qt.LeftButton:
-                # Region handles and the selected mask keep their own drag behaviour.
-                if self._label.region_creation or self._label._region_hit(event.position()) is not None:
-                    return super().eventFilter(watched, event)
+        if event.type() == QEvent.MouseButtonPress and (
+                event.button() == Qt.MiddleButton
+                or (event.button() == Qt.LeftButton and self._space_pan)):
             self._pan = (QPointF(event.position()),
                          self._scroll.horizontalScrollBar().value(),
                          self._scroll.verticalScrollBar().value())
@@ -453,7 +456,9 @@ class ImagePreview(QWidget):
             return True
         if event.type() == QEvent.MouseButtonRelease and self._pan is not None:
             self._pan = None
-            viewport.unsetCursor()
+            viewport.setCursor(Qt.OpenHandCursor if self._space_pan else Qt.ArrowCursor)
+            if not self._space_pan:
+                viewport.unsetCursor()
             return True
         return super().eventFilter(watched, event)
 
@@ -527,6 +532,19 @@ class ImagePreview(QWidget):
         self._fit_width = False
         self._update_scaled()
         self.zoom_changed.emit(None if self._zoom is None else self._scale)
+
+    def set_space_pan(self, active):
+        """Temporary Hand tool, the way Photoshop binds the Space bar."""
+        self._space_pan = bool(active)
+        self._label.space_pan = self._space_pan
+        if self._pan is not None:
+            return
+        if self._space_pan:
+            self._scroll.viewport().setCursor(Qt.OpenHandCursor)
+            self._label.setCursor(Qt.OpenHandCursor)
+        else:
+            self._scroll.viewport().unsetCursor()
+            self._label.unsetCursor()
 
     def set_fit_width(self):
         self.cancel_region_drag()

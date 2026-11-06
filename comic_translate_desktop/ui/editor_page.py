@@ -7,7 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 from PySide6.QtCore import Qt, QSize, QSettings, QTimer, QEvent, QPoint
 from PySide6.QtGui import QPixmap, QIcon, QImageReader, QShortcut, QKeySequence
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QGroupBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QGroupBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton)
 from ..config import load_ai_config, MAIN_DIR
 from ..font_library import available_fonts, font_description, font_display_name, font_reference, inspect_font, resolve_font_reference
 from comic_translate_core.page_compositor import compose_page, layer_bounds
@@ -236,7 +236,7 @@ class EditorPage(QWidget):
         self._zoom.lineEdit().setReadOnly(True)
         self._zoom.lineEdit().setAlignment(Qt.AlignCenter)
         self._zoom.setMinimumWidth(92)
-        self._zoom.setToolTip(tr('缩放：Ctrl+滚轮以光标为中心，Ctrl+0/1/2 适应页面/100%/适应宽度'))
+        self._zoom.setToolTip(tr('缩放：Alt+滚轮以光标为中心，空格+拖动平移；Ctrl+0/1/2 适应页面/100%/适应宽度'))
         toolbar.addWidget(self._zoom)
         self._strip_toggle = QPushButton(tr('连续长条'))
         self._strip_toggle.setCheckable(True)
@@ -540,6 +540,9 @@ class EditorPage(QWidget):
             shortcut.setContext(Qt.WidgetWithChildrenShortcut)
             shortcut.activated.connect(action)
             self._zoom_shortcuts.append(shortcut)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
         self._set_editable(False)
         settings = QSettings()
         state = settings.value('ui/editorSplitter')
@@ -785,7 +788,26 @@ class EditorPage(QWidget):
     def eventFilter(self, watched, event):
         if watched is self.page_list.viewport() and event.type() in (QEvent.Resize, QEvent.Show):
             self._thumbnail_timer.start(0)
+        elif event.type() in (QEvent.KeyPress, QEvent.KeyRelease) and event.key() == Qt.Key_Space:
+            if self._space_pans_canvas():
+                if event.isAutoRepeat():
+                    return True
+                self.preview.set_space_pan(event.type() == QEvent.KeyPress)
+                return True
+        elif event.type() == QEvent.WindowDeactivate:
+            self.preview.set_space_pan(False)
         return super().eventFilter(watched, event)
+
+    def _space_pans_canvas(self):
+        """Space is the Hand tool, but never inside a text field or on a focused button."""
+        if not self.isVisible() or self.preview._original.isNull():
+            return False
+        active = QApplication.activeWindow()
+        if active is not None and active is not self.window() and QApplication.activeModalWidget() is None:
+            return False
+        focus = QApplication.focusWidget()
+        return not isinstance(focus, (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
+                                      QComboBox, QAbstractButton))
 
     def _load_page_thumbnails(self):
         requests = []
@@ -1647,6 +1669,10 @@ class EditorPage(QWidget):
         self._store_properties()
         self._refresh_font_choices()
         QTimer.singleShot(0, self._adapt_width)
+
+    def hideEvent(self, event):
+        self.preview.set_space_pan(False)
+        super().hideEvent(event)
 
     def _adapt_width(self):
         if self.isVisible():

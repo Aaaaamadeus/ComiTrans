@@ -220,6 +220,8 @@ class StripPreview(ImagePreview):
             return super()._update_scaled()
         if not hasattr(self, '_strip_scroll'):
             return
+        if self._zoom is not None:
+            self._scale = self._zoom
         self._layout_strip()
         self._load_visible(refresh_active=True)
 
@@ -277,9 +279,26 @@ class StripPreview(ImagePreview):
             if event.type() == QEvent.Resize and self._continuous:
                 self.cancel_region_drag()
                 self._visible_timer.start(0)
-        elif self._continuous and event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+        elif self._continuous and watched in self._canvas_keys:
             key = self._canvas_keys.get(watched)
-            if key and key != self._active_path:
-                self.page_requested.emit(key)
+            if event.type() == QEvent.Wheel:
+                if event.modifiers() & (Qt.ControlModifier | Qt.AltModifier):
+                    self._zoom_strip(1.12 if event.angleDelta().y() > 0 else 1 / 1.12, key)
+                else:
+                    bar = self._strip_scroll.verticalScrollBar()
+                    bar.setValue(bar.value() - (event.angleDelta().y() // 120) * 80)
                 return True
+            if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+                if key and key != self._active_path:
+                    self.page_requested.emit(key)
+                    return True
         return super().eventFilter(watched, event)
+
+    def _zoom_strip(self, step, key):
+        """Zoom the whole strip around the page under the cursor."""
+        if key not in self._indices:
+            return
+        available = max(100, self._strip_scroll.viewport().width() - 26)
+        current = self._zoom if self._zoom is not None else available / max(1, self._pages[key][1].width())
+        self.set_zoom(current * step)
+        self.reveal_page(key)
