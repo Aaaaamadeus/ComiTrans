@@ -79,10 +79,32 @@ class PageCanvas(QLabel):
         self.region_creation = False
         self.stretch_pixmap = False
         self._region_drag = None
+        self._view_pixmap = None
+        self._view_scale = 1.0
         self.setMouseTracking(True)
         self.setAccessibleName(tr('漫画画布'))
 
+    def set_view(self, pixmap, scale, viewport):
+        """Draw the page from its source pixmap; only the exposed rect is sampled."""
+        self._view_pixmap = pixmap
+        self._view_scale = max(0.01, float(scale))
+        self.image_size = pixmap.size()
+        self.setMinimumSize(0, 0)
+        self.setFixedSize(max(viewport.width(), round(pixmap.width() * self._view_scale)),
+                          max(viewport.height(), round(pixmap.height() * self._view_scale)))
+        self.update()
+
+    def clear_view(self):
+        self._view_pixmap = None
+        self._view_scale = 1.0
+
     def page_rect(self):
+        if self._view_pixmap is not None and not self._view_pixmap.isNull():
+            bounds = self.contentsRect()
+            width = self._view_pixmap.width() * self._view_scale
+            height = self._view_pixmap.height() * self._view_scale
+            return QRectF(bounds.center().x() + .5 - width / 2,
+                          bounds.center().y() + .5 - height / 2, width, height)
         pixmap = self.pixmap()
         if pixmap is None or pixmap.isNull():
             return QRectF()
@@ -266,7 +288,19 @@ class PageCanvas(QLabel):
         super().changeEvent(event)
 
     def paintEvent(self, event):
-        if self.stretch_pixmap:
+        if self._view_pixmap is not None and not self._view_pixmap.isNull():
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.SmoothPixmapTransform)
+            page = self.page_rect()
+            clip = QRectF(event.rect()).intersected(page)
+            if not clip.isEmpty() and self._view_scale > 0:
+                source = QRectF((clip.left() - page.left()) / self._view_scale,
+                                (clip.top() - page.top()) / self._view_scale,
+                                clip.width() / self._view_scale,
+                                clip.height() / self._view_scale)
+                painter.drawPixmap(clip, self._view_pixmap, source)
+            painter.end()
+        elif self.stretch_pixmap:
             pixmap = self.pixmap()
             if pixmap is not None and not pixmap.isNull():
                 painter = QPainter(self)
@@ -276,17 +310,21 @@ class PageCanvas(QLabel):
                 painter.end()
         else:
             super().paintEvent(event)
-        pixmap = self.pixmap()
-        if pixmap is None or pixmap.isNull():
+        self._paint_canvas_overlay()
+
+    def _paint_canvas_overlay(self):
+        if self.image_size is None:
             return
         bounds = self.contentsRect()
         page = self.page_rect()
+        if page.isEmpty():
+            return
         painter = QPainter(self)
         margin = QRegion(bounds).subtracted(QRegion(page.adjusted(-12, -12, 12, 12).toAlignedRect()))
         painter.setClipRegion(margin)
         draw_corner_tones(painter, QRectF(bounds),
                           compact=self.window().width() < COMPACT_BREAKPOINT)
-        if self.region is not None and self.image_size is not None:
+        if self.region is not None:
             painter.setClipping(False)
             painter.setClipRect(page)
             rect = self.region_rect()
@@ -302,17 +340,24 @@ class PageCanvas(QLabel):
                 painter.setBrush(QColor('#FFFFFF'))
                 for handle in self._region_handles().values():
                     painter.drawRect(QRectF(handle.x() - 3.5, handle.y() - 3.5, 7, 7))
+        painter.end()
 
 
 class ImagePreview(QWidget):
     import_requested = Signal()
     region_edited = Signal(object)
     region_edit_finished = Signal()
+    zoom_changed = Signal(object)
+
+    MIN_ZOOM, MAX_ZOOM = 0.05, 8.0
 
     def __init__(self, parent=None, *, import_action=False, illustration='studio-import-v1.png'):
         super().__init__(parent)
         self._original = QPixmap()
         self._zoom = None
+        self._fit_width = False
+        self._scale = 1.0
+        self._pan = None
         self.setMinimumSize(120, 100)
         self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self._stack = QStackedLayout(self)
@@ -355,22 +400,81 @@ class ImagePreview(QWidget):
         self._label = PageCanvas()
         self._label.region_edited.connect(self.region_edited)
         self._label.region_edit_finished.connect(self.region_edit_finished)
+        self._label.installEventFilter(self)
         self._label.setObjectName('previewLabel')
         self._label.setAlignment(Qt.AlignCenter)
         self._label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self._scroll = QScrollArea()
         self._scroll.setObjectName('previewCanvas')
         self._scroll.setWidget(self._label)
-        self._scroll.setWidgetResizable(True)
+        self._scroll.setWidgetResizable(False)
         self._scroll.setAlignment(Qt.AlignCenter)
         self._scroll.viewport().installEventFilter(self)
         self._stack.addWidget(self._scroll)
 
     def eventFilter(self, watched, event):
-        if watched is self._scroll.viewport() and event.type() == QEvent.Resize:
-            self.cancel_region_drag()
-            self._update_scaled()
+        viewport = self._scroll.viewport()
+        if watched is viewport:
+            if event.type() == QEvent.Resize:
+                self.cancel_region_drag()
+                self._update_scaled()
+                return super().eventFilter(watched, event)
+        elif watched is not self._label:
+            return super().eventFilter(watched, event)
+        if event.type() == QEvent.Wheel:
+            if event.modifiers() & Qt.ControlModifier:
+                step = 1.12 if event.angleDelta().y() > 0 else 1 / 1.12
+                self._zoom_at(self._scale * step, self._viewport_position(watched, event))
+            else:
+                self._wheel_scroll(event)
+            return True
+        if event.type() == QEvent.MouseButtonDblClick and event.button() == Qt.LeftButton:
+            if watched is self._label and (self._label.region_creation
+                                           or self._label._region_hit(event.position()) is not None):
+                return super().eventFilter(watched, event)
+            self.set_zoom(None if self._zoom is not None or self._fit_width else 1.0)
+            return True
+        if event.type() == QEvent.MouseButtonPress and event.button() in (Qt.MiddleButton, Qt.LeftButton):
+            if watched is self._label and event.button() == Qt.LeftButton:
+                # Region handles and the selected mask keep their own drag behaviour.
+                if self._label.region_creation or self._label._region_hit(event.position()) is not None:
+                    return super().eventFilter(watched, event)
+            self._pan = (QPointF(event.position()),
+                         self._scroll.horizontalScrollBar().value(),
+                         self._scroll.verticalScrollBar().value())
+            viewport.setCursor(Qt.ClosedHandCursor)
+            return True
+        if event.type() == QEvent.MouseMove and self._pan is not None:
+            start, left, top = self._pan
+            self._scroll.horizontalScrollBar().setValue(
+                round(left - (event.position().x() - start.x())))
+            self._scroll.verticalScrollBar().setValue(
+                round(top - (event.position().y() - start.y())))
+            return True
+        if event.type() == QEvent.MouseButtonRelease and self._pan is not None:
+            self._pan = None
+            viewport.unsetCursor()
+            return True
         return super().eventFilter(watched, event)
+
+    def _viewport_position(self, watched, event):
+        if watched is self._label:
+            return QPointF(self._label.mapTo(self._scroll.viewport(), event.position().toPoint()))
+        return event.position()
+
+    def _wheel_scroll(self, event):
+        delta = event.pixelDelta()
+        if delta.isNull():
+            angle = event.angleDelta()
+            dx, dy = (angle.x() // 120) * 60, (angle.y() // 120) * 60
+        else:
+            dx, dy = delta.x(), delta.y()
+        if event.modifiers() & Qt.ShiftModifier and dx == 0:
+            dx, dy = dy, 0
+        horizontal = self._scroll.horizontalScrollBar()
+        vertical = self._scroll.verticalScrollBar()
+        horizontal.setValue(horizontal.value() - dx)
+        vertical.setValue(vertical.value() - dy)
 
     def set_image(self, path):
         try:
@@ -390,6 +494,7 @@ class ImagePreview(QWidget):
             self.clear(tr('无法读取图片'))
             return
         self._stack.setCurrentWidget(self._scroll)
+        self._label.clear()
         self._update_scaled()
 
     def update_regions(self, image, regions):
@@ -412,13 +517,46 @@ class ImagePreview(QWidget):
         self._original = QPixmap()
         self.set_region(None)
         self._label.clear()
+        self._label.clear_view()
         self._empty_title.setText(tr(text))
         self._stack.setCurrentWidget(self._empty)
 
     def set_zoom(self, factor=None):
         self.cancel_region_drag()
-        self._zoom = factor
+        self._zoom = None if factor is None else max(self.MIN_ZOOM, min(self.MAX_ZOOM, float(factor)))
+        self._fit_width = False
         self._update_scaled()
+        self.zoom_changed.emit(None if self._zoom is None else self._scale)
+
+    def set_fit_width(self):
+        self.cancel_region_drag()
+        self._zoom = None
+        self._fit_width = True
+        self._update_scaled()
+        self.zoom_changed.emit('width')
+
+    def zoom_by(self, factor):
+        self._zoom_at(self._scale * factor, QPointF(self._scroll.viewport().rect().center()))
+
+    def _zoom_at(self, factor, position):
+        """Zoom around a viewport point so the page pixel under it stays put."""
+        if self._original.isNull():
+            return
+        position = QPointF(position)
+        page = self._label.page_rect()
+        if page.isEmpty():
+            return
+        horizontal = self._scroll.horizontalScrollBar()
+        vertical = self._scroll.verticalScrollBar()
+        image_x = (position.x() + horizontal.value() - page.left()) / self._scale
+        image_y = (position.y() + vertical.value() - page.top()) / self._scale
+        self._zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, float(factor)))
+        self._fit_width = False
+        self._update_scaled()
+        page = self._label.page_rect()
+        horizontal.setValue(round(page.left() + image_x * self._scale - position.x()))
+        vertical.setValue(round(page.top() + image_y * self._scale - position.y()))
+        self.zoom_changed.emit(self._scale)
 
     def set_region_creation(self, enabled):
         self.cancel_region_drag()
@@ -448,14 +586,15 @@ class ImagePreview(QWidget):
     def _update_scaled(self):
         if self._original.isNull():
             return
-        if self._zoom is None:
-            size = self._scroll.viewport().size() - QSize(24, 24)
-            self._label.setMinimumSize(0, 0)
+        viewport = self._scroll.viewport().size()
+        width = max(1, self._original.width())
+        height = max(1, self._original.height())
+        if self._zoom is not None:
+            scale = max(self.MIN_ZOOM, min(self.MAX_ZOOM, float(self._zoom)))
+        elif self._fit_width:
+            scale = max(self.MIN_ZOOM, (viewport.width() - 24) / width)
         else:
-            size = self._original.size() * self._zoom
-            self._label.setMinimumSize(size)
-        if size.width() > 0 and size.height() > 0:
-            dpr = self.devicePixelRatioF()
-            pixmap = self._original.scaled(size * dpr, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            pixmap.setDevicePixelRatio(dpr)
-            self._label.setPixmap(pixmap)
+            scale = min((viewport.width() - 24) / width, (viewport.height() - 24) / height)
+            scale = max(self.MIN_ZOOM, scale)
+        self._scale = scale
+        self._label.set_view(self._original, scale, viewport)

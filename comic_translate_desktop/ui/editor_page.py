@@ -228,9 +228,15 @@ class EditorPage(QWidget):
         self._focus_btn.setToolTip(tr('收起侧栏与辅助信息，专注查看作品 · Ctrl+Shift+F'))
         toolbar.addWidget(self._focus_btn)
         self._zoom = QComboBox()
-        for name, value in [(tr('适应页面'), None), ('50%', .5), ('100%', 1.), ('150%', 1.5), ('200%', 2.)]:
+        for name, value in [(tr('适应页面'), None), ('50%', .5), ('100%', 1.), ('150%', 1.5),
+                            ('200%', 2.), (tr('适应宽度'), 'width')]:
             self._zoom.addItem(tr(name), value)
-        self._zoom.setToolTip(tr('缩放预览；放大后可使用滚动条浏览'))
+        self._zoom.setEditable(True)
+        self._zoom.setInsertPolicy(QComboBox.NoInsert)
+        self._zoom.lineEdit().setReadOnly(True)
+        self._zoom.lineEdit().setAlignment(Qt.AlignCenter)
+        self._zoom.setMinimumWidth(92)
+        self._zoom.setToolTip(tr('缩放：Ctrl+滚轮以光标为中心，Ctrl+0/1/2 适应页面/100%/适应宽度'))
         toolbar.addWidget(self._zoom)
         self._strip_toggle = QPushButton(tr('连续长条'))
         self._strip_toggle.setCheckable(True)
@@ -501,7 +507,8 @@ class EditorPage(QWidget):
         self._pages_toggle.toggled.connect(lambda checked: self._choose_panel(0, checked))
         self._properties_toggle.toggled.connect(lambda checked: self._choose_panel(1, checked))
         self._focus_btn.toggled.connect(self._toggle_canvas_focus)
-        self._zoom.currentIndexChanged.connect(lambda: self.preview.set_zoom(self._zoom.currentData()))
+        self._zoom.currentIndexChanged.connect(self._zoom_selected)
+        self.preview.zoom_changed.connect(self._sync_zoom_display)
         self._apply_btn.clicked.connect(self.apply_changes)
         self._save_btn.clicked.connect(self.request_save)
         self._text_input.textChanged.connect(self._schedule_preview)
@@ -521,6 +528,18 @@ class EditorPage(QWidget):
         self._focus_shortcut = QShortcut(QKeySequence('Ctrl+Shift+F'), self)
         self._focus_shortcut.setContext(Qt.WidgetWithChildrenShortcut)
         self._focus_shortcut.activated.connect(self._focus_btn.toggle)
+        self._zoom_shortcuts = []
+        for keys, action in (
+            ('Ctrl+0', lambda: self.preview.set_zoom(None)),
+            ('Ctrl+1', lambda: self.preview.set_zoom(1.0)),
+            ('Ctrl+2', self.preview.set_fit_width),
+            ('Ctrl+=', lambda: self.preview.zoom_by(1.25)),
+            ('Ctrl+-', lambda: self.preview.zoom_by(1 / 1.25)),
+        ):
+            shortcut = QShortcut(QKeySequence(keys), self)
+            shortcut.setContext(Qt.WidgetWithChildrenShortcut)
+            shortcut.activated.connect(action)
+            self._zoom_shortcuts.append(shortcut)
         self._set_editable(False)
         settings = QSettings()
         state = settings.value('ui/editorSplitter')
@@ -529,8 +548,27 @@ class EditorPage(QWidget):
         self._desired_panels = [settings.value('ui/editorPages', True, type=bool),
                                 settings.value('ui/editorProperties', True, type=bool)]
         self._apply_panel_layout()
-        self._zoom.setCurrentIndex(max(0, min(4, int(settings.value('ui/editorZoom', 0)))))
+        self._zoom.setCurrentIndex(max(0, min(self._zoom.count() - 1, int(settings.value('ui/editorZoom', 0)))))
         self._strip_toggle.setChecked(settings.value('ui/editorContinuous', False, type=bool))
+
+    def _zoom_selected(self):
+        value = self._zoom.currentData()
+        if value == 'width':
+            self.preview.set_fit_width()
+        else:
+            self.preview.set_zoom(value)
+
+    def _sync_zoom_display(self, value):
+        if value is None:
+            text = tr('适应页面')
+        elif value == 'width':
+            text = tr('适应宽度')
+        else:
+            text = f'{round(float(value) * 100)}%'
+        self._zoom.blockSignals(True)
+        self._zoom.setCurrentIndex(-1)
+        self._zoom.setEditText(text)
+        self._zoom.blockSignals(False)
 
     def save_ui_state(self):
         settings = QSettings()
