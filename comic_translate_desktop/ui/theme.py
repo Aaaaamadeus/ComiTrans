@@ -273,6 +273,8 @@ QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBo
 QPlainTextEdit[readOnly="true"] { border: none; background: transparent; }
 QPlainTextEdit[readOnly="true"]:focus { border: none; background: transparent; }
 QPlainTextEdit#logContent, QPlainTextEdit#logContent:focus { border: none; background: @paper; padding: 8px 10px; }
+QPlainTextEdit#prefInput { background: @workspace; border: 1px solid @rule; border-radius: 8px; padding: 6px 8px; }
+QPlainTextEdit#prefInput:focus { border-color: @ruleStrong; background: @paper; }
 QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QPlainTextEdit:disabled { background: @workspace; color: @disabled; border-color: transparent; }
 QComboBox::drop-down { width: 24px; border: none; }
 QComboBox::down-arrow { image: url("@icons/chevron-down.svg"); width: 16px; height: 16px; }

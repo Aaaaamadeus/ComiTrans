@@ -178,4 +178,4 @@ class TranslationFontPicker(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.preview.setVisible(self.width() >= 720)
+        self.preview.setVisible(self.width() >= 620)
