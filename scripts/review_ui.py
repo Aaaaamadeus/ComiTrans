@@ -33,6 +33,8 @@ from comic_translate_desktop.ui.font_library_dialog import FontLibraryDialog
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=Path('docs/ui-review'))
+    parser.add_argument('--theme', choices=('light', 'dark'), default='light',
+                        help='Capture the paper (light) or night ink (dark) palette')
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -46,7 +48,7 @@ def main():
     QSettings().clear()
     app.setStyle('Fusion')
     install_ui_font(app)
-    apply_theme(app, 'light')
+    apply_theme(app, args.theme)
     ui_font_family = resolved_ui_font_family()
     assert ui_font_family in UI_FONT_ALLOWLIST, (
         f'UI font fell back to {ui_font_family!r}; screenshots would not represent the app')
@@ -69,6 +71,7 @@ def main():
          patch.object(config, 'PROJECT_ROOT', scratch), \
          patch.object(config, 'DEFAULT_OUTPUT_DIR', scratch / 'output'), \
          patch.object(MainWindow, '_start_warmup'):
+        config.save_ai_config({'ui_theme': args.theme})
         window = MainWindow()
         screen = app.primaryScreen().availableGeometry()
         window.resize(min(1440, int(screen.width() * .94)), min(900, int(screen.height() * .94)))
@@ -116,7 +119,12 @@ def main():
                     report['illustrations'].append(dict(file=asset, width=pixmap.width(),
                                                        height=pixmap.height(), transparent=True))
                 capture('automatic', window.translate_tab,
-                        (window._add_btn, window._start_btn, window._font_picker.combo, window._font_picker.import_button, window._font_picker.library_button))
+                        (window._add_btn, window._start_btn))
+                window._pref_toggle.setChecked(True)
+                QTest.qWait(80)
+                capture('automatic-preferences', window.translate_tab,
+                        (window._font_picker.combo, window._font_picker.import_button,
+                         window._font_picker.library_button))
                 check_font_search(window._font_picker.combo)
                 library = FontLibraryDialog(window.config, window)
                 library.resize(min(820, int(screen.width() * .9)), min(660, int(screen.height() * .9)))
@@ -271,12 +279,14 @@ def main():
                 report['editor_font_switch'] = dict(manual_overrides_default=True, only_selected_block=True,
                                                     save_reload_pixels_match=True, subsequent_default_keeps_manual_font=True)
                 editor._inspector_tabs.setCurrentIndex(0)
+                window._pref_toggle.setChecked(False)
+                QTest.qWait(60)
                 window._add_paths([page])
                 capture('automatic-preview', window.translate_tab)
                 for width, height in ((1024, 720), (960, 540), (820, 480)):
                     window.resize(min(width, int(screen.width() * .94)), min(height, int(screen.height() * .94)))
                     capture(f'automatic-{width}', window.translate_tab,
-                            (window._add_btn, window._start_btn, window._font_picker.combo, window._font_picker.import_button, window._font_picker.library_button))
+                            (window._add_btn, window._start_btn))
                     capture(f'settings-{width}', settings, (settings._save_btn,))
                     capture(f'diagnosis-{width}', diagnosis, (diagnosis._send_btn,))
                     window.tabs.setCurrentWidget(editor)

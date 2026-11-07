@@ -513,7 +513,7 @@ class EditorPage(QWidget):
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 1)
         self.splitter.setStretchFactor(2, 0)
-        self.splitter.setSizes([220, 760, 380])
+        self.splitter.setSizes([220, 720, 440])
         root.addWidget(self.splitter, 1)
         root.addWidget(self._status)
         self._pages_toggle.toggled.connect(lambda checked: self._choose_panel(0, checked))
@@ -647,6 +647,8 @@ class EditorPage(QWidget):
 
     def _reveal_text_editor(self):
         if not self.isVisible() or self._loaded_row < 0 or self._inspector_tabs.currentIndex() != 0:
+            return
+        if self.height() >= 760:
             return
         panel = self._properties_scroll
         point = self._text_input.mapTo(panel.widget(), QPoint(0, 0))

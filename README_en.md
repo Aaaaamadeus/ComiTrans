@@ -42,6 +42,14 @@ A black-and-white manga workbench with open section headings, local halftones, t
 
 ![ComiTrans automatic processing](docs/ui-review/automatic-style-review.png)
 
+**Night mode (Night ink)**
+
+Settings → Runtime & output → Appearance switches between Follow system / Paper / Night ink. It applies instantly and recolors the Windows title bar too; Night ink changes the UI and the area around the canvas only, never the manga pixels or exports.
+
+| Automatic processing | Typesetting |
+| --- | --- |
+| ![Automatic processing in night ink](docs/ui-review/dark-automatic.png) | ![Typesetting in night ink](docs/ui-review/dark-editor.png) |
+
 <details>
 <summary>Processing, mask editing, and font library screenshots</summary>
 
