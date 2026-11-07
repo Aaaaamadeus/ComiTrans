@@ -275,6 +275,9 @@ QPlainTextEdit[readOnly="true"]:focus { border: none; background: transparent; }
 QPlainTextEdit#logContent, QPlainTextEdit#logContent:focus { border: none; background: @paper; padding: 8px 10px; }
 QPlainTextEdit#prefInput { background: @workspace; border: 1px solid @rule; border-radius: 8px; padding: 6px 8px; }
 QPlainTextEdit#prefInput:focus { border-color: @ruleStrong; background: @paper; }
+QPlainTextEdit#textInput { background: @workspace; border: 1px solid @rule; border-radius: 8px; padding: 8px 10px; font-size: 15px; }
+QPlainTextEdit#textInput:focus { border-color: @ruleStrong; background: @paper; }
+QPlainTextEdit#textSource { background: @workspace; border: 1px solid @rule; border-radius: 8px; padding: 8px 10px; font-size: 15px; }
 QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QPlainTextEdit:disabled { background: @workspace; color: @disabled; border-color: transparent; }
 QComboBox::drop-down { width: 24px; border: none; }
 QComboBox::down-arrow { image: url("@icons/chevron-down.svg"); width: 16px; height: 16px; }
@@ -301,6 +304,8 @@ QScrollArea#previewCanvas, QLabel#previewLabel { background: @canvas; color: @pa
 QWidget#emptyPreview { background: @paper; }
 QSplitter::handle { background: @paper; }
 QSplitter::handle:hover { background: @muted; }
+QSplitter#inspectorSplitter::handle { background: @rule; margin: 2px 0; }
+QSplitter#inspectorSplitter::handle:hover { background: @ruleStrong; }
 QScrollBar:vertical { width: 8px; background: transparent; margin: 0; }
 QScrollBar:horizontal { height: 8px; background: transparent; margin: 0; }
 QScrollBar::handle { background: @scrollHandle; border-radius: 4px; min-height: 24px; min-width: 24px; }
