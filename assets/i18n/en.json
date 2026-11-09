@@ -659,5 +659,14 @@
   "一键精修": "Retouch all",
   "把上次任务生成的全部图片或 PDF 加入嵌字精修列表": "Add every image or PDF from the last task to the typesetting list",
   "上次任务还没有可精修的结果": "No editable results from the last task yet",
-  "已把 {_0} 个结果加入精修列表。": "Added {_0} results to the retouch list."
+  "已把 {_0} 个结果加入精修列表。": "Added {_0} results to the retouch list.",
+  "填白": "Fill white",
+  "填黑": "Fill black",
+  "把框选区域整块填成白色（可撤回）。": "Fill the selected rectangle with white (undoable).",
+  "把框选区域整块填成黑色（可撤回）。": "Fill the selected rectangle with black (undoable).",
+  "选区包含已还原气泡，请先恢复该气泡的处理结果再填色。": "The selection contains a restored bubble; restore its processed result before filling.",
+  "已把选区填为白色 · 未保存，可撤回修补。": "Selection filled with white · unsaved, undo available.",
+  "已把选区填为黑色 · 未保存，可撤回修补。": "Selection filled with black · unsaved, undo available.",
+  "选区超出图片范围。": "The selection is outside the image.",
+  "在画布拖动框选背景，再点击“修补选区”或“填白 / 填黑”；译文保持独立。": "Drag a background selection on the canvas, then choose Repair, Fill white, or Fill black. Text stays independent."
 }

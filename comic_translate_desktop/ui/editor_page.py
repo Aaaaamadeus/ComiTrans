@@ -331,15 +331,24 @@ class EditorPage(QWidget):
         self._repair_mode.setCheckable(True)
         self._repair_mode.setToolTip(tr('拖动框选修补范围，拖动边角调整；Esc 取消本次拖动。'))
         self._repair_btn = QPushButton(tr('修补选区'))
+        self._fill_white_btn = QPushButton(tr('填白'))
+        self._fill_white_btn.setToolTip(tr('把框选区域整块填成白色（可撤回）。'))
+        self._fill_black_btn = QPushButton(tr('填黑'))
+        self._fill_black_btn.setToolTip(tr('把框选区域整块填成黑色（可撤回）。'))
         self._repair_undo = QPushButton(tr('撤回修补'))
         self._repair_undo.setToolTip(tr('使用处理前的图片逐步撤回；保存成功后清空缓存。'))
-        for button in (self._repair_mode, self._repair_btn, self._repair_undo):
+        for button in (self._repair_mode, self._repair_btn, self._fill_white_btn,
+                       self._fill_black_btn, self._repair_undo):
             button.setProperty('compact', True)
             button.setProperty('role', 'utility')
             repair_toolbar.addWidget(button)
         repair_toolbar.addStretch()
         self._repair_mode.toggled.connect(self._toggle_repair_mode)
         self._repair_btn.clicked.connect(self._start_background_repair)
+        self._fill_white_btn.clicked.connect(
+            lambda: self._fill_repair_region((255, 255, 255)))
+        self._fill_black_btn.clicked.connect(
+            lambda: self._fill_repair_region((0, 0, 0)))
         self._repair_undo.clicked.connect(self.undo_background_repair)
         canvas_layout.addLayout(repair_toolbar)
         canvas_layout.addWidget(self.preview, 1)
@@ -1411,6 +1420,12 @@ class EditorPage(QWidget):
                 protected = True
         self._repair_btn.setEnabled(ready and self._repair_box is not None and not protected)
         self._repair_btn.setToolTip(tr('选区包含已还原气泡，请先恢复该气泡的处理结果再修补。') if protected else '')
+        fills_enabled = ready and self._repair_box is not None and not protected
+        self._fill_white_btn.setEnabled(fills_enabled)
+        self._fill_black_btn.setEnabled(fills_enabled)
+        fill_tip = tr('选区包含已还原气泡，请先恢复该气泡的处理结果再填色。') if protected else ''
+        self._fill_white_btn.setToolTip(fill_tip or tr('把框选区域整块填成白色（可撤回）。'))
+        self._fill_black_btn.setToolTip(fill_tip or tr('把框选区域整块填成黑色（可撤回）。'))
         selected = 0 <= self._loaded_row < len(self.items)
         self._restore_bubble_btn.setEnabled(ready and selected)
         self._restore_bubble_btn.setText(tr('恢复处理结果') if selected and self.items[self._loaded_row].get('restore_original') else tr('还原此气泡'))
@@ -1426,7 +1441,7 @@ class EditorPage(QWidget):
         self._update_region_guide()
         self._update_repair_controls()
         if enabled:
-            self._status.setText(tr('在画布拖动框选背景，再点击“修补选区”；译文保持独立。'))
+            self._status.setText(tr('在画布拖动框选背景，再点击“修补选区”或“填白 / 填黑”；译文保持独立。'))
 
     def _start_background_repair(self):
         if self._requesting_page or self._indexing or self._save_jobs.busy or self._repair_worker is not None or self._cleaned_image is None or self._repair_box is None:
@@ -1451,6 +1466,43 @@ class EditorPage(QWidget):
         self._update_repair_controls()
         self._status.setText(tr('正在修补背景，请稍候再保存或切换页面。'))
         worker.start()
+
+    def _fill_repair_region(self, color) -> None:
+        """Paint the selected rectangle with a flat colour on the cleaned base."""
+        if (self._requesting_page or self._indexing or self._save_jobs.busy
+                or self._repair_worker is not None or self._cleaned_image is None
+                or self._repair_box is None or self._export_worker is not None):
+            return
+        try:
+            box = tuple(map(int, self._repair_box))
+        except (TypeError, ValueError):
+            self._status.setText(tr('选区超出图片范围。'))
+            return
+        x1, y1, x2, y2 = box
+        if not (0 <= x1 < x2 <= self._cleaned_image.width
+                and 0 <= y1 < y2 <= self._cleaned_image.height):
+            self._status.setText(tr('选区超出图片范围。'))
+            return
+        try:
+            protected = intersects_restored_region(box, self.items, self._cleaned_image.size)
+        except (ValueError, KeyError, TypeError, OSError) as exc:
+            self._status.setText(tr('还原失败：{_0}', _0=exc))
+            return
+        if protected:
+            self._status.setText(tr('选区包含已还原气泡，请先恢复该气泡的处理结果再填色。'))
+            return
+        if not self.apply_changes():
+            return
+        before = self._cleaned_image.crop(box)
+        self._cleaned_image.paste(tuple(color), box)
+        self._repair_history.append((box, before, self._dirty, self._edit_revision))
+        self._layer_cache.clear()
+        self._dirty = self._preview_dirty = True
+        self._refresh_page_dirty_label()
+        if self.apply_changes():
+            self._status.setText(
+                tr('已把选区填为白色 · 未保存，可撤回修补。') if color == (255, 255, 255)
+                else tr('已把选区填为黑色 · 未保存，可撤回修补。'))
 
     def _accept_background_repair(self, box, patch):
         before = self._cleaned_image.crop(box)
