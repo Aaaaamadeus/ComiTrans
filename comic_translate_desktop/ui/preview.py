@@ -5,11 +5,12 @@ from pathlib import Path
 from functools import lru_cache
 from PySide6.QtCore import Qt, QRectF, QPointF, QSize, Signal, QEvent
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap, QImageReader, QRegion
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QStackedLayout, QPushButton, QSizePolicy
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QStackedLayout, QPushButton, QSizePolicy, QProgressBar
 from ..pdf_utils import render_pdf_preview
 from ..config import ICON_PATH
 from .halftone import COMPACT_BREAKPOINT, draw_corner_tones, draw_tone
 from .theme import color, display_font, theme_name
+from .motion import fade_in
 
 
 @lru_cache(maxsize=4)
@@ -482,6 +483,36 @@ class ImagePreview(QWidget):
         layout.addLayout(content)
         layout.addStretch()
         self._stack.addWidget(self._empty)
+        self._state_panel = QWidget()
+        self._state_panel.setObjectName('canvasState')
+        state_layout = QVBoxLayout(self._state_panel)
+        state_layout.setContentsMargins(32, 32, 32, 32)
+        state_layout.setSpacing(10)
+        state_layout.addStretch()
+        self._state_title = QLabel()
+        self._state_title.setObjectName('canvasStateTitle')
+        self._state_title.setAlignment(Qt.AlignCenter)
+        self._state_title.setWordWrap(True)
+        state_layout.addWidget(self._state_title)
+        self._state_bar = QProgressBar()
+        self._state_bar.setRange(0, 0)
+        self._state_bar.setFixedWidth(180)
+        self._state_bar.setTextVisible(False)
+        self._state_bar.setObjectName('canvasStateBar')
+        state_layout.addWidget(self._state_bar, 0, Qt.AlignHCenter)
+        self._state_message = QLabel()
+        self._state_message.setProperty('muted', True)
+        self._state_message.setAlignment(Qt.AlignCenter)
+        self._state_message.setWordWrap(True)
+        self._state_message.setMaximumWidth(420)
+        state_layout.addWidget(self._state_message, 0, Qt.AlignHCenter)
+        self._retry_btn = QPushButton(tr('重试'))
+        self._retry_btn.setProperty('role', 'retry')
+        self._retry_btn.clicked.connect(self._retry_failed_page)
+        state_layout.addWidget(self._retry_btn, 0, Qt.AlignHCenter)
+        state_layout.addStretch()
+        self._retry_slot = None
+        self._stack.addWidget(self._state_panel)
         self._label = PageCanvas()
         self._label.region_edited.connect(self.region_edited)
         self._label.region_edit_finished.connect(self.region_edit_finished)
@@ -582,6 +613,7 @@ class ImagePreview(QWidget):
         self._stack.setCurrentWidget(self._scroll)
         self._label.clear()
         self._update_scaled()
+        fade_in(self._scroll)
 
     def update_regions(self, image, regions):
         from PIL.ImageQt import ImageQt
@@ -607,6 +639,31 @@ class ImagePreview(QWidget):
         self._label.clear_view()
         self._empty_title.setText(tr(text))
         self._stack.setCurrentWidget(self._empty)
+
+    def set_loading(self, message=''):
+        """Decoding a page: keep the previous panel out of the way."""
+        self._state_title.setText(tr('正在加载页面…'))
+        self._state_message.setText(message or tr('正在解码原图与排版数据'))
+        self._state_bar.setVisible(True)
+        self._retry_btn.setVisible(False)
+        self._retry_slot = None
+        if self._stack.currentWidget() is not self._state_panel:
+            self._stack.setCurrentWidget(self._state_panel)
+            fade_in(self._state_panel)
+
+    def set_error(self, message, retry=None):
+        self._state_title.setText(tr('这一页没有打开'))
+        self._state_message.setText(str(message))
+        self._state_bar.setVisible(False)
+        self._retry_slot = retry
+        self._retry_btn.setVisible(retry is not None)
+        self._stack.setCurrentWidget(self._state_panel)
+        fade_in(self._state_panel)
+
+    def _retry_failed_page(self):
+        slot, self._retry_slot = self._retry_slot, None
+        if slot is not None:
+            slot()
 
     def set_zoom(self, factor=None):
         self.cancel_region_drag()

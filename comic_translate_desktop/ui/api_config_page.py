@@ -26,6 +26,7 @@ from ..config import mask_api_key
 from ..i18n import UI_LANGUAGES
 from comic_translate_core.languages import SOURCE_LANGUAGES
 from .manga_components import PanelHeading
+from .motion import set_reduced_motion
 from .theme import apply_theme
 
 
@@ -154,6 +155,10 @@ class ApiConfigPage(QWidget):
         self._theme.currentIndexChanged.connect(
             lambda: apply_theme(QApplication.instance(), self._theme.currentData()))
         appearance_form.addRow(tr('主题'), self._theme)
+        self._reduced_motion = QCheckBox(tr('减少动效（关闭淡入与呼吸动画）'))
+        self._reduced_motion.setToolTip(tr('开启后不再播放页面淡入与运行中呼吸动画。'))
+        self._reduced_motion.toggled.connect(set_reduced_motion)
+        appearance_form.addRow(tr('动效'), self._reduced_motion)
         appearance_note = QLabel(tr('跟随系统会随 Windows 深浅色自动切换。'))
         appearance_note.setWordWrap(True)
         appearance_note.setProperty('muted', True)
@@ -374,6 +379,9 @@ class ApiConfigPage(QWidget):
         self._theme.blockSignals(True)
         self._theme.setCurrentIndex(max(0, self._theme.findData(config.get("ui_theme", "auto"))))
         self._theme.blockSignals(False)
+        self._reduced_motion.blockSignals(True)
+        self._reduced_motion.setChecked(bool(config.get("ui_reduced_motion", False)))
+        self._reduced_motion.blockSignals(False)
         self._model_info.setText(
             tr('CharSpot Small: {_4}\n检测: {_0}\nBaberu OCR: {_1}\nmanga-ocr: {_2}\n修复: {_3}', _4=config.get('charspot_ocr_model', ''), _0=config.get('detector_model', ''), _1=config.get('baberu_ocr_model', ''), _2=config.get('ocr_model', ''), _3=config.get('lama_model', ''))
         )
@@ -405,6 +413,7 @@ class ApiConfigPage(QWidget):
             "page_output_dir": self._output_input.text().strip(),
             "issue_url": self._issue_input.text().strip(),
             "ui_theme": self._theme.currentData(),
+            "ui_reduced_motion": self._reduced_motion.isChecked(),
         }
         key = self._key_input.text().strip()
         if key:

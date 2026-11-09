@@ -911,7 +911,9 @@ class EditorPage(QWidget):
         revision, previous = self._edit_revision, self.output_path
         settings = deepcopy(self.config)
         self._requesting_page = True
+        self._loading_page = Path(path)
         self._status.setText(tr('正在后台加载页面：{_0}', _0=Path(path).name))
+        self.preview.set_loading(tr('正在加载 {_0}', _0=Path(path).name))
         def accept(data):
             self._requesting_page = False
             if self.output_path != previous or self._edit_revision != revision:
@@ -926,6 +928,10 @@ class EditorPage(QWidget):
         self._requesting_page = False
         self._restore_page_selection()
         self._status.setText(tr('页面加载失败：{_0}', _0=error))
+        retry = None
+        if getattr(self, '_loading_page', None) is not None:
+            retry = lambda: self.request_page(self._loading_page)
+        self.preview.set_error(tr('页面加载失败：{_0}', _0=error), retry=retry)
         self._update_repair_controls()
 
     def confirm_discard(self):

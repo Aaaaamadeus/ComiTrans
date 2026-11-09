@@ -130,6 +130,7 @@ def load_ai_config() -> dict[str, Any]:
         "ui_language": normalize_ui_language(raw.get("ui_language")),
         "ui_language_selected": bool(raw.get("ui_language_selected", False)),
         "ui_theme": ui_theme,
+        "ui_reduced_motion": bool(raw.get("ui_reduced_motion", False)),
         "api_key": _clean_text(raw.get("api_key")),
         "api_base_url": _clean_text(raw.get("api_base_url")),
         "translation_model": _clean_text(raw.get("translation_model")) or "gemini-2.5-flash",

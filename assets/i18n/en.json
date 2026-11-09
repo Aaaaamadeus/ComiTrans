@@ -618,5 +618,13 @@
   "添加文件": "Add files",
   "导入译图 / PDF": "Import images / PDF",
   "导入字体": "Import font",
-  "就绪": "Ready"
+  "就绪": "Ready",
+  "正在加载页面…": "Loading page…",
+  "正在解码原图与排版数据": "Decoding the image and layout data",
+  "这一页没有打开": "This page did not open",
+  "重试": "Retry",
+  "正在加载 {_0}": "Loading {_0}",
+  "动效": "Motion",
+  "减少动效（关闭淡入与呼吸动画）": "Reduce motion (disable fades and pulsing)",
+  "开启后不再播放页面淡入与运行中呼吸动画。": "Stops page fades and the running-state pulse."
 }

@@ -64,6 +64,7 @@ from .editor_page import EditorPage
 from .error_log_page import ErrorLogPage
 from .step_panel import StepPanel
 from .theme import apply_theme, brand_font, refresh_style, set_themed_icon
+from .motion import fade_in, set_pulse, set_reduced_motion
 from .window_chrome import apply_window_chrome, watch_window_chrome
 from .preview import ImagePreview
 from .log_panel import LogPanel
@@ -97,6 +98,7 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
 
         self.config = app_config.load_ai_config()
+        set_reduced_motion(self.config.get('ui_reduced_motion', False))
         self.pipeline = None
         self.pipeline_fingerprint = None
         self.worker = None
@@ -791,6 +793,7 @@ class MainWindow(QMainWindow):
         self._status_dot.setProperty("state", state)
         refresh_style(self.status_label)
         refresh_style(self._status_dot)
+        set_pulse(self._status_dot, state in ('running', 'warming'))
         self.status_label.setAccessibleName(tr(text))
         self.status_pill.setToolTip(tr(text))
         if state not in ('running', 'stopping'):
@@ -1145,6 +1148,7 @@ class MainWindow(QMainWindow):
         self._pref_toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow)
         self._pref_container.setVisible(checked)
         if checked:
+            fade_in(self._pref_container, 160)
             QTimer.singleShot(0, lambda: self._pref_container.verticalScrollBar().setValue(self._pref_scroll_value))
         self._ui_settings.setValue('ui/preferencesVisible', checked)
         self._apply_compact_layout()
@@ -1305,6 +1309,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr('设置未保存'), tr('无法保存设置：{error}', error=str(exc)))
             return
         self.api_config_page.load_config(self.config)
+        set_reduced_motion(self.config.get('ui_reduced_motion', False))
         apply_theme(QApplication.instance(), self.config.get('ui_theme', 'auto'))
         self._font_picker.load_config(self.config)
         self._translation_color.set_color(self.config.get('text_color'))

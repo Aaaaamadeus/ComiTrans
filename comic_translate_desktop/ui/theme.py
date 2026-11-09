@@ -280,6 +280,8 @@ QPushButton[role="utility"] { border: 1px solid transparent; background: transpa
 QPushButton[role="utility"]:checked { background: @muted; color: @ink; border-color: transparent; }
 QPushButton[role="utility"]:hover:!checked { background: @muted; }
 QPushButton[role="utility"]:focus { border: 1px solid @ruleStrong; }
+QPushButton[role="retry"] { border: 1px solid @ruleStrong; border-radius: 10px; padding: 6px 16px; background: @paper; }
+QPushButton[role="retry"]:hover { background: @muted; }
 QPushButton[role="quiet"]:hover, QToolButton[role="quiet"]:hover { background: @muted; }
 QPushButton[role="quiet"]:focus, QToolButton[role="quiet"]:focus { border-color: @ruleStrong; }
 QPushButton[role="nav"]:focus { border-bottom-color: @ink; }
@@ -342,6 +344,10 @@ QLabel#dropTitle { font-weight: 600; }
 QScrollArea { border: none; }
 QScrollArea#previewCanvas, QLabel#previewLabel { background: @canvas; color: @paper; }
 QWidget#emptyPreview { background: @paper; }
+QWidget#canvasState { background: @paper; }
+QLabel#canvasStateTitle { font-size: 20px; font-weight: 700; color: @ink; }
+QProgressBar#canvasStateBar { background: @muted; border: none; border-radius: 2px; min-height: 4px; max-height: 4px; }
+QProgressBar#canvasStateBar::chunk { background: @ink; border-radius: 2px; }
 QSplitter::handle { background: @paper; }
 QSplitter::handle:hover { background: @muted; }
 QSplitter#inspectorSplitter::handle { background: @rule; margin: 2px 0; }
