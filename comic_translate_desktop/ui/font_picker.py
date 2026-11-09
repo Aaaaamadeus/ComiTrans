@@ -15,6 +15,7 @@ from .. import config
 from comic_translate_core.chinese import convert_chinese
 from ..font_library import available_fonts, font_description, font_display_name, font_reference, import_font, inspect_font, resolve_font_reference
 from .searchable_combo import SearchableFontCombo
+from .theme import set_themed_icon
 
 
 class TranslationFontPicker(QWidget):
@@ -40,7 +41,8 @@ class TranslationFontPicker(QWidget):
         self.combo.setToolTip(tr('指定字体用于全部译文；自动匹配保留漫画风格。缺字自动回退到内置中文字体。'))
         self.combo.setAccessibleName(tr('翻译默认字体'))
         row.addWidget(self.combo, 1)
-        self.import_button = QPushButton(tr('＋ 导入字体'))
+        self.import_button = QPushButton(tr('导入字体'))
+        set_themed_icon(self.import_button, 'plus')
         self.import_button.setProperty('role', 'quiet')
         self.import_button.setProperty('compact', True)
         self.import_button.setToolTip(tr('导入 TTF、OTF、TTC 或 OTC；字体集合使用第一个款式'))

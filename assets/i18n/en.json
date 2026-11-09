@@ -614,5 +614,8 @@
   "全屏编辑": "Full-screen editor",
   "在独立窗口中编辑当前气泡的译文 · F2": "Edit this bubble's translation in its own window · F2",
   "全屏编辑 · 第 {_0} 块": "Full-screen editor · Block {_0}",
-  "修改会实时同步到右侧面板；Ctrl+S 保存图片。": "Edits sync to the inspector live; Ctrl+S saves the image."
+  "修改会实时同步到右侧面板；Ctrl+S 保存图片。": "Edits sync to the inspector live; Ctrl+S saves the image.",
+  "添加文件": "Add files",
+  "导入译图 / PDF": "Import images / PDF",
+  "导入字体": "Import font"
 }

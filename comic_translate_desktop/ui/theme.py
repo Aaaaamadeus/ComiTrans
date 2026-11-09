@@ -1,8 +1,9 @@
 """Shared monochrome tokens; UI fonts never enter the typesetter config."""
 from __future__ import annotations
 from functools import lru_cache
-from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QFontInfo, QPalette
+from weakref import ref as weakref
+from PySide6.QtCore import QObject, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QFontInfo, QIcon, QPalette
 from ..config import AI_ROOT, ICON_PATH
 from ..i18n import ui_language
 
@@ -208,6 +209,38 @@ def refresh_style(widget):
     widget.style().unpolish(widget)
     widget.style().polish(widget)
     widget.update()
+
+
+_icon_buttons = []
+
+
+@lru_cache(maxsize=64)
+def themed_icon(name, theme_key):
+    path = ICON_PATH.parent / 'ui' / PALETTES[theme_key]['iconDir'] / f'{name}.svg'
+    return QIcon(str(path))
+
+
+def set_themed_icon(button, name, size=14):
+    button.setProperty('themedIcon', name)
+    button.setIconSize(QSize(size, size))
+    button.setIcon(themed_icon(name, theme_name()))
+    _icon_buttons.append(weakref(button))
+
+
+def refresh_themed_icons():
+    alive = []
+    for reference in _icon_buttons:
+        widget = reference()
+        if widget is None:
+            continue
+        name = widget.property('themedIcon')
+        if name:
+            widget.setIcon(themed_icon(name, theme_name()))
+        alive.append(reference)
+    _icon_buttons[:] = alive
+
+
+theme_changed.changed.connect(lambda *_: refresh_themed_icons())
 
 
 APP_STYLESHEET_TEMPLATE = '''

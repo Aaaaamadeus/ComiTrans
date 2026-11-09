@@ -22,7 +22,7 @@ from ..editor_jobs import LatestJobQueue, read_page, read_project_pages, SaveReq
 from .color_picker import TextColorPicker
 from .strip_preview import StripPreview
 from .thumbnail_loader import ThumbnailLoader
-from .theme import ui_font
+from .theme import set_themed_icon, ui_font
 from .manga_components import PanelHeading
 from .searchable_combo import SearchableFontCombo
 
@@ -268,7 +268,8 @@ class EditorPage(QWidget):
         left.setSpacing(12)
         heading = PanelHeading('01', tr('页面'), sidebar=True)
         left.addWidget(heading)
-        add = QPushButton(tr('＋ 导入译图 / PDF'))
+        add = QPushButton(tr('导入译图 / PDF'))
+        set_themed_icon(add, 'plus')
         add.clicked.connect(self._import_pages)
         left.addWidget(add)
         self.page_list = QListWidget()

@@ -63,7 +63,7 @@ from .api_config_page import ApiConfigPage
 from .editor_page import EditorPage
 from .error_log_page import ErrorLogPage
 from .step_panel import StepPanel
-from .theme import apply_theme, brand_font, refresh_style
+from .theme import apply_theme, brand_font, refresh_style, set_themed_icon
 from .window_chrome import apply_window_chrome, watch_window_chrome
 from .preview import ImagePreview
 from .log_panel import LogPanel
@@ -251,9 +251,11 @@ class MainWindow(QMainWindow):
         label.setObjectName("dropTitle")
         label.setAlignment(Qt.AlignCenter)
         drop.addWidget(label)
-        self._add_btn = QPushButton(tr('＋ 添加文件'))
+        self._add_btn = QPushButton(tr('添加文件'))
+        set_themed_icon(self._add_btn, 'plus')
         self._add_btn.setProperty('role', 'quiet')
         self._folder_btn = QPushButton(tr('添加文件夹'))
+        set_themed_icon(self._folder_btn, 'folder')
         self._folder_btn.setProperty("role", "quiet")
         drop.addWidget(self._add_btn)
         drop.addWidget(self._folder_btn)
