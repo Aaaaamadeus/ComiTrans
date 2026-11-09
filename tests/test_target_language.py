@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'comic-translate-ai' / 'main'))
 
 from PySide6.QtCore import QSettings, QCoreApplication, QEvent
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 from comic_translate_core.chinese import ChineseConversionError, convert_chinese, normalize_target_language
 from comic_translate_desktop import config
@@ -147,10 +148,11 @@ class TargetLanguageUiTests(unittest.TestCase):
         self.assertFalse(window._font_picker.isVisible())
         self.assertFalse(window._translation_alignment.isVisible())
         window._pref_toggle.click()
-        self.app.processEvents()
+        QTest.qWait(280)
         self.assertTrue(window._font_picker.isVisible())
         self.assertTrue(window._translation_alignment.isVisible())
         window._pref_toggle.click()
+        QTest.qWait(240)
         self.assertFalse(window._font_picker.isVisible())
         self.assertFalse(window._translation_alignment.isVisible())
 

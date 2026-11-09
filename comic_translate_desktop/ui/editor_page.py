@@ -97,6 +97,14 @@ class EditorPage(QWidget):
         self._preview_timer.setSingleShot(True)
         self._preview_timer.setInterval(40)
         self._preview_timer.timeout.connect(self.apply_changes)
+        # Owned timers instead of QTimer.singleShot(bound method): a queued
+        # callback must not outlive the widget while another window pumps events.
+        self._reveal_timer = QTimer(self)
+        self._reveal_timer.setSingleShot(True)
+        self._reveal_timer.timeout.connect(self._reveal_text_editor)
+        self._adapt_timer = QTimer(self)
+        self._adapt_timer.setSingleShot(True)
+        self._adapt_timer.timeout.connect(self._adapt_width)
         self._init_typesetter()
         self._build_ui()
 
@@ -1341,7 +1349,7 @@ class EditorPage(QWidget):
         self._row_dirty = False
         if self.height() >= 700:
             self._properties_scroll.verticalScrollBar().setValue(0)
-        QTimer.singleShot(0, self._reveal_text_editor)
+        self._reveal_timer.start(0)
 
     def apply_changes(self):
         if self._cleaned_image is None:
@@ -1756,11 +1764,21 @@ class EditorPage(QWidget):
 
     def shutdown_jobs(self):
         self._indexing = False
+        for timer in (self._reveal_timer, self._adapt_timer,
+                      self._preview_timer, self._thumbnail_timer):
+            timer.stop()
         self._page_jobs.close()
         self._import_jobs.close()
         self._save_jobs.close()
         self._thumbnail_loader.request([])
         self.preview._thumbnail_loader.request([])
+        # Detach event filters before the window goes away; otherwise a deleted
+        # EditorPage can still be called for application-wide events.
+        app = QApplication.instance()
+        if app is not None:
+            app.removeEventFilter(self)
+        for watched in (self.page_list.viewport(), self.preview):
+            watched.removeEventFilter(self)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1781,7 +1799,7 @@ class EditorPage(QWidget):
         super().showEvent(event)
         self._store_properties()
         self._refresh_font_choices()
-        QTimer.singleShot(0, self._adapt_width)
+        self._adapt_timer.start(0)
 
     def hideEvent(self, event):
         self.preview.set_space_pan(False)
@@ -1792,4 +1810,4 @@ class EditorPage(QWidget):
             self._source_text.setFixedHeight(64 if self.height() < 700 else 110)
             self._apply_source_layout()
             self._apply_panel_layout()
-            QTimer.singleShot(0, self._reveal_text_editor)
+            self._reveal_timer.start(0)

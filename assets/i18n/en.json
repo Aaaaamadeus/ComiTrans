@@ -655,5 +655,9 @@
   "微调运行与模型细节": "Tune runtime and model details",
   "原先需要手动编辑 config.yaml 的选项集中在这里，保存后下一次任务生效。": "Options that previously required editing config.yaml are gathered here. Changes apply to the next task.",
   "全部 {_0} 个路径存在": "All {_0} paths found",
-  "{_0}/{_1} 个路径存在，缺失项会在开始翻译前提示": "{_0}/{_1} paths found; missing ones are reported before translating"
+  "{_0}/{_1} 个路径存在，缺失项会在开始翻译前提示": "{_0}/{_1} paths found; missing ones are reported before translating",
+  "一键精修": "Retouch all",
+  "把上次任务生成的全部图片或 PDF 加入嵌字精修列表": "Add every image or PDF from the last task to the typesetting list",
+  "上次任务还没有可精修的结果": "No editable results from the last task yet",
+  "已把 {_0} 个结果加入精修列表。": "Added {_0} results to the retouch list."
 }
