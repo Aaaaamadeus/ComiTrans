@@ -125,7 +125,7 @@ def main():
                 capture('automatic', window.translate_tab,
                         (window._add_btn, window._start_btn))
                 window._pref_toggle.setChecked(True)
-                QTest.qWait(80)
+                QTest.qWait(320)
                 capture('automatic-preferences', window.translate_tab,
                         (window._font_picker.combo, window._font_picker.import_button,
                          window._font_picker.library_button))
@@ -289,6 +289,8 @@ def main():
                 QTest.qWait(60)
                 window._add_paths([page])
                 capture('automatic-preview', window.translate_tab)
+                window._on_image_done(str(page), str(page))
+                capture('automatic-complete', window.translate_tab)
                 for width, height in ((1024, 720), (960, 540), (820, 480)):
                     window.resize(min(width, int(screen.width() * .94)), min(height, int(screen.height() * .94)))
                     capture(f'automatic-{width}', window.translate_tab,
