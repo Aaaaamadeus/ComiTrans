@@ -40,6 +40,14 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ![ComiTrans 自动处理界面](docs/ui-review/automatic-style-review.png)
 
+**夜间模式（夜墨）**
+
+设置 → 运行与输出 → 外观 可切换「跟随系统 / 纸白 / 夜墨」，切换即时生效，Windows 标题栏同步换色；夜墨只改变界面与画布周围，漫画像素与导出结果保持不变。
+
+| 自动处理 | 嵌字精修 |
+| --- | --- |
+| ![夜墨下的自动处理](docs/ui-review/dark-automatic.png) | ![夜墨下的嵌字精修](docs/ui-review/dark-editor.png) |
+
 **快速逐字日志（实际 Qt 录屏，界面测试文本）**
 
 日志正文使用 Aa今日花晴 春懒猫困，以约每秒 250 字快速展开，积压时自动加速；复制、导出与任务结束时补齐全文。支持级别筛选、搜索、字号调整、暂停跟随和选区保留，显示最近 5,000 条记录，完整日志保存在磁盘。
@@ -76,7 +84,7 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 - **多语言源文与自定义 OCR**：选择日语、韩语、英语或“自定义 OCR”，可翻译成简体或繁体中文；支持独立 HTTP OCR 与兼容视觉模型接口。[接入说明与混合语言策略](docs/MULTILINGUAL_OCR.md)。
 - **纯本地桌面客户端**：PySide6 桌面应用，抛弃 Web 页面，启动后即可使用。
-- **全 ONNX 推理**：漫画文本检测、Baberu/manga-ocr、LaMa 修复全部为 ONNX 模型，不再依赖 PyTorch。
+- **全 ONNX 推理**：漫画文本检测、日/韩/英本地 OCR、LaMa 修复全部为 ONNX 模型，不再依赖 PyTorch。
 - **模型拆包发布**：模型单独一个下载包，更新程序无需重新下载模型。
 - **启动即预热**：打开客户端自动加载 AI 管线，不等点击翻译才加载模型。
 - **GPU 推理**：新安装默认优先 NVIDIA CUDA；软件内提供 CUDA/cuDNN 官方安装链接，需兼容的 NVIDIA 驱动，日志明确实际设备。保留旧配置中的 CPU 选择。
@@ -137,7 +145,7 @@ Copy-Item comic-translate-ai/main/config.example.yaml comic-translate-ai/main/co
 ## 使用说明
 
 1. 点击“添加文件”或“添加文件夹”，也可以直接拖拽图片、PDF 或文件夹到窗口。
-2. 在“设置”页填写翻译 API，并在工作台选择“原文语言”。日语自动选择 Baberu / manga-ocr，韩语、英语使用 PP-OCRv5；其它语言配置“自定义 OCR”。缺少韩英模型时运行 `.\.venv\Scripts\python scripts/download_ocr_models.py`，详见[接入文档](docs/MULTILINGUAL_OCR.md)。
+2. 在“设置”页填写翻译 API，并在工作台选择“原文语言”。日语自动使用 v2.5.1 包中的 CharSpot Small，旧包可沿用 Baberu / manga-ocr，韩语、英语使用 PP-OCRv5；其它语言配置“自定义 OCR”。缺少韩英模型时运行 `.\.venv\Scripts\python scripts/download_ocr_models.py`，详见[接入文档](docs/MULTILINGUAL_OCR.md)。
 3. 勾选“多模态翻译”后，翻译会发送整页图片给 AI；不勾选则使用纯文本翻译。两种模式默认都由本地算法选择字体和排版。
 4. 在翻译页顶部展开“翻译偏好”，填写背景提示词和中文人名（每行一个，AI 自动对照）。
 5. 点击“开始翻译”，实时查看执行步骤、进度和日志。
@@ -176,7 +184,7 @@ PDF 会以一个文件任务显示，内部按在途页数上限连续处理，�
 
 | 引擎 | 使用方式 |
 | --- | --- |
-| 日语本地 OCR | 自动模式优先 Baberu，无法加载时回退 manga-ocr；可明确指定引擎 |
+| 日语本地 OCR | 自动模式优先 CharSpot Small；使用旧模型包时兼容 Baberu 和 manga-ocr |
 | 韩语 / 英语本地 OCR | PP-OCRv5 ONNX，模型随 v2.3.0 模型包提供 |
 | 标准 HTTP OCR | 对完整 POST 地址发送文本区域 PNG 的 Base64，返回原文字符串 |
 | 兼容视觉模型接口 | 填写兼容 OpenAI 的 Base URL、独立 Key 和支持图片输入的模型，调用 `chat.completions` 识别原文 |
@@ -232,7 +240,7 @@ Python 扩展通过 `OcrEngine.recognize(image, language) -> OcrResult` 接入�
 每张图片或 PDF 页面按以下流程处理。不同页面的准备、API 等待与修补可重叠，按并发设置限制在途页数，结果按输入顺序保存：
 
 1. **气泡与文本检测**：ONNX 文本检测器输出气泡、文字掩膜和文本行。
-2. **源语言 OCR**：日语使用 Baberu / manga-ocr，韩语和英语按文本行使用 PP-OCRv5，也可使用自定义 OCR。仅日语本地模式保留原有英文跳过规则；其它模式可正常识别、翻译英文。无原文或无译文的区域保留原图。
+2. **源语言 OCR**：日语使用 v2.5.1 包中的 CharSpot Small，韩语和英语按文本行使用 PP-OCRv5，也可使用自定义 OCR。仅日语本地模式保留原有英文跳过规则；其它模式可正常识别、翻译英文。无原文或无译文的区域保留原图。
 3. **大模型翻译**：纯文本模式发送 OCR 结果；多模态模式发送整页图片。字体默认由本地按角色、字形和文本框选择；单独启用实验性字体比对时，AI 才参与三候选字体族判断，结果通过本地门控后生效。字号与排版方向始终由本地决定。
 4. **背景修复**：按检测文字掩膜擦除，纯色使用实际底色，验证通过的规则网点与渐变局部重建，复杂背景调用原尺寸分块 LaMa 修复。
 5. **中文排版**：按掩膜有效面积估算字号、按掩膜质心定位，横竖方向自适应，长文本自动收紧字号。
@@ -245,11 +253,12 @@ Python 扩展通过 `OcrEngine.recognize(image, language) -> OcrResult` 接入�
 
 | 用途 | 模型 | 来源 |
 | --- | --- | --- |
-| 漫画气泡与文本检测 | `comic-text-detector.onnx` | [mayocream/comic-text-detector-onnx](https://huggingface.co/mayocream/comic-text-detector-onnx)，由 [dmMaze/comic-text-detector](https://github.com/dmMaze/comic-text-detector) 导出 |
-| 日文 OCR（默认） | `baberu-ocr/` | [genshiai-daichi/baberu-ocr](https://huggingface.co/genshiai-daichi/baberu-ocr)，Apache-2.0，121 MB 量化 ONNX 组合 |
-| 日文 OCR（回退） | `manga-ocr-onnx/` | [l0wgear/manga-ocr-2025-onnx](https://huggingface.co/l0wgear/manga-ocr-2025-onnx)，基于 [kha-white/manga-ocr](https://github.com/kha-white/manga-ocr) |
+| 漫画文字块与文字行 | ogkalu Small INT8 ＋ PP-OCRv6 manga | [固定来源、许可证与 SHA256](docs/models/split-detector.json) |
+| 日文 OCR | CharSpot Small | [模型卡、词表及许可证](docs/models/charspot-small.json) |
 | 韩语 / 英语 OCR | `korean_PP-OCRv5_rec_mobile.onnx` / `en_PP-OCRv5_rec_mobile.onnx` | [固定模型来源与校验值](docs/MULTILINGUAL_OCR.md#韩语和英语模型) |
-| LaMa 背景修复 | `lama-manga-dynamic.onnx` | manga-lama |
+| LaMa 背景修复 | `lama-manga-dynamic.onnx` | [固定来源与许可证核验](docs/MODEL_UPGRADE-v2.5.1.md) |
+
+v2.5.1 本地预览只随包提供 CharSpot Small 日语 OCR，默认使用 Small＋文字行半幅修框，全套模型 284.712 MB（v2.5.0 的 48.71%）。旧日语模型包仍可使用。3 页漫画的 22 框测试中，字符错误从 12 减至 5。[评测](docs/MODEL_UPGRADE-v2.5.1.md) · [安装与回退](docs/RELEASE-v2.5.1.md)
 
 模型来源、可替换的其它 ONNX 版本以及效果更好的漫画文本检测模型候选见 [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md)。
 
@@ -273,20 +282,20 @@ Python 扩展通过 `OcrEngine.recognize(image, language) -> OcrResult` 接入�
 ### 生成发布包
 
 ```powershell
-python package_release.py --output release/v2.5.0
+python package_release.py --output release/v2.5.1
 ```
 
-本版 Release 提供完整程序包与模型包：
+本地构建生成两个 v2.5.1 压缩包。
 
-- `ComiTrans-v2.5.0-app.zip`：主程序，不含模型
-- [ComiTrans-v2.5.0-models.zip](https://github.com/Aaaaamadeus/ComiTrans/releases/download/v2.5.0/ComiTrans-v2.5.0-models.zip)：含日语、韩语、英语 OCR 的 ONNX 模型包；已有模型可复用
+- `ComiTrans-v2.5.1-app.zip`：主程序，不含模型
+- `ComiTrans-v2.5.1-models.zip`：含日语、韩语、英语 OCR 的 ONNX 模型包；已有模型可复用
 
-不发布 CUDA/cuDNN 运行库包；GPU 用户通过软件内的官方链接安装。发布页同时提供 `SHA256SUMS.txt` 和 `baseline.json`。
+不发布 CUDA/cuDNN 运行库包；v2.5.0 修补版与 v2.5.1 用户可在设置中点击「下载安装便携 GPU 运行库」，重启后从程序目录加载。发布页同时提供 `SHA256SUMS.txt` 和 `baseline.json`。
 
 版本元数据保存在源码仓库，随发布提交：
 
-- [docs/releases/v2.5.0/baseline.json](docs/releases/v2.5.0/baseline.json)：2.5.0 目标构建基线
-- [docs/releases/v2.5.0/SHA256SUMS.txt](docs/releases/v2.5.0/SHA256SUMS.txt)：2.5.0 程序包、模型包及目标基线的 SHA256
+- [docs/releases/v2.5.1/baseline.json](docs/releases/v2.5.1/baseline.json)：2.5.1 目标构建基线
+- [docs/releases/v2.5.1/SHA256SUMS.txt](docs/releases/v2.5.1/SHA256SUMS.txt)：2.5.1 程序包、模型包及目标基线的 SHA256
 
 - [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json)：程序文件 SHA256 清单与构建指纹，供后续生成补丁
 - [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt)：程序包、模型包和基线清单的 SHA256
@@ -303,7 +312,7 @@ ComiTrans
 │   │   ├── comic_translator_pipeline.py
 │   │   ├── onnx_text_detector.py  # ONNX 文本检测
 │   │   ├── onnx_manga_ocr.py      # ONNX 日文 OCR
-│   │   ├── onnx_baberu_ocr.py     # Baberu ONNX OCR（默认）
+│   │   ├── onnx_baberu_ocr.py     # Baberu ONNX OCR（旧模型包）
 │   │   ├── manga_lama.py          # ONNX 背景修复
 │   │   └── vertical_typesetter.py # 中文排版
 │   ├── models/                    # 模型权重（Release 中位于 exe 旁）
@@ -448,4 +457,4 @@ v2.2.1 已全面 ONNX 化并移除 PyTorch。检测、OCR、修复均使用 ONNX
 - 项目代码遵循相应开源协议发布（详见仓库 LICENSE 文件）。
 - 字体：得意黑 Smiley Sans、霞鹜文楷 LXGW WenKai、霞鹜漫黑 LXGW Marker Gothic（SIL OFL 1.1）、Klee One、思源黑体/宋体、setofont（濑户字体）、851手写杂书体 均为可免费商用的开源/免费字体，各自的授权见字体项目说明。
 - UI 字体 Skribble 与 Aa今日花晴 春懒猫困使用各自的内嵌版权信息，来源与用途见 [字体说明](assets/ui/fonts/README.md)。
-- 模型：comic-text-detector、Baberu OCR、manga-ocr、manga-lama 均为开源模型，来源见 [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md)。
+- 模型：CharSpot Small 权重为 CC BY-NC-SA 4.0，各模型的来源、署名与许可见 [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md)。

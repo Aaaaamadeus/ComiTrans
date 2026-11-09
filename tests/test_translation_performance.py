@@ -39,6 +39,7 @@ class InferenceRuntimeTests(unittest.TestCase):
             events.append('session')
             return SimpleNamespace(get_providers=lambda: ['CUDAExecutionProvider', 'CPUExecutionProvider'])
         with patch('comic_translate_core.onnx_session._cuda_preloaded', False), \
+                patch('comic_translate_core.onnx_session.runtime_directories', return_value=[]), \
                 patch('onnxruntime.preload_dlls', side_effect=lambda: events.append('preload')), \
                 patch('onnxruntime.get_available_providers', return_value=['CUDAExecutionProvider']), \
                 patch('onnxruntime.InferenceSession', side_effect=session):

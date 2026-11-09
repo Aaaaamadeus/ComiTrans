@@ -47,6 +47,24 @@ class DesktopUiTests(unittest.TestCase):
         self.addCleanup(destroy_widget, panel)
         return panel
 
+    def test_copy_report_reads_current_config_and_errors_from_failure_dialog(self):
+        from comic_translate_desktop import config
+        from comic_translate_desktop.diagnostics import Diagnostics
+        from comic_translate_desktop.ui.error_log_page import ErrorLogPage
+
+        with patch.object(config, "CONFIG_PATH", self.root / "config.yaml"), patch.object(config, "PROJECT_ROOT", self.root):
+            diagnostics = Diagnostics()
+            page = ErrorLogPage(diagnostics)
+            self.addCleanup(destroy_widget, page)
+            config.save_ai_config({"translation_model": "deepseek-flash"})
+            diagnostics.add_error("HTTPS client initialization failed")
+            self.assertNotIn("deepseek-flash", page.prompt_view.toPlainText())
+            with patch("comic_translate_desktop.ui.error_log_page.QApplication.clipboard") as clipboard:
+                page.copy_prompt()
+                copied = clipboard.return_value.setText.call_args.args[0]
+            self.assertIn("deepseek-flash", copied)
+            self.assertIn("HTTPS client initialization failed", copied)
+
     def test_live_log_retains_selection_and_only_resumes_on_request(self):
         panel = self.log_panel()
         for index in range(60):

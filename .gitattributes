@@ -5,3 +5,10 @@ docs/releases/**/SHA256SUMS.txt text eol=lf
 # Preserve original font/license bytes referenced by the bundled SHA256 manifest.
 comic-translate-ai/font_file/TC/** -text
 comic-translate-ai/font_file/Manga/** -text
+
+# Keep audited model/config/license bytes unchanged on Windows checkouts.
+comic-translate-ai/models/** -text
+comic-translate-ai/models/**/*.onnx filter=lfs diff=lfs merge=lfs -text
+docs/models/charspot-small.json -text
+docs/models/split-detector.json -text
+docs/models/baberu-v1.2.json -text

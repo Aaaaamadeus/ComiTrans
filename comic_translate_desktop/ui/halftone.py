@@ -8,6 +8,8 @@ from PySide6.QtCore import QByteArray, QRectF, Qt
 from PySide6.QtGui import QPainter, QPainterPath
 from PySide6.QtSvg import QSvgRenderer
 
+from .theme import theme
+
 DOT_COLOR = '#111111'
 COMPACT_SPACING = 4.0
 COMPACT_BREAKPOINT = 960
@@ -23,7 +25,8 @@ def _mix(start, end, amount):
 
 
 @lru_cache(maxsize=96)
-def halftone_svg(width, height, compact=False, mask='linear', profile='section', direction='left'):
+def halftone_svg(width, height, compact=False, mask='linear', profile='section', direction='left',
+                 dot_color=DOT_COLOR):
     """45° grid, black ink and a taper toward the title's white space.
 
     The latest visual reference supersedes the earlier 8–15% opacity rule.
@@ -41,7 +44,7 @@ def halftone_svg(width, height, compact=False, mask='linear', profile='section',
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
         f'viewBox="0 0 {width} {height}" aria-hidden="true" '
         'style="mix-blend-mode: multiply; pointer-events: none;">',
-        f'<g fill="{DOT_COLOR}">',
+        f'<g fill="{dot_color}">',
     ]
     # u、v 为旋转 45° 后的网格坐标；沿 u 轴逐行增加间距。
     u = spacing[0] / 2
@@ -70,19 +73,23 @@ def halftone_svg(width, height, compact=False, mask='linear', profile='section',
 
 
 @lru_cache(maxsize=96)
-def _renderer(width, height, compact, mask, profile, direction):
+def _renderer(width, height, compact, mask, profile, direction, dot_color):
     # 由 GUI 线程调用，按尺寸缓存；日志追加不会重新构建 SVG。
-    return QSvgRenderer(QByteArray(halftone_svg(width, height, compact, mask, profile, direction)))
+    return QSvgRenderer(QByteArray(halftone_svg(width, height, compact, mask, profile, direction, dot_color)))
 
 
 def draw_tone(painter, bounds, *, compact=False, mask='linear', profile='section', direction='left'):
     if bounds.width() <= 0 or bounds.height() <= 0:
         return
+    palette = theme()
     renderer = _renderer(max(1, round(bounds.width())), max(1, round(bounds.height())),
-                         compact, mask, profile, direction)
+                         compact, mask, profile, direction, palette['tone'])
     painter.save()
-    # QWidget 中用 Qt 的对应混合模式实现 SVG 的 mix-blend-mode: multiply。
-    painter.setCompositionMode(QPainter.CompositionMode_Multiply)
+    if palette['toneBlend'] == 'multiply':
+        # QWidget 中用 Qt 的对应混合模式实现 SVG 的 mix-blend-mode: multiply。
+        painter.setCompositionMode(QPainter.CompositionMode_Multiply)
+    else:
+        painter.setOpacity(palette['toneAlpha'])
     renderer.render(painter, bounds)
     painter.restore()
 
@@ -95,7 +102,7 @@ def draw_corner_tones(painter, bounds, *, compact=False):
     height = min(112, bounds.height() * .28)
     painter.save()
     painter.setRenderHint(QPainter.Antialiasing)
-    painter.setOpacity(.3)
+    painter.setOpacity(.3 if theme()['toneBlend'] == 'multiply' else 1.0)
     corners = (
         (QRectF(bounds.left() + 8, bounds.top() + 8, width, height), 'left'),
         (QRectF(bounds.right() - width - 8, bounds.bottom() - height - 8, width, height), 'right'),

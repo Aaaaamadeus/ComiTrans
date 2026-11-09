@@ -1,0 +1,51 @@
+{
+  "id": "muscgab/manga-ocr-charspot-small",
+  "revision": "72ca29202673880ca9c67b1c02c107535be4472b",
+  "directory": "charspot-small",
+  "source": "https://huggingface.co/muscgab/manga-ocr-charspot-small",
+  "license": "CC-BY-NC-SA-4.0 (weights); Apache-2.0 (code)",
+  "files": [
+    {
+      "path": "model.onnx",
+      "bytes": 43992111,
+      "sha256": "05fb79760f8e3dbc989b61f23a34c46b511818a2166573ce7e41d994f4403843",
+      "url": "https://huggingface.co/muscgab/manga-ocr-charspot-small/resolve/72ca29202673880ca9c67b1c02c107535be4472b/model.onnx"
+    },
+    {
+      "path": "config.json",
+      "bytes": 645,
+      "sha256": "fbab49bfbfee9e9fee22e74288202a7928e268e9b03de185aa9e206614b0a65c",
+      "url": "https://huggingface.co/muscgab/manga-ocr-charspot-small/resolve/72ca29202673880ca9c67b1c02c107535be4472b/config.json"
+    },
+    {
+      "path": "vocab.json",
+      "bytes": 62244,
+      "sha256": "9f72fc7852b1432bcb61b3b94b2e4cd8abef52b01e9051550a6a3070e2b314d5",
+      "url": "https://huggingface.co/muscgab/manga-ocr-charspot-small/resolve/72ca29202673880ca9c67b1c02c107535be4472b/vocab.json"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "url": "https://huggingface.co/muscgab/manga-ocr-charspot-small/resolve/72ca29202673880ca9c67b1c02c107535be4472b/LICENSE"
+    },
+    {
+      "path": "LICENSE_MODEL",
+      "bytes": 20850,
+      "sha256": "e66c269d4819aaab34b49ef5220c4ddab6756f21bb5180761a4eb8561f2b7bbd",
+      "url": "https://huggingface.co/muscgab/manga-ocr-charspot-small/resolve/72ca29202673880ca9c67b1c02c107535be4472b/LICENSE_MODEL"
+    },
+    {
+      "path": "NOTICE.md",
+      "bytes": 3097,
+      "sha256": "6f81dc2287f230c2d1329dd819552313d2e920e64d820c36f2a514073a449d35",
+      "url": "https://huggingface.co/muscgab/manga-ocr-charspot-small/resolve/72ca29202673880ca9c67b1c02c107535be4472b/NOTICE.md"
+    },
+    {
+      "path": "README.md",
+      "bytes": 16451,
+      "sha256": "5291292e48d623bf3eb2e503e77e9c230a6f1058f582c9a5faccad99a7581253",
+      "url": "https://huggingface.co/muscgab/manga-ocr-charspot-small/resolve/72ca29202673880ca9c67b1c02c107535be4472b/README.md"
+    }
+  ]
+}

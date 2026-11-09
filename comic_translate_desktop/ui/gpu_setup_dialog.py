@@ -1,10 +1,22 @@
-"""Explicit links to official installers; no automatic downloads or installation."""
-from PySide6.QtCore import QUrl
+"""Install the portable CUDA runtime or open the official driver and SDK instructions."""
+from PySide6.QtCore import QUrl, QThread, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QDialog, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 from comic_translate_core.gpu_runtime import CUDA_DOWNLOAD_URL, CUDNN_DOWNLOAD_URL, MSVC_DOWNLOAD_URL
 from ..i18n import tr
+from comic_translate_core.gpu_install import install
+
+
+class RuntimeInstall(QThread):
+    status = Signal(str)
+
+    def run(self):
+        try:
+            path = install(self.status.emit, canceled=self.isInterruptionRequested)
+            self.status.emit(tr("运行库已就绪，请重启 ComiTrans。") + str(path))
+        except Exception as exc:
+            self.status.emit(str(exc))
 
 
 class GpuSetupDialog(QDialog):
@@ -29,6 +41,15 @@ class GpuSetupDialog(QDialog):
             label = QLabel(tr(paragraph))
             label.setWordWrap(True)
             body.addWidget(label)
+        self.installer = RuntimeInstall(self)
+        self.install_button = QPushButton(tr("下载安装便携 GPU 运行库（约 1.53 GB）"))
+        self.install_status = QLabel(tr("从 NVIDIA 发布的 PyPI 软件包下载至程序目录。需要兼容的 NVIDIA 驱动，下载后重启生效。"))
+        self.install_status.setWordWrap(True)
+        self.install_button.clicked.connect(self.start_install)
+        self.installer.status.connect(self.install_status.setText)
+        self.installer.finished.connect(lambda: self.install_button.setEnabled(True))
+        body.insertWidget(0, self.install_button)
+        body.insertWidget(1, self.install_status)
         self.download_buttons = []
         for title, url in ((tr('打开 CUDA 12.8 官方下载'), CUDA_DOWNLOAD_URL),
                            (tr('打开 cuDNN 9.10.2 官方下载'), CUDNN_DOWNLOAD_URL),
@@ -43,3 +64,27 @@ class GpuSetupDialog(QDialog):
         close = QPushButton(tr('关闭'))
         close.clicked.connect(self.accept)
         layout.addWidget(close)
+
+    def start_install(self):
+        self.install_button.setEnabled(False)
+        self.installer.start()
+
+    def reject(self):
+        if self.installer.isRunning():
+            self.installer.requestInterruption()
+            self.install_status.setText(tr("正在取消下载…"))
+            return
+        super().reject()
+
+    def closeEvent(self, event):
+        if self.installer.isRunning():
+            self.reject()
+            event.ignore()
+        else:
+            super().closeEvent(event)
+
+    def accept(self):
+        if self.installer.isRunning():
+            self.reject()
+        else:
+            super().accept()

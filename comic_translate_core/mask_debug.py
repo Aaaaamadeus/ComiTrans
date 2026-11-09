@@ -46,15 +46,34 @@ def main(argv=None):
         cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), tuple(args.box), detector, args.font_size)), rgb.shape[:2])
     report = dict(result.diagnostics)
     report['source_outline_ratio'] = result.source_outline_ratio
+    erase = result.erase_mask
+    fallback = getattr(result, 'box_fill_mask', None)
+    final = erase if fallback is None else np.maximum(erase, fallback)
+    report['box_fill_pixels'] = int(np.count_nonzero(fallback)) if fallback is not None else 0
+    report['final_pixels'] = int(np.count_nonzero(final))
     if args.reference_mask:
         with Image.open(args.reference_mask) as source:
-            report['metrics'] = evaluate_masks(result.erase_mask, np.array(source.convert('L')))
+            reference = np.array(source.convert('L'))
+            # The reference annotates text pixels, so it grades the detector mask.
+            # The whole-box fallback is a repair scope, not a text mask; report it
+            # separately instead of inflating the same score.
+            report['metrics'] = evaluate_masks(erase, reference)
+            report['metrics_final_scope'] = evaluate_masks(final, reference)
     args.output.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(result.erase_mask).save(args.output / 'erase.png')
+    Image.fromarray(erase).save(args.output / 'erase.png')
+    if fallback is not None:
+        Image.fromarray(fallback).save(args.output / 'box_fill.png')
+    Image.fromarray(final).save(args.output / 'final_mask.png')
     Image.fromarray(result.layout_mask).save(args.output / 'layout.png')
+    # Three-colour overlay: detector mask red, fallback-only blue, overlap magenta.
+    red = erase > 0
+    blue = (fallback > 0) if fallback is not None else np.zeros_like(red)
     overlay = rgb.copy()
-    selected = result.erase_mask > 0
-    overlay[selected] = ((rgb[selected].astype(np.uint16) + [255, 0, 80]) // 2).astype(np.uint8)
+    for selection, tint in ((red & blue, [255, 0, 255]),
+                            (red & ~blue, [255, 0, 80]),
+                            (~red & blue, [40, 160, 255])):
+        if np.any(selection):
+            overlay[selection] = ((rgb[selection].astype(np.uint16) + tint) // 2).astype(np.uint8)
     Image.fromarray(overlay).save(args.output / 'overlay.png')
     (args.output / 'diagnostics.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     return 0

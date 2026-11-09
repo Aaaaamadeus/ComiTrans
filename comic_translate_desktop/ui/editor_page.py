@@ -7,7 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 from PySide6.QtCore import Qt, QSize, QSettings, QTimer, QEvent, QPoint
 from PySide6.QtGui import QPixmap, QIcon, QImageReader, QShortcut, QKeySequence
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QGroupBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QGroupBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView)
 from ..config import load_ai_config, MAIN_DIR
 from ..font_library import available_fonts, font_description, font_display_name, font_reference, inspect_font, resolve_font_reference
 from comic_translate_core.page_compositor import compose_page, layer_bounds
@@ -22,7 +22,7 @@ from ..editor_jobs import LatestJobQueue, read_page, read_project_pages, SaveReq
 from .color_picker import TextColorPicker
 from .strip_preview import StripPreview
 from .thumbnail_loader import ThumbnailLoader
-from .theme import ui_font
+from .theme import set_themed_icon, ui_font
 from .manga_components import PanelHeading
 from .searchable_combo import SearchableFontCombo
 
@@ -89,12 +89,10 @@ class EditorPage(QWidget):
         self._repair_engine = BackgroundRepair(
             self.config['lama_model'], device='cuda' if self.config.get('use_gpu') else 'cpu')
         self._edit_revision = 0
+        self._text_dialog = None
         self._preview_dirty = False
         self._layer_cache = {}
         self._font_typesetters = {}
-        self._inspector_reveal_timer = QTimer(self)
-        self._inspector_reveal_timer.setSingleShot(True)
-        self._inspector_reveal_timer.timeout.connect(self._reveal_text_editor)
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)
         self._preview_timer.setInterval(40)
@@ -227,10 +225,22 @@ class EditorPage(QWidget):
         self._focus_btn.setProperty('compact', True)
         self._focus_btn.setToolTip(tr('收起侧栏与辅助信息，专注查看作品 · Ctrl+Shift+F'))
         toolbar.addWidget(self._focus_btn)
+        self._zoom_tool_btn = QPushButton(tr('缩放工具'))
+        self._zoom_tool_btn.setCheckable(True)
+        self._zoom_tool_btn.setProperty('role', 'utility')
+        self._zoom_tool_btn.setProperty('compact', True)
+        self._zoom_tool_btn.setToolTip(tr('点击放大，Alt+点击缩小 · Z'))
+        toolbar.addWidget(self._zoom_tool_btn)
         self._zoom = QComboBox()
-        for name, value in [(tr('适应页面'), None), ('50%', .5), ('100%', 1.), ('150%', 1.5), ('200%', 2.)]:
+        for name, value in [(tr('适应页面'), None), ('50%', .5), ('100%', 1.), ('150%', 1.5),
+                            ('200%', 2.), (tr('适应宽度'), 'width')]:
             self._zoom.addItem(tr(name), value)
-        self._zoom.setToolTip(tr('缩放预览；放大后可使用滚动条浏览'))
+        self._zoom.setEditable(True)
+        self._zoom.setInsertPolicy(QComboBox.NoInsert)
+        self._zoom.lineEdit().setReadOnly(True)
+        self._zoom.lineEdit().setAlignment(Qt.AlignCenter)
+        self._zoom.setMinimumWidth(92)
+        self._zoom.setToolTip(tr('缩放：Alt+滚轮以光标为中心，空格+拖动平移；Ctrl+0/1/2 适应页面/100%/适应宽度'))
         toolbar.addWidget(self._zoom)
         self._strip_toggle = QPushButton(tr('连续长条'))
         self._strip_toggle.setCheckable(True)
@@ -264,7 +274,8 @@ class EditorPage(QWidget):
         left.setSpacing(12)
         heading = PanelHeading('01', tr('页面'), sidebar=True)
         left.addWidget(heading)
-        add = QPushButton(tr('＋ 导入译图 / PDF'))
+        add = QPushButton(tr('导入译图 / PDF'))
+        set_themed_icon(add, 'plus')
         add.clicked.connect(self._import_pages)
         left.addWidget(add)
         self.page_list = QListWidget()
@@ -295,6 +306,18 @@ class EditorPage(QWidget):
         self.preview.import_requested.connect(self._import_pages)
         self.preview.region_edited.connect(self._resize_region_from_canvas)
         self.preview.region_edit_finished.connect(self.apply_changes)
+        self.preview.region_clicked.connect(self._select_block)
+        self.preview.installEventFilter(self)
+        self._zoom_tool_btn.toggled.connect(self.preview.set_zoom_tool)
+        self._canvas_frame = canvas
+        self._zoom_hud = QLabel(canvas)
+        self._zoom_hud.setObjectName('zoomHud')
+        self._zoom_hud.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._zoom_hud.hide()
+        self._zoom_hud_timer = QTimer(self)
+        self._zoom_hud_timer.setSingleShot(True)
+        self._zoom_hud_timer.setInterval(900)
+        self._zoom_hud_timer.timeout.connect(self._zoom_hud.hide)
         repair_toolbar = QHBoxLayout()
         self._repair_mode = QPushButton(tr('框选背景'))
         self._repair_mode.setCheckable(True)
@@ -315,8 +338,8 @@ class EditorPage(QWidget):
         self.splitter.addWidget(canvas)
         self._properties_panel = QFrame()
         self._properties_panel.setObjectName('editorInspector')
-        self._properties_panel.setMinimumWidth(280)
-        self._properties_panel.setMaximumWidth(420)
+        self._properties_panel.setMinimumWidth(300)
+        self._properties_panel.setMaximumWidth(560)
         inspector_layout = QVBoxLayout(self._properties_panel)
         inspector_layout.setContentsMargins(0, 0, 0, 0)
         inspector_layout.setSpacing(0)
@@ -332,10 +355,8 @@ class EditorPage(QWidget):
         heading = PanelHeading('03', tr('文本与排版'), sidebar=True)
         props.addWidget(heading)
         self.block_list = QListWidget()
-        self.block_list.setFixedHeight(96)
+        self.block_list.setMinimumHeight(160)
         self.block_list.currentRowChanged.connect(self._load_properties)
-        self.block_list.currentRowChanged.connect(lambda _row: self._inspector_reveal_timer.start(0))
-        props.addWidget(self.block_list)
         self._restore_bubble_btn = QPushButton(tr('还原此气泡'))
         self._restore_bubble_btn.setToolTip(tr('撤销所选气泡的修补与嵌字，恢复处理前的原始像素；可再次恢复处理结果。'))
         self._restore_bubble_btn.clicked.connect(self.toggle_bubble_original)
@@ -350,7 +371,14 @@ class EditorPage(QWidget):
         props.addLayout(original_actions)
         self._inspector_tabs = QTabWidget()
         self._inspector_tabs.setDocumentMode(True)
-        props.addWidget(self._inspector_tabs, 1)
+        self._inspector_splitter = QSplitter(Qt.Vertical)
+        self._inspector_splitter.setObjectName('inspectorSplitter')
+        self._inspector_splitter.setChildrenCollapsible(False)
+        self._inspector_splitter.setHandleWidth(6)
+        self._inspector_splitter.addWidget(self.block_list)
+        self._inspector_splitter.addWidget(self._inspector_tabs)
+        self._inspector_splitter.setSizes([200, 420])
+        props.addWidget(self._inspector_splitter, 1)
         text_panel = QWidget()
         text_props = QVBoxLayout(text_panel)
         text_props.setContentsMargins(0, 8, 0, 0)
@@ -372,7 +400,7 @@ class EditorPage(QWidget):
         props.addWidget(self._source_toggle)
         self._source_text = QPlainTextEdit()
         self._source_text.setReadOnly(True)
-        self._source_text.setFixedHeight(76)
+        self._source_text.setFixedHeight(110)
         self._source_text.setFont(ui_font(japanese=True))
         props.addWidget(self._source_text)
         self._source_toggle.toggled.connect(self._toggle_source_text)
@@ -385,19 +413,25 @@ class EditorPage(QWidget):
         self._line_break_btn.setToolTip(tr('在光标处插入换行，与 Enter 相同'))
         self._line_break_btn.clicked.connect(self._insert_line_break)
         break_row.addWidget(self._line_break_btn)
+        self._expand_btn = QPushButton(tr('全屏编辑'))
+        self._expand_btn.setProperty('compact', True)
+        self._expand_btn.setToolTip(tr('在独立窗口中编辑当前气泡的译文 · F2'))
+        self._expand_btn.clicked.connect(self.open_text_editor)
+        break_row.addWidget(self._expand_btn)
         props.addLayout(break_row)
         break_hint = QLabel(tr('Enter 换行 · 竖排时换到左列'))
         break_hint.setWordWrap(True)
         break_hint.setProperty('muted', True)
         props.addWidget(break_hint)
         self._text_input = QPlainTextEdit()
-        self._text_input.setMinimumHeight(96)
-        self._text_input.setMaximumHeight(180)
+        self._text_input.setObjectName('textInput')
+        self._text_input.setMinimumHeight(140)
+        self._text_input.setMaximumHeight(16777215)
+        self._text_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._text_input.setAccessibleName(tr('译文与手动换行'))
         self._text_input.setPlaceholderText(tr('输入译文，按 Enter 手动换行'))
         self._text_input.setToolTip(tr('Enter 插入硬换行：横排换到下一行，竖排换到左侧下一列；连续回车保留空行或空列。'))
-        props.addWidget(self._text_input)
-        props.addStretch(1)
+        props.addWidget(self._text_input, 1)
         props = layout_props
         group = QGroupBox(tr('字体与排版'))
         form = QFormLayout(group)
@@ -481,27 +515,30 @@ class EditorPage(QWidget):
         form.addRow(tr(drag_hint))
         props.addWidget(group)
         self._apply_btn = QPushButton(tr('刷新预览'))
+        self._apply_btn.setProperty('compact', True)
+        self._apply_btn.setProperty('role', 'quiet')
         props.addStretch()
         inspector_actions = QFrame()
         inspector_actions.setObjectName('inspectorActions')
-        actions_layout = QVBoxLayout(inspector_actions)
+        actions_layout = QHBoxLayout(inspector_actions)
         actions_layout.setContentsMargins(12, 10, 12, 10)
-        actions_layout.addWidget(self._apply_btn)
         hint = QLabel(tr('修改实时预览 · Ctrl+S 保存图片'))
         hint.setProperty('muted', True)
-        actions_layout.addWidget(hint)
+        actions_layout.addWidget(hint, 1)
+        actions_layout.addWidget(self._apply_btn)
         inspector_layout.addWidget(inspector_actions)
         self.splitter.addWidget(self._properties_panel)
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 1)
         self.splitter.setStretchFactor(2, 0)
-        self.splitter.setSizes([220, 820, 320])
+        self.splitter.setSizes([220, 720, 440])
         root.addWidget(self.splitter, 1)
         root.addWidget(self._status)
         self._pages_toggle.toggled.connect(lambda checked: self._choose_panel(0, checked))
         self._properties_toggle.toggled.connect(lambda checked: self._choose_panel(1, checked))
         self._focus_btn.toggled.connect(self._toggle_canvas_focus)
-        self._zoom.currentIndexChanged.connect(lambda: self.preview.set_zoom(self._zoom.currentData()))
+        self._zoom.currentIndexChanged.connect(self._zoom_selected)
+        self.preview.zoom_changed.connect(self._sync_zoom_display)
         self._apply_btn.clicked.connect(self.apply_changes)
         self._save_btn.clicked.connect(self.request_save)
         self._text_input.textChanged.connect(self._schedule_preview)
@@ -521,6 +558,27 @@ class EditorPage(QWidget):
         self._focus_shortcut = QShortcut(QKeySequence('Ctrl+Shift+F'), self)
         self._focus_shortcut.setContext(Qt.WidgetWithChildrenShortcut)
         self._focus_shortcut.activated.connect(self._focus_btn.toggle)
+        self._zoom_shortcuts = []
+        for keys, action in (
+            ('Ctrl+0', lambda: self.preview.set_zoom(None)),
+            ('Ctrl+1', lambda: self.preview.set_zoom(1.0)),
+            ('Ctrl+2', self.preview.set_fit_width),
+            ('Ctrl+=', lambda: self.preview.zoom_by(1.25)),
+            ('Ctrl+-', lambda: self.preview.zoom_by(1 / 1.25)),
+        ):
+            shortcut = QShortcut(QKeySequence(keys), self)
+            shortcut.setContext(Qt.WidgetWithChildrenShortcut)
+            shortcut.activated.connect(action)
+            self._zoom_shortcuts.append(shortcut)
+        self._text_editor_shortcut = QShortcut(QKeySequence('F2'), self)
+        self._text_editor_shortcut.setContext(Qt.WidgetWithChildrenShortcut)
+        self._text_editor_shortcut.activated.connect(self.open_text_editor)
+        self._zoom_tool_shortcut = QShortcut(QKeySequence('Z'), self)
+        self._zoom_tool_shortcut.setContext(Qt.WidgetWithChildrenShortcut)
+        self._zoom_tool_shortcut.activated.connect(self._toggle_zoom_tool)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
         self._set_editable(False)
         settings = QSettings()
         state = settings.value('ui/editorSplitter')
@@ -529,8 +587,47 @@ class EditorPage(QWidget):
         self._desired_panels = [settings.value('ui/editorPages', True, type=bool),
                                 settings.value('ui/editorProperties', True, type=bool)]
         self._apply_panel_layout()
-        self._zoom.setCurrentIndex(max(0, min(4, int(settings.value('ui/editorZoom', 0)))))
+        self._zoom.setCurrentIndex(max(0, min(self._zoom.count() - 1, int(settings.value('ui/editorZoom', 0)))))
         self._strip_toggle.setChecked(settings.value('ui/editorContinuous', False, type=bool))
+
+    def _zoom_selected(self):
+        value = self._zoom.currentData()
+        if value == 'width':
+            self.preview.set_fit_width()
+        else:
+            self.preview.set_zoom(value)
+
+    def _sync_zoom_display(self, value):
+        if value is None:
+            text = tr('适应页面')
+        elif value == 'width':
+            text = tr('适应宽度')
+        else:
+            text = f'{round(float(value) * 100)}%'
+        self._zoom.blockSignals(True)
+        self._zoom.setCurrentIndex(-1)
+        self._zoom.setEditText(text)
+        self._zoom.blockSignals(False)
+        if hasattr(self, '_zoom_hud'):
+            self._zoom_hud.setText(text)
+            self._zoom_hud.adjustSize()
+            self._place_zoom_hud()
+            self._zoom_hud.show()
+            self._zoom_hud.raise_()
+            self._zoom_hud_timer.start()
+
+    def _place_zoom_hud(self):
+        if not hasattr(self, '_zoom_hud') or not self._zoom_hud.isVisible():
+            return
+        rect = self.preview.geometry()
+        self._zoom_hud.move(max(8, rect.right() - self._zoom_hud.width() - 16),
+                            max(8, rect.bottom() - self._zoom_hud.height() - 16))
+
+    def _toggle_zoom_tool(self):
+        focus = QApplication.focusWidget()
+        if isinstance(focus, (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)):
+            return
+        self._zoom_tool_btn.toggle()
 
     def save_ui_state(self):
         settings = QSettings()
@@ -590,9 +687,16 @@ class EditorPage(QWidget):
         self._apply_source_layout()
 
     def _reveal_text_editor(self):
-        if self.isVisible() and self.height() < 700 and self._loaded_row >= 0 and self._inspector_tabs.currentIndex() == 0:
-            center = self._text_input.mapTo(self._properties_scroll.widget(), self._text_input.rect().center())
-            self._properties_scroll.ensureVisible(center.x(), center.y(), 0, self._text_input.height() // 2 + 8)
+        if not self.isVisible() or self._loaded_row < 0 or self._inspector_tabs.currentIndex() != 0:
+            return
+        if self.height() >= 760:
+            return
+        panel = self._properties_scroll
+        point = self._text_input.mapTo(panel.widget(), QPoint(0, 0))
+        if panel.viewport().height() - point.y() < 120:
+            # Only ~a line of the editor is visible: align the tab header instead of a blank field.
+            tabs_top = self._inspector_tabs.mapTo(panel.widget(), QPoint(0, 0)).y()
+            panel.verticalScrollBar().setValue(max(0, tabs_top - 8))
 
     def _apply_source_layout(self):
         expanded = self._source_expanded and (not self.isVisible() or self.height() >= 700 or self._source_compact_override)
@@ -747,7 +851,28 @@ class EditorPage(QWidget):
     def eventFilter(self, watched, event):
         if watched is self.page_list.viewport() and event.type() in (QEvent.Resize, QEvent.Show):
             self._thumbnail_timer.start(0)
+        elif watched is getattr(self, 'preview', None) and event.type() == QEvent.Resize:
+            self._place_zoom_hud()
+        elif event.type() in (QEvent.KeyPress, QEvent.KeyRelease) and event.key() == Qt.Key_Space:
+            if self._space_pans_canvas():
+                if event.isAutoRepeat():
+                    return True
+                self.preview.set_space_pan(event.type() == QEvent.KeyPress)
+                return True
+        elif event.type() == QEvent.WindowDeactivate:
+            self.preview.set_space_pan(False)
         return super().eventFilter(watched, event)
+
+    def _space_pans_canvas(self):
+        """Space is the Hand tool, but never inside a text field or on a focused button."""
+        if not self.isVisible() or self.preview._original.isNull():
+            return False
+        active = QApplication.activeWindow()
+        if active is not None and active is not self.window() and QApplication.activeModalWidget() is None:
+            return False
+        focus = QApplication.focusWidget()
+        return not isinstance(focus, (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
+                                      QComboBox, QAbstractButton))
 
     def _load_page_thumbnails(self):
         requests = []
@@ -828,7 +953,9 @@ class EditorPage(QWidget):
         revision, previous = self._edit_revision, self.output_path
         settings = deepcopy(self.config)
         self._requesting_page = True
+        self._loading_page = Path(path)
         self._status.setText(tr('正在后台加载页面：{_0}', _0=Path(path).name))
+        self.preview.set_loading(tr('正在加载 {_0}', _0=Path(path).name))
         def accept(data):
             self._requesting_page = False
             if self.output_path != previous or self._edit_revision != revision:
@@ -843,6 +970,10 @@ class EditorPage(QWidget):
         self._requesting_page = False
         self._restore_page_selection()
         self._status.setText(tr('页面加载失败：{_0}', _0=error))
+        retry = None
+        if getattr(self, '_loading_page', None) is not None:
+            retry = lambda: self.request_page(self._loading_page)
+        self.preview.set_error(tr('页面加载失败：{_0}', _0=error), retry=retry)
         self._update_repair_controls()
 
     def confirm_discard(self):
@@ -1037,6 +1168,27 @@ class EditorPage(QWidget):
         self._text_input.insertPlainText('\n')
         self._text_input.setFocus()
 
+    def open_text_editor(self):
+        """F2 / 全屏编辑: one bubble, a roomy source and target side by side."""
+        if not 0 <= self._loaded_row < len(self.items):
+            return None
+        from .text_editor_dialog import TextEditorDialog
+        if self._text_dialog is None:
+            self._text_dialog = TextEditorDialog(self)
+            self._text_dialog.text_changed.connect(self._apply_dialog_text)
+        item = self.items[self._loaded_row]
+        self._text_dialog.set_block(self._loaded_row + 1, item.get('source_text', ''),
+                                    self._text_input.toPlainText())
+        self._text_dialog.show()
+        self._text_dialog.raise_()
+        self._text_dialog.activateWindow()
+        return self._text_dialog
+
+    def _apply_dialog_text(self, text):
+        if self._loading or self._text_input.toPlainText() == text:
+            return
+        self._text_input.setPlainText(text)
+
     def _layout_spins(self):
         return (self._size_spin, self._offset_x, self._offset_y, self._mask_width, self._mask_height)
 
@@ -1075,6 +1227,9 @@ class EditorPage(QWidget):
         return [left, top, left + width, top + height]
 
     def _update_region_guide(self):
+        self.preview.set_regions(
+            [(index, tuple(self._mask_box(item))) for index, item in enumerate(self.items)],
+            visible=self._show_mask.isChecked() and not self._repair_mode.isChecked())
         if self._repair_mode.isChecked():
             self.preview.set_region(self._repair_box, editable=self._repair_box is not None)
             return
@@ -1089,6 +1244,15 @@ class EditorPage(QWidget):
             box = list(self.items[self._loaded_row]['box'][:4])
             self._box_label.setText(tr('原图区域：{_0}', _0=', '.join(map(str, box))))
         self.preview.set_region(box if self._show_mask.isChecked() else None, editable=box is not None and not restored)
+
+    def _select_block(self, index):
+        """A click on a box in the canvas is the same as picking it in the list."""
+        if not 0 <= index < len(self.items) or index == self._loaded_row:
+            return
+        self.block_list.setCurrentRow(index)
+        item = self.block_list.item(index)
+        if item is not None:
+            self.block_list.scrollToItem(item, QAbstractItemView.PositionAtCenter)
 
     def _resize_region_from_canvas(self, box):
         if self._repair_mode.isChecked():
@@ -1141,6 +1305,9 @@ class EditorPage(QWidget):
             self._font_choice_dirty = False
             self._set_editable(False)
             self.preview.set_region(None)
+            self.preview.set_regions([])
+            if self._text_dialog is not None:
+                self._text_dialog.close()
             return
         if not self._loading:
             self._store_properties()
@@ -1167,8 +1334,14 @@ class EditorPage(QWidget):
         self._mask_height.setValue(box[3] - box[1])
         self._update_region_guide()
         self._set_editable(True)
+        if self._text_dialog is not None and self._text_dialog.isVisible():
+            self._text_dialog.set_block(row + 1, item.get('source_text', ''),
+                                        self._text_input.toPlainText())
         self._loading = False
         self._row_dirty = False
+        if self.height() >= 700:
+            self._properties_scroll.verticalScrollBar().setValue(0)
+        QTimer.singleShot(0, self._reveal_text_editor)
 
     def apply_changes(self):
         if self._cleaned_image is None:
@@ -1610,10 +1783,13 @@ class EditorPage(QWidget):
         self._refresh_font_choices()
         QTimer.singleShot(0, self._adapt_width)
 
+    def hideEvent(self, event):
+        self.preview.set_space_pan(False)
+        super().hideEvent(event)
+
     def _adapt_width(self):
         if self.isVisible():
-            self.block_list.setFixedHeight(60 if self.height() < 700 else 96)
-            self._source_text.setFixedHeight(48 if self.height() < 700 else 76)
+            self._source_text.setFixedHeight(64 if self.height() < 700 else 110)
             self._apply_source_layout()
             self._apply_panel_layout()
-            self._inspector_reveal_timer.start(0)
+            QTimer.singleShot(0, self._reveal_text_editor)

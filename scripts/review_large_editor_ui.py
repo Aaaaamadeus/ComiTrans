@@ -15,7 +15,8 @@ from PySide6.QtWidgets import QApplication
 from comic_translate_desktop import config
 from comic_translate_desktop.i18n import set_ui_language
 from comic_translate_desktop.ui.main_window import MainWindow
-from comic_translate_desktop.ui.theme import install_ui_font
+from comic_translate_desktop.ui.theme import (
+    UI_FONT_ALLOWLIST, install_ui_font, resolved_ui_font_family)
 from tests.qt_utils import destroy_widget
 
 app = QApplication([])
@@ -23,6 +24,8 @@ app.setApplicationName('ComiTrans-Performance-Review')
 app.setOrganizationName('ComiTrans-Review')
 app.setStyle('Fusion')
 install_ui_font(app)
+assert resolved_ui_font_family() in UI_FONT_ALLOWLIST, (
+    f'UI font fell back to {resolved_ui_font_family()!r}; screenshots would not represent the app')
 destination = ROOT / 'docs/ui-review'
 destination.mkdir(exist_ok=True)
 scale = os.environ.get('QT_SCALE_FACTOR', '1')

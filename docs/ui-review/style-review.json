@@ -2,9 +2,17 @@
   "source": "running Qt Widgets",
   "model_requests": false,
   "api_requests": false,
+  "ui_font": "Microsoft YaHei UI",
   "captures": [
     {
       "file": "automatic-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "automatic-preferences-style-review.png",
       "width": 1440,
       "height": 900,
       "dpr": 1.0,
@@ -269,10 +277,10 @@
       44
     ],
     "statusPill": [
-      1076,
-      28,
-      100,
-      28
+      1080,
+      30,
+      96,
+      24
     ],
     "设置": [
       1184,
@@ -313,14 +321,14 @@
     "edits_preserve_file_until_save": true,
     "saved_pixels_match_preview": true,
     "guide_excluded_from_export": true,
-    "cached_edit_ms": 11.2
+    "cached_edit_ms": 7.7
   },
   "editor_mask_drag": {
     "handles": 8,
     "geometry": [
       93,
       133,
-      335,
+      336,
       337
     ],
     "live_during_drag": true,

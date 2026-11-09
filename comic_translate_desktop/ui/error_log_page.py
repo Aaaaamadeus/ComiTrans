@@ -168,7 +168,7 @@ class ErrorLogPage(QWidget):
                 bar.setValue(value)
 
     def copy_prompt(self) -> None:
-        QApplication.clipboard().setText(self.prompt_view.toPlainText())
+        QApplication.clipboard().setText(self._diagnostics.build_prompt())
         self._status_label.setText(tr('诊断提示词已复制'))
 
     def copy_raw_logs(self) -> None:

@@ -304,13 +304,12 @@ class PPOcrTests(unittest.TestCase):
                 self.assertGreater(score, .85)
 
     def test_real_detector_multiline_crops_keep_edge_punctuation(self):
-        from onnx_text_detector import OnnxTextDetector
+        from onnx_text_detector import create_text_detector
         config = app_config.load_ai_config()
         fonts = Path("C:/Windows/Fonts")
         required = (config["detector_model"], config["korean_ocr_model"], config["english_ocr_model"], fonts / "malgun.ttf", fonts / "arial.ttf")
         if not all(Path(path).is_file() for path in required):
             self.skipTest("Optional local detector/OCR models and fonts are not installed")
-        detector = OnnxTextDetector(config["detector_model"], input_size=1024, device="cpu")
         with tempfile.TemporaryDirectory() as temporary:
             for language, text, font in (("en", "HELLO WORLD!\nHOW ARE YOU?", "arial.ttf"), ("ko", "안녕하세요\n감사합니다", "malgun.ttf")):
                 with self.subTest(language=language):
@@ -321,7 +320,7 @@ class PPOcrTests(unittest.TestCase):
                     path = Path(temporary) / "page.png"
                     image.save(path)
                     pipeline = bare_pipeline(language)
-                    pipeline.detector = detector
+                    pipeline.detector = create_text_detector(config["detector_model"], language=language)
                     pipeline.ocr_engine = create_ocr({**config, "source_language": language, "ocr_backend": "auto"})
                     prepared = pipeline.prepare_comic_page(path)
                     actual = "\n".join(prepared["ocr_texts"])

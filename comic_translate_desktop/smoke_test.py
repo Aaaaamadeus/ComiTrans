@@ -60,12 +60,15 @@ def run_smoke_test(app, output_dir, *, require_gpu=False):
                     'detector': pipeline.detector.session.get_providers(),
                     'inpainting': pipeline.inpainter.onnx_session.get_providers(),
                 }
+                if hasattr(pipeline.detector, "line_session"):
+                    result['providers']['detector_lines'] = pipeline.detector.line_session.get_providers()
                 for name, value in vars(pipeline.ocr).items():
                     if hasattr(value, 'get_providers'):
                         result['providers']['ocr_' + name] = value.get_providers()
-                # The bundled Baberu int4/int8 models deliberately use CPU.
+                result['ocr_backend'] = pipeline.ocr_backend_active
                 # Require CUDA for every stage that actually requests it.
-                result['ocr_cpu_expected'] = getattr(pipeline.ocr, 'vision_name', '') == 'vision_int4.onnx'
+                result['ocr_cpu_expected'] = (pipeline.ocr_backend_active == 'charspot' or
+                    getattr(pipeline.ocr, 'vision_name', '') == 'vision_int4.onnx')
                 result['gpu_active'] = all('CUDAExecutionProvider' in p
                     for name, p in result['providers'].items()
                     if not (name.startswith('ocr_') and result['ocr_cpu_expected']))
@@ -190,7 +193,35 @@ def run_smoke_test(app, output_dir, *, require_gpu=False):
                 install_qt_language(app)
                 install_ui_font(app)
                 config.save_ai_config({'ui_language': 'zh-CN', 'ui_language_selected': True})
-            result["success"] = all((result["pipeline_ready"], result["svg_valid"], result["window_visible"],
+            # Construct the same TLS transport used for translation, without sending a request.
+            from comic_translate_core.text_mask import AdaptiveTextMask, MaskRequest
+            import cv2
+            import numpy as np
+            paper = np.full((100, 130, 3), 252, np.uint8)
+            cv2.rectangle(paper, (16, 16), (113, 83), (20, 20, 20), 2)
+            strokes = np.zeros(paper.shape[:2], np.uint8)
+            cv2.putText(strokes, 'Hi', (33, 68), cv2.FONT_HERSHEY_SIMPLEX, 1.4, 255, 3)
+            paper[strokes > 0] = 10
+            paper = cv2.imdecode(cv2.imencode('.jpg', paper, [cv2.IMWRITE_JPEG_QUALITY, 82])[1], 1)
+            mask = AdaptiveTextMask().generate(MaskRequest(paper, (20, 20, 109, 79), strokes, 28))
+            result['jpeg_paper_fill'] = mask.fill_color is not None and not mask.erase_mask[16, 16:113].any()
+            # The whole-box fallback has to ship as well: a mark the detector
+            # seed never covers must be repainted inside a plain white balloon.
+            balloon = np.full((120, 150, 3), 255, np.uint8)
+            cv2.putText(balloon, 'Hi', (30, 78), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (10, 10, 10), 3)
+            seeded = np.zeros(balloon.shape[:2], np.uint8)
+            cv2.putText(seeded, 'Hi', (30, 78), cv2.FONT_HERSHEY_SIMPLEX, 1.4, 255, 3)
+            seeded = cv2.erode(seeded, np.ones((3, 3), np.uint8))
+            cv2.circle(balloon, (120, 92), 3, (10, 10, 10), -1)   # missed punctuation
+            fallback = AdaptiveTextMask().generate(MaskRequest(balloon, (20, 30, 130, 100), seeded, 28))
+            covered = getattr(fallback, 'box_fill_mask', None)
+            result['white_box_fallback'] = bool(
+                covered is not None and fallback.box_fill_color is not None
+                and int(covered[89:96, 117:124].min()) == 255)
+            import httpx
+            with httpx.Client(timeout=90.0):
+                result["translation_https_client"] = True
+            result["success"] = all((result['jpeg_paper_fill'], result['white_box_fallback'], result["translation_https_client"], result["pipeline_ready"], result["svg_valid"], result["window_visible"],
                                      result["screenshot_saved"], result["brand_font"] == "Skribble",
                                      result["log_font"] == "Aa今日花晴 春懒猫困", not result["missing_glyphs"],
                                      result['font_imported'], result['font_choice_persisted'], result['font_pipeline_updated'],

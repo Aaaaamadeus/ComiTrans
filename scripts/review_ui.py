@@ -25,13 +25,16 @@ from comic_translate_desktop import config
 from comic_translate_desktop.ui.main_window import MainWindow
 from comic_translate_desktop.ui.preview import studio_illustration
 from comic_translate_desktop.font_library import font_reference
-from comic_translate_desktop.ui.theme import APP_STYLESHEET, install_ui_font
+from comic_translate_desktop.ui.theme import (
+    UI_FONT_ALLOWLIST, apply_theme, install_ui_font, resolved_ui_font_family)
 from comic_translate_desktop.ui.font_library_dialog import FontLibraryDialog
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=Path('docs/ui-review'))
+    parser.add_argument('--theme', choices=('light', 'dark'), default='light',
+                        help='Capture the paper (light) or night ink (dark) palette')
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -45,11 +48,17 @@ def main():
     QSettings().clear()
     app.setStyle('Fusion')
     install_ui_font(app)
-    app.setStyleSheet(APP_STYLESHEET)
-    report = {'source': 'running Qt Widgets', 'model_requests': False, 'api_requests': False, 'captures': []}
+    apply_theme(app, args.theme)
+    ui_font_family = resolved_ui_font_family()
+    assert ui_font_family in UI_FONT_ALLOWLIST, (
+        f'UI font fell back to {ui_font_family!r}; screenshots would not represent the app')
+    report = {'source': 'running Qt Widgets', 'model_requests': False, 'api_requests': False,
+              'ui_font': ui_font_family, 'captures': []}
 
     def check_action(window, button):
-        name = button.text() if hasattr(button, 'text') else button.currentText()
+        name = (button.text() if hasattr(button, 'text')
+                else button.currentText() if hasattr(button, 'currentText')
+                else button.objectName() or type(button).__name__)
         assert button.isVisible(), name
         for point in (button.rect().topLeft(), button.rect().bottomRight()):
             assert window.rect().contains(button.mapTo(window, point)), (name, window.size())
@@ -64,6 +73,7 @@ def main():
          patch.object(config, 'PROJECT_ROOT', scratch), \
          patch.object(config, 'DEFAULT_OUTPUT_DIR', scratch / 'output'), \
          patch.object(MainWindow, '_start_warmup'):
+        config.save_ai_config({'ui_theme': args.theme})
         window = MainWindow()
         screen = app.primaryScreen().availableGeometry()
         window.resize(min(1440, int(screen.width() * .94)), min(900, int(screen.height() * .94)))
@@ -76,16 +86,18 @@ def main():
             for button in buttons:
                 check_action(window, button)
             header_widgets = [widget for widget in (window._brand_title, window._nav_auto, window._nav_editor,
-                              window.status_label, window._stop_btn, window._settings_btn, window._logs_btn,
+                              window.status_pill, window._stop_btn, window._settings_btn, window._logs_btn,
                               window._output_btn, window._issue_btn, window._more_btn) if widget.isVisible()]
             for first, second in zip(header_widgets, header_widgets[1:]):
-                assert not first.geometry().intersects(second.geometry()), (first.text(), second.text())
+                gap = second.mapTo(window, second.rect().topLeft()).x() - first.mapTo(
+                    window, first.rect().topRight()).x()
+                assert gap >= 0, (first.objectName() or first.text(), second.objectName() or second.text())
             for widget in header_widgets:
                 check_action(window, widget)
             if name == 'automatic':
                 report['topbar_geometry'] = {widget.objectName() or widget.text(): widget.geometry().getRect()
                                             for widget in (window._brand_title, window._nav_auto, window._nav_editor,
-                                                           window.status_label, window._settings_btn, window._logs_btn,
+                                                           window.status_pill, window._settings_btn, window._logs_btn,
                                                            window._output_btn, window._issue_btn, window._more_btn)
                                             if widget.isVisible()}
             path = output / f'{name}-style-review.png'
@@ -111,7 +123,12 @@ def main():
                     report['illustrations'].append(dict(file=asset, width=pixmap.width(),
                                                        height=pixmap.height(), transparent=True))
                 capture('automatic', window.translate_tab,
-                        (window._add_btn, window._start_btn, window._font_picker.combo, window._font_picker.import_button, window._font_picker.library_button))
+                        (window._add_btn, window._start_btn))
+                window._pref_toggle.setChecked(True)
+                QTest.qWait(80)
+                capture('automatic-preferences', window.translate_tab,
+                        (window._font_picker.combo, window._font_picker.import_button,
+                         window._font_picker.library_button))
                 check_font_search(window._font_picker.combo)
                 library = FontLibraryDialog(window.config, window)
                 library.resize(min(820, int(screen.width() * .9)), min(660, int(screen.height() * .9)))
@@ -266,12 +283,14 @@ def main():
                 report['editor_font_switch'] = dict(manual_overrides_default=True, only_selected_block=True,
                                                     save_reload_pixels_match=True, subsequent_default_keeps_manual_font=True)
                 editor._inspector_tabs.setCurrentIndex(0)
+                window._pref_toggle.setChecked(False)
+                QTest.qWait(60)
                 window._add_paths([page])
                 capture('automatic-preview', window.translate_tab)
                 for width, height in ((1024, 720), (960, 540), (820, 480)):
                     window.resize(min(width, int(screen.width() * .94)), min(height, int(screen.height() * .94)))
                     capture(f'automatic-{width}', window.translate_tab,
-                            (window._add_btn, window._start_btn, window._font_picker.combo, window._font_picker.import_button, window._font_picker.library_button))
+                            (window._add_btn, window._start_btn))
                     capture(f'settings-{width}', settings, (settings._save_btn,))
                     capture(f'diagnosis-{width}', diagnosis, (diagnosis._send_btn,))
                     window.tabs.setCurrentWidget(editor)

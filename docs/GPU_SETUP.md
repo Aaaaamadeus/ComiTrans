@@ -1,5 +1,7 @@
 # Windows GPU 安装与排查
 
+在「设置 → 运行与输出 → GPU 安装说明与下载」点击「下载安装便携 GPU 运行库」，完成后重启。首次下载约 1.53 GB，需要兼容的 NVIDIA 驱动。DLL 保存在程序旁的 gpu-runtime 目录，无需另外安装 Python 或配置 PATH。
+
 ComiTrans v2.5.0 的程序包和模型包均不附带 CUDA/cuDNN，也不发布额外运行库附件。软件内入口是 **设置 → 运行与输出 → GPU 安装说明与下载**。下载与安装由用户在官方页面完成，程序不会自动下载或启动安装器。
 
 新安装默认优先使用 GPU；旧配置中明确关闭 GPU 的选择保持不变。只有 CPU 或不使用 GPU 时，可以关闭“使用 GPU”，无需安装下面的 NVIDIA 库。
@@ -22,6 +24,7 @@ Windows 上，程序在初始化 GPU 模型前注册以下已存在的 DLL 目�
 
 - `CUDA_PATH_V12_8`、`CUDA_PATH`、`CUDNN_PATH` 指定的目录及其 `bin` 子目录。
 - 系统 `PATH` 中实际含有 CUDA 12/cuDNN 9 DLL 的绝对路径，忽略空项和相对路径。
+- v2.5.0 修补版及 v2.5.1 会检查已安装的 CUDA 12.x 和 cuDNN 9.x 的版本子目录，也会检查当前 Windows 用户的 `%LOCALAPPDATA%\ComiTrans\gpu-runtime\bin`。便携版在这些目录中分别定位 CUDA 和 cuDNN，可从两个不同目录加载。该用户目录可放入已有的兼容 NVIDIA DLL，多份 ComiTrans 安装共用。
 - 默认 `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\bin` 和 `C:\Program Files\NVIDIA\CUDNN\v9.10\bin`，包括后者的 `12.8` / `12.9` 子目录。
 
 自定义安装位置可以直接把实际 DLL 目录加入 `PATH`，或设置 `CUDA_PATH` / `CUDNN_PATH`。修改环境变量后应重启 ComiTrans；从终端启动时也应重新打开终端。程序只读取这些路径，不修改系统环境变量。

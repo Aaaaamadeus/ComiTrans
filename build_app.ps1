@@ -1,6 +1,9 @@
-param([switch]$IncludeModels)
+﻿param([switch]$IncludeModels)
 
-$ErrorActionPreference = "Stop"
+# Native tools such as PyInstaller write progress to stderr. Under Windows
+# PowerShell 5.1 that becomes a NativeCommandError, which "Stop" would turn into
+# a premature abort, so keep "Continue" and check $LASTEXITCODE after each step.
+$ErrorActionPreference = "Continue"
 
 Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
@@ -24,7 +27,9 @@ if ($IncludeModels) {
     $modelTarget = "dist\ComiTrans\comic-translate-ai\models"
     if (Test-Path "comic-translate-ai\models") {
         New-Item -ItemType Directory -Force -Path $modelTarget | Out-Null
-        Copy-Item -Recurse -Force "comic-translate-ai\models\*" $modelTarget
+        # The development model tree also contains non-ONNX weights. Use the release allowlist.
+        & ".\.venv\Scripts\python.exe" -c "import pathlib, shutil; from package_release import collect_models; root=pathlib.Path('dist'); [( (root / name).parent.mkdir(parents=True, exist_ok=True), shutil.copyfile(path, root / name)) for path, name in collect_models()]"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         Write-Host "模型已复制: $modelTarget"
     }
 } else {

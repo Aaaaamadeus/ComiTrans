@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from comic_translate_core.detector_paths import LEGACY_PATH, SPLIT_PATH, REGION_FILE, LINE_FILE
 from comic_translate_core.chinese import normalize_target_language
 from comic_translate_core.layout_options import normalize_text_color, normalize_vertical_alignment
 from .i18n import normalize_ui_language
@@ -118,6 +119,9 @@ def load_ai_config() -> dict[str, Any]:
         except Exception:
             pass  # Keep usable built-in fonts when an imported file is missing/corrupt.
     ocr_backend = str(raw.get("ocr_backend") or "auto").strip().lower()
+    ui_theme = str(raw.get("ui_theme") or "auto").strip().lower()
+    if ui_theme not in ("auto", "light", "dark"):
+        ui_theme = "auto"
     ocr_config = {key: raw.get(key, default) for key, default in OCR_DEFAULTS.items()}
     ocr_config["source_language"] = str(raw.get("source_language") or "ja").strip().lower()
 
@@ -125,6 +129,8 @@ def load_ai_config() -> dict[str, Any]:
         **ocr_config,
         "ui_language": normalize_ui_language(raw.get("ui_language")),
         "ui_language_selected": bool(raw.get("ui_language_selected", False)),
+        "ui_theme": ui_theme,
+        "ui_reduced_motion": bool(raw.get("ui_reduced_motion", False)),
         "api_key": _clean_text(raw.get("api_key")),
         "api_base_url": _clean_text(raw.get("api_base_url")),
         "translation_model": _clean_text(raw.get("translation_model")) or "gemini-2.5-flash",
@@ -151,9 +157,10 @@ def load_ai_config() -> dict[str, Any]:
         "font_fallbacks": font_fallbacks,
         "translation_font": translation_font,
         "translation_font_active": translation_font_active,
-        "detector_model": str(_resolve_path(raw.get("detector_model"), "text_detector/comic-text-detector.onnx", base=MODELS_ROOT)),
+        "detector_model": str(_detector_path(raw.get("detector_model"))),
         "lama_model": str(_resolve_path(raw.get("lama_model"), "manga-lama/lama-manga-dynamic.onnx", base=MODELS_ROOT)),
         "ocr_backend": ocr_backend,
+        "charspot_ocr_model": str(_resolve_path(raw.get("charspot_ocr_model"), "charspot-small", base=MODELS_ROOT)),
         "ocr_model": str(_resolve_path(raw.get("ocr_model"), "manga-ocr-onnx", base=MODELS_ROOT)),
         "baberu_ocr_model": str(_resolve_path(raw.get("baberu_ocr_model"), "baberu-ocr", base=MODELS_ROOT)),
         "korean_ocr_model": str(_resolve_path(raw.get("korean_ocr_model"), "ppocr/korean_PP-OCRv5_rec_mobile.onnx", base=MODELS_ROOT)),
@@ -218,12 +225,40 @@ def _baberu_ocr_complete(path: Path) -> bool:
     )
 
 
+def _detector_path(value):
+    # Older installations saved this relative default even without a user choice.
+    # Absolute paths and other custom paths stay explicit.
+    setting = _clean_text(value)
+    if setting and setting != "auto" and Path(setting) != Path("models") / LEGACY_PATH:
+        return _resolve_path(setting, str(SPLIT_PATH), base=MODELS_ROOT)
+    new = MODELS_ROOT / SPLIT_PATH
+    old = MODELS_ROOT / LEGACY_PATH
+    try:
+        if not new.parent.exists() and old.is_file():
+            return old
+    except PermissionError:
+        # Report access failures through the UI's model check.
+        pass
+    return new
+
+
 def missing_models(config: dict[str, Any]) -> list[str]:
     missing = validate_ocr_config(config)
+    try:
+        return _check_model_paths(config, missing)
+    except PermissionError as exc:
+        missing.append(f"模型读取权限不足：{exc.filename or exc}")
+        return missing
+
+
+def _check_model_paths(config: dict[str, Any], missing: list[str]) -> list[str]:
     for key in ("detector_model", "lama_model"):
         path = Path(config[key])
         if not path.exists():
             missing.append(f"{key}: {path}")
+    detector = Path(config["detector_model"])
+    if detector.name == REGION_FILE and not detector.with_name(LINE_FILE).is_file():
+        missing.append(f"detector_model: {detector.with_name(LINE_FILE)}")
     backend = effective_ocr_backend(config)
     if backend == "custom":
         return missing
@@ -231,6 +266,14 @@ def missing_models(config: dict[str, Any]) -> list[str]:
         key = "korean_ocr_model" if source_language(config) == "ko" else "english_ocr_model"
         if not Path(config.get(key) or "").is_file():
             missing.append(f"{key}: {config.get(key, '')}（请运行 scripts/download_ocr_models.py）")
+        return missing
+    charspot_path = Path(config.get("charspot_ocr_model") or MODELS_ROOT / "charspot-small")
+    charspot_ok = all((charspot_path / name).is_file() for name in ("model.onnx", "config.json", "vocab.json"))
+    if backend == "charspot":
+        if not charspot_ok:
+            missing.append(f"CharSpot Small: {charspot_path}（请安装本版模型包）")
+        return missing
+    if backend == "auto" and charspot_ok:
         return missing
     manga_path = Path(config["ocr_model"])
     baberu_path = Path(config["baberu_ocr_model"])
@@ -242,6 +285,6 @@ def missing_models(config: dict[str, Any]) -> list[str]:
         missing.append(f"ocr_model: {manga_path} (manga-ocr 模型文件不完整)")
     elif backend == "auto" and not (baberu_ok or manga_ok):
         missing.append(
-            f"OCR: Baberu ({baberu_path}) 与 manga-ocr ({manga_path}) 均不完整"
+            f"OCR: 请安装 CharSpot Small ({charspot_path})，或提供完整的旧日语模型。"
         )
     return missing

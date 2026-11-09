@@ -270,7 +270,7 @@ class TextBlock(object):
             return self.default_stroke_width
         return 0
 
-def sort_textblk_list(blk_list: List[TextBlock], im_w: int, im_h: int) -> List[TextBlock]:
+def sort_textblk_list(blk_list: List[TextBlock], im_w: int, im_h: int, *, right_to_left=None) -> List[TextBlock]:
     if len(blk_list) == 0:
         return blk_list
     num_ja = 0
@@ -280,7 +280,7 @@ def sort_textblk_list(blk_list: List[TextBlock], im_w: int, im_h: int) -> List[T
             num_ja += 1
         xyxy.append(blk.xyxy)
     xyxy = np.array(xyxy)
-    flip_lr = num_ja > len(blk_list) / 2
+    flip_lr = num_ja > len(blk_list) / 2 if right_to_left is None else right_to_left
     im_oriw = im_w
     if im_w > im_h:
         im_w /= 2

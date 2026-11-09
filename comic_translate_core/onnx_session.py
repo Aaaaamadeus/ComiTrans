@@ -18,15 +18,24 @@ def _preload_cuda(ort):
         if preload is not None:
             # ORT locates installed CUDA/cuDNN DLLs without importing torch.
             # Available providers alone do not mean their DLLs can be loaded.
+            directories = []
             if hasattr(os, 'add_dll_directory'):
                 for directory in runtime_directories():
                     # Python 3.8+ does not search PATH for dependent DLLs by
                     # default. Keep handles for cuDNN's late-loaded engines.
                     try:
                         _dll_directory_handles.append(os.add_dll_directory(str(directory)))
+                        directories.append(directory)
                     except OSError as exc:
                         print(f'[WARNING] CUDA 目录不可用: {directory}: {exc}')
-            preload()
+            cuda = next((d for d in directories if (d / 'cublas64_12.dll').is_file() and (d / 'cudart64_12.dll').is_file()), None)
+            cudnn = next((d for d in directories if (d / 'cudnn64_9.dll').is_file()), None)
+            if cuda and cudnn:
+                preload(cuda=True, cudnn=False, directory=str(cuda))
+                preload(cuda=False, cudnn=True, directory=str(cudnn))
+                print(f'[GPU] CUDA: {cuda}; cuDNN: {cudnn}')
+            else:
+                preload()
         _cuda_preloaded = True
 
 

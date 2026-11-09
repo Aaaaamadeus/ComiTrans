@@ -5,7 +5,7 @@ from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
-from .theme import ui_font
+from .theme import color, theme_changed, ui_font
 
 
 STAGE_ORDER = ["start", "detect", "ocr", "translate", "inpaint", "typeset", "save"]
@@ -46,6 +46,7 @@ class StepPanel(QWidget):
         self.setFixedHeight(54)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        theme_changed.changed.connect(self._refresh)
         self._file_label = QLabel(tr('等待任务'), self)
         self._file_label.hide()
         for index, stage in enumerate(STAGE_ORDER, start=1):
@@ -162,9 +163,10 @@ class StepPanel(QWidget):
             name.setFont(ui_font(12 if self._compact or self.width() < 850 else 13,
                                  QFont.Bold if state in (RUNNING, DONE) else QFont.Medium))
             status.setFont(ui_font(11))
-            name.setStyleSheet('color: #111111; background: transparent;')
-            status.setStyleSheet('color: %s; background: transparent;' %
-                                ('#111111' if state in (RUNNING, FAILED) else '#595959'))
+            name.setStyleSheet(f'color: {color("ink")}; background: transparent;')
+            status.setStyleSheet(
+                'color: %s; background: transparent;' %
+                (color('ink') if state in (RUNNING, FAILED) else color('secondary')))
             status.setText(tr(STATUS_TEXT[state]))
             status.setVisible(not self._compact)
             name.setAccessibleName(f'{tr(STAGE_LABELS[stage])}, {tr(STATUS_TEXT[state])}')
@@ -191,20 +193,20 @@ class StepPanel(QWidget):
         radius = 5.5 if self._compact else 7.0
         cell = self.width() / len(STAGE_ORDER)
         left, right = 4.0, self.width() - 4.0
-        painter.setPen(QPen(QColor('#D0D0D0'), 3, Qt.SolidLine, Qt.RoundCap))
+        painter.setPen(QPen(QColor(color('rule')), 3, Qt.SolidLine, Qt.RoundCap))
         painter.drawLine(QPointF(left, y), QPointF(right, y))
         if self.completed_nodes:
             endpoint = right if self.completed_nodes == 7 else self.completed_nodes * cell
-            painter.setPen(QPen(QColor('#111111'), 4, Qt.SolidLine, Qt.RoundCap))
+            painter.setPen(QPen(QColor(color('ink')), 4, Qt.SolidLine, Qt.RoundCap))
             painter.drawLine(QPointF(left, y), QPointF(endpoint, y))
         for index, stage in enumerate(STAGE_ORDER):
             state = self._states[stage]
             x = (index + .5) * cell
-            ink = QColor('#777777' if state in (PENDING, CANCELLED) else '#111111')
+            ink = QColor(color('disabled') if state in (PENDING, CANCELLED) else color('ink'))
             painter.setPen(QPen(ink, 2.5 if state in (RUNNING, FAILED) else 1.5))
-            painter.setBrush(QColor('#111111' if state == DONE else '#FFFFFF'))
+            painter.setBrush(QColor(color('ink') if state == DONE else color('paper')))
             painter.drawEllipse(QPointF(x, y), radius, radius)
-            painter.setPen(QPen(QColor('#FFFFFF') if state == DONE else ink, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.setPen(QPen(QColor(color('paper')) if state == DONE else ink, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
             if state == DONE:
                 tick = QPainterPath(QPointF(x - radius * .45, y))
                 tick.lineTo(x - radius * .1, y + radius * .35)

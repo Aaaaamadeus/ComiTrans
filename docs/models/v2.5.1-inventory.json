@@ -1,0 +1,305 @@
+{
+  "baseline_bytes": 584467185,
+  "limit_bytes": 876700777,
+  "bytes": 284712120,
+  "baseline_ratio": 0.4871310610877153,
+  "budget_used_ratio": 0.32475404091035726,
+  "files": [
+    {
+      "path": "ComiTrans/comic-translate-ai/models/manga-lama/lama-manga-dynamic.onnx",
+      "bytes": 206291843,
+      "sha256": "de31ffa5ba26916b8ea35319f6c12151ff9654d4261bccf0583a69bb095315f9"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/ppocr/korean_PP-OCRv5_rec_mobile.onnx",
+      "bytes": 13488748,
+      "sha256": "cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/ppocr/en_PP-OCRv5_rec_mobile.onnx",
+      "bytes": 7872351,
+      "sha256": "c3461add59bb4323ecba96a492ab75e06dda42467c9e3d0c18db5d1d21924be8"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/charspot-small/model.onnx",
+      "bytes": 43992111,
+      "sha256": "05fb79760f8e3dbc989b61f23a34c46b511818a2166573ce7e41d994f4403843"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/charspot-small/config.json",
+      "bytes": 645,
+      "sha256": "fbab49bfbfee9e9fee22e74288202a7928e268e9b03de185aa9e206614b0a65c"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/charspot-small/vocab.json",
+      "bytes": 62244,
+      "sha256": "9f72fc7852b1432bcb61b3b94b2e4cd8abef52b01e9051550a6a3070e2b314d5"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/charspot-small/LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/charspot-small/LICENSE_MODEL",
+      "bytes": 20850,
+      "sha256": "e66c269d4819aaab34b49ef5220c4ddab6756f21bb5180761a4eb8561f2b7bbd"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/charspot-small/NOTICE.md",
+      "bytes": 3097,
+      "sha256": "6f81dc2287f230c2d1329dd819552313d2e920e64d820c36f2a514073a449d35"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/charspot-small/README.md",
+      "bytes": 16451,
+      "sha256": "5291292e48d623bf3eb2e503e77e9c230a6f1058f582c9a5faccad99a7581253"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/charspot-small/model-manifest.json",
+      "bytes": 2282,
+      "sha256": "a663108f9d47e45f7190de6b0e5b6ba942eaa650554af98f6f5262ee7538cc5d"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/split-detector/detector-v4-s_int8.onnx",
+      "bytes": 11120765,
+      "sha256": "5fe9e4f576e49d4e7e8b0e029d6d3cdc252abd4694113e1cae120e62c931ea79"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/split-detector/manga_det_v0.2.onnx",
+      "bytes": 1816954,
+      "sha256": "d132078c46e292b226fb5a2ca52a7612ad319262dfdf493e7d8e3be435295978"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/split-detector/LICENSE.txt",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/split-detector/model-manifest.json",
+      "bytes": 1063,
+      "sha256": "9fc9407b46feeb8592670f93b10f6c9e19f920de6e0242d75da62810b312ef47"
+    }
+  ],
+  "graphs": [
+    {
+      "path": "ComiTrans/comic-translate-ai/models/manga-lama/lama-manga-dynamic.onnx",
+      "external_data": [],
+      "inputs": [
+        {
+          "name": "image",
+          "dtype": 1,
+          "shape": [
+            "batch",
+            3,
+            "h",
+            "w"
+          ]
+        },
+        {
+          "name": "mask",
+          "dtype": 1,
+          "shape": [
+            "batch",
+            1,
+            "h",
+            "w"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "inpainted",
+          "dtype": 1,
+          "shape": [
+            "batch",
+            3,
+            "h",
+            "w"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/ppocr/korean_PP-OCRv5_rec_mobile.onnx",
+      "external_data": [],
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": 1,
+          "shape": [
+            "DynamicDimension.0",
+            3,
+            "?",
+            "DynamicDimension.1"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "fetch_name_0",
+          "dtype": 1,
+          "shape": [
+            "DynamicDimension.0",
+            "Reshape_524_o0__d2",
+            11947
+          ]
+        }
+      ]
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/ppocr/en_PP-OCRv5_rec_mobile.onnx",
+      "external_data": [],
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": 1,
+          "shape": [
+            "DynamicDimension.0",
+            3,
+            "?",
+            "DynamicDimension.1"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "fetch_name_0",
+          "dtype": 1,
+          "shape": [
+            "DynamicDimension.0",
+            "Reshape_524_o0__d2",
+            438
+          ]
+        }
+      ]
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/charspot-small/model.onnx",
+      "external_data": [],
+      "inputs": [
+        {
+          "name": "img",
+          "dtype": 1,
+          "shape": [
+            1,
+            3,
+            "H",
+            "W"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "boxes",
+          "dtype": 1,
+          "shape": [
+            "n",
+            4
+          ]
+        },
+        {
+          "name": "scores",
+          "dtype": 1,
+          "shape": [
+            "n"
+          ]
+        },
+        {
+          "name": "ids",
+          "dtype": 7,
+          "shape": [
+            "n"
+          ]
+        },
+        {
+          "name": "order",
+          "dtype": 7,
+          "shape": [
+            "n"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/split-detector/detector-v4-s_int8.onnx",
+      "external_data": [],
+      "inputs": [
+        {
+          "name": "images",
+          "dtype": 1,
+          "shape": [
+            "N",
+            3,
+            640,
+            640
+          ]
+        },
+        {
+          "name": "orig_target_sizes",
+          "dtype": 7,
+          "shape": [
+            "N",
+            2
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "labels",
+          "dtype": 7,
+          "shape": [
+            1,
+            300
+          ]
+        },
+        {
+          "name": "boxes",
+          "dtype": 1,
+          "shape": [
+            1,
+            300,
+            4
+          ]
+        },
+        {
+          "name": "scores",
+          "dtype": 1,
+          "shape": [
+            1,
+            300
+          ]
+        }
+      ]
+    },
+    {
+      "path": "ComiTrans/comic-translate-ai/models/split-detector/manga_det_v0.2.onnx",
+      "external_data": [],
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": 1,
+          "shape": [
+            "DynamicDimension.0",
+            3,
+            "DynamicDimension.1",
+            "DynamicDimension.2"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "fetch_name_0",
+          "dtype": 1,
+          "shape": [
+            "DynamicDimension.3",
+            1,
+            "DynamicDimension.4",
+            "DynamicDimension.5"
+          ]
+        }
+      ]
+    }
+  ],
+  "archive_uncompressed_bytes": 284712120
+}

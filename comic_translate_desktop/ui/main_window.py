@@ -63,7 +63,9 @@ from .api_config_page import ApiConfigPage
 from .editor_page import EditorPage
 from .error_log_page import ErrorLogPage
 from .step_panel import StepPanel
-from .theme import APP_STYLESHEET, brand_font, refresh_style
+from .theme import apply_theme, brand_font, refresh_style, set_themed_icon
+from .motion import fade_in, set_pulse, set_reduced_motion
+from .window_chrome import apply_window_chrome, watch_window_chrome
 from .preview import ImagePreview
 from .log_panel import LogPanel
 from .font_picker import TranslationFontPicker
@@ -96,6 +98,7 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
 
         self.config = app_config.load_ai_config()
+        set_reduced_motion(self.config.get('ui_reduced_motion', False))
         self.pipeline = None
         self.pipeline_fingerprint = None
         self.worker = None
@@ -108,6 +111,7 @@ class MainWindow(QMainWindow):
         self._prompt_refresh_timer.timeout.connect(self._refresh_error_page)
 
         self._build_ui()
+        watch_window_chrome(self)
         self._star_prompt = StarPrompt(self.centralWidget())
         self._append_log(tr('本地客户端已就绪。'))
         if self.config["api_key"] and self.config["api_key"] == self.config["translation_model"]:
@@ -116,7 +120,7 @@ class MainWindow(QMainWindow):
         self._start_warmup()
 
     def _build_ui(self) -> None:
-        self.setStyleSheet(APP_STYLESHEET)
+        apply_theme(QApplication.instance(), self.config.get('ui_theme', 'auto'))
         central = QWidget()
         central.setObjectName("appRoot")
         self.setCentralWidget(central)
@@ -146,13 +150,25 @@ class MainWindow(QMainWindow):
             button.setProperty("role", "nav")
             header.addWidget(button)
         header.addStretch()
-        self.status_label = QLabel(tr('○ 就绪'))
-        self.status_label.setObjectName("statusPill")
-        self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
-        self.status_label.setMinimumWidth(100)
-        self.status_label.setMaximumWidth(180)
-        header.addWidget(self.status_label)
+        self.status_pill = QFrame()
+        self.status_pill.setObjectName('statusPill')
+        self.status_pill.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.status_pill.setMinimumWidth(96)
+        self.status_pill.setMaximumWidth(190)
+        pill_layout = QHBoxLayout(self.status_pill)
+        pill_layout.setContentsMargins(8, 4, 10, 4)
+        pill_layout.setSpacing(6)
+        self._status_dot = QLabel()
+        self._status_dot.setObjectName('statusDot')
+        self._status_dot.setFixedSize(8, 8)
+        self._status_dot.setProperty('state', 'idle')
+        pill_layout.addWidget(self._status_dot)
+        self.status_label = QLabel(tr('就绪'))
+        self.status_label.setObjectName('statusText')
+        self.status_label.setProperty('state', 'idle')
+        self.status_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        pill_layout.addWidget(self.status_label)
+        header.addWidget(self.status_pill)
         self._stop_btn = QPushButton(tr('□ 停止任务'))
         self._stop_btn.setToolTip(tr('请求停止，等待后台安全收尾'))
         header.addWidget(self._stop_btn)
@@ -249,9 +265,11 @@ class MainWindow(QMainWindow):
         label.setObjectName("dropTitle")
         label.setAlignment(Qt.AlignCenter)
         drop.addWidget(label)
-        self._add_btn = QPushButton(tr('＋ 添加文件'))
+        self._add_btn = QPushButton(tr('添加文件'))
+        set_themed_icon(self._add_btn, 'plus')
         self._add_btn.setProperty('role', 'quiet')
         self._folder_btn = QPushButton(tr('添加文件夹'))
+        set_themed_icon(self._folder_btn, 'folder')
         self._folder_btn.setProperty("role", "quiet")
         drop.addWidget(self._add_btn)
         drop.addWidget(self._folder_btn)
@@ -316,8 +334,12 @@ class MainWindow(QMainWindow):
         self._source_language.setToolTip(tr('其它语言可在设置中接入自定义 OCR'))
         self._source_language.currentIndexChanged.connect(self._change_source_language)
         control_row.addWidget(self._source_language, 0, 1)
+        self._language_arrow = QLabel('→')
+        self._language_arrow.setProperty('muted', True)
+        self._language_arrow.setAccessibleName(tr('翻译方向'))
+        control_row.addWidget(self._language_arrow, 0, 2)
         self._target_caption = QLabel(tr('译文'))
-        control_row.addWidget(self._target_caption, 0, 2)
+        control_row.addWidget(self._target_caption, 0, 3)
         self._target_language = QComboBox()
         self._target_language.setAccessibleName(tr('译文简繁切换'))
         self._target_language.setMinimumWidth(170 if ui_language() == 'en' else 140 if ui_language() == 'ja' else 110)
@@ -327,15 +349,18 @@ class MainWindow(QMainWindow):
         self._target_language.setCurrentIndex(max(0, self._target_language.findData(self.config.get('target_language', 'zh-Hans'))))
         self._target_language.setToolTip(tr('选择简体中文或繁體中文，自动保存并用于后续翻译。'))
         self._target_language.currentIndexChanged.connect(self._change_target_language)
-        control_row.addWidget(self._target_language, 0, 3)
+        control_row.addWidget(self._target_language, 0, 4)
         self._pref_toggle = QToolButton()
         self._pref_toggle.setText(tr('翻译偏好'))
         self._pref_toggle.setCheckable(True)
         self._pref_toggle.setArrowType(Qt.RightArrow)
         self._pref_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self._pref_toggle.setProperty("role", "quiet")
-        control_row.addWidget(self._pref_toggle, 0, 4)
         control_row.setColumnStretch(5, 1)
+        self._control_divider = QFrame()
+        self._control_divider.setObjectName('optionDivider')
+        self._control_divider.setFrameShape(QFrame.VLine)
+        self._control_divider.setFixedWidth(1)
         self._language_stacked = False
         self._start_btn = QPushButton(tr('开始翻译'))
         self._start_btn.setProperty("role", "primary")
@@ -369,19 +394,25 @@ class MainWindow(QMainWindow):
         pref_layout.setContentsMargins(0, 0, 0, 0)
         pref_layout.setSpacing(10)
         pref_layout.addWidget(self._font_picker)
+
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(8)
         color_row = QHBoxLayout()
-        color_row.addWidget(QLabel(tr('文字颜色')))
+        color_label = QLabel(tr('文字颜色'))
+        color_label.setMinimumWidth(76)
+        color_row.addWidget(color_label)
         self._translation_color = TextColorPicker(self.config.get('text_color'))
         self._translation_color.setAccessibleName(tr('译文默认文字颜色'))
         self._translation_color.color_changed.connect(self._change_translation_color)
         color_row.addWidget(self._translation_color)
-        color_hint = QLabel(tr('自动保存 · 下次翻译生效'))
-        color_hint.setProperty('muted', True)
-        color_hint.setWordWrap(True)
-        color_row.addWidget(color_hint, 1)
-        pref_layout.addLayout(color_row)
+        color_row.addStretch(1)
+        left_layout.addLayout(color_row)
         alignment_row = QHBoxLayout()
-        alignment_row.addWidget(QLabel(tr('竖排列对齐')))
+        alignment_label = QLabel(tr('竖排列对齐'))
+        alignment_label.setMinimumWidth(76)
+        alignment_row.addWidget(alignment_label)
         self._translation_alignment = QComboBox()
         self._translation_alignment.setAccessibleName(tr('译文默认竖排列对齐'))
         self._translation_alignment.setMinimumWidth(140)
@@ -392,51 +423,15 @@ class MainWindow(QMainWindow):
         self._translation_alignment.setToolTip(tr('自动保存，下次翻译生效；竖排各列按最长列的顶部或底部对齐，整组文字保持居中。横排不受影响。'))
         self._translation_alignment.currentIndexChanged.connect(self._change_translation_alignment)
         alignment_row.addWidget(self._translation_alignment)
-        alignment_hint = QLabel(tr('自动保存 · 下次翻译生效'))
-        alignment_hint.setProperty('muted', True)
-        alignment_hint.setWordWrap(True)
-        alignment_row.addWidget(alignment_hint, 1)
-        pref_layout.addLayout(alignment_row)
+        alignment_row.addStretch(1)
+        left_layout.addLayout(alignment_row)
 
         self._resume_enabled = QCheckBox(tr('断点续传：跳过已完成页面'))
         self._resume_enabled.setChecked(self.config.get('resume_enabled', True))
         self._resume_enabled.setToolTip(tr('中断后重新添加原文件并使用同一输出目录，即可继续。取消勾选将从头翻译。'))
         self._resume_enabled.toggled.connect(self._save_translation_preferences)
-        pref_layout.addWidget(self._resume_enabled)
+        left_layout.addWidget(self._resume_enabled)
 
-        prompt_panel = QVBoxLayout()
-        prompt_panel.setSpacing(4)
-        prompt_label = QLabel(tr('背景提示词'))
-        prompt_label.setProperty("muted", True)
-        self._prompt_input = QPlainTextEdit()
-        self._prompt_input.setPlaceholderText(
-            tr('可填写故事背景、世界观、人物关系、语气风格等，翻译时会自动附加到提示词中')
-        )
-        self._prompt_input.setMinimumHeight(68)
-        self._prompt_input.setMaximumHeight(78)
-        prompt_panel.addWidget(prompt_label)
-        prompt_panel.addWidget(self._prompt_input)
-
-        names_panel = QVBoxLayout()
-        names_panel.setSpacing(4)
-        names_label = QLabel(tr('中文人名（每行一个，AI 会自动对照）'))
-        names_label.setProperty("muted", True)
-        self._names_input = QPlainTextEdit()
-        self._names_input.setPlaceholderText(tr('例如：\n路飞\n娜美\n索隆'))
-        self._names_input.setMinimumHeight(68)
-        self._names_input.setMaximumHeight(78)
-        names_panel.addWidget(names_label)
-        names_panel.addWidget(self._names_input)
-
-        context_row = QHBoxLayout()
-        context_row.setSpacing(10)
-        self._preference_context_layout = context_row
-        context_row.addLayout(prompt_panel, 1)
-        context_row.addLayout(names_panel, 1)
-        pref_layout.addLayout(context_row)
-
-        self._prompt_input.setPlainText(self.config.get("translation_prompt", ""))
-        self._names_input.setPlainText(self.config.get("chinese_names", ""))
         self._pref_scroll_value = 0
         self._pref_save_error = False
         preference_status = QHBoxLayout()
@@ -449,7 +444,50 @@ class MainWindow(QMainWindow):
         self._pref_retry.clicked.connect(self._save_translation_preferences)
         preference_status.addWidget(self._pref_status, 1)
         preference_status.addWidget(self._pref_retry)
-        pref_layout.addLayout(preference_status)
+        left_layout.addLayout(preference_status)
+        left_layout.addStretch(1)
+
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(8)
+        prompt_panel = QVBoxLayout()
+        prompt_panel.setSpacing(4)
+        prompt_label = QLabel(tr('背景提示词'))
+        prompt_label.setProperty("muted", True)
+        self._prompt_input = QPlainTextEdit()
+        self._prompt_input.setObjectName('prefInput')
+        self._prompt_input.setPlaceholderText(
+            tr('可填写故事背景、世界观、人物关系、语气风格等，翻译时会自动附加到提示词中')
+        )
+        self._prompt_input.setMinimumHeight(64)
+        self._prompt_input.setMaximumHeight(82)
+        prompt_panel.addWidget(prompt_label)
+        prompt_panel.addWidget(self._prompt_input)
+
+        names_panel = QVBoxLayout()
+        names_panel.setSpacing(4)
+        names_label = QLabel(tr('中文人名（每行一个，AI 会自动对照）'))
+        names_label.setProperty("muted", True)
+        self._names_input = QPlainTextEdit()
+        self._names_input.setObjectName('prefInput')
+        self._names_input.setPlaceholderText(tr('例如：\n路飞\n娜美\n索隆'))
+        self._names_input.setMinimumHeight(64)
+        self._names_input.setMaximumHeight(82)
+        names_panel.addWidget(names_label)
+        names_panel.addWidget(self._names_input)
+        right_layout.addLayout(prompt_panel)
+        right_layout.addLayout(names_panel)
+        right_layout.addStretch(1)
+
+        self._pref_columns = QHBoxLayout()
+        self._pref_columns.setSpacing(24)
+        self._pref_columns.addWidget(left_panel, 3)
+        self._pref_columns.addWidget(right_panel, 2)
+        pref_layout.addLayout(self._pref_columns)
+
+        self._prompt_input.setPlainText(self.config.get("translation_prompt", ""))
+        self._names_input.setPlainText(self.config.get("chinese_names", ""))
         self._pref_toggle.toggled.connect(self._toggle_preferences)
         self._pref_save_timer = QTimer(self)
         self._pref_save_timer.setSingleShot(True)
@@ -750,12 +788,14 @@ class MainWindow(QMainWindow):
         self._update_actions()
 
     def _set_status(self, text: str, state: str = "idle") -> None:
-        symbol = {"idle": "○", "warming": "◉", "running": "◉", "ready": "✓", "success": "✓", "error": "⊠", "warning": "△", "stopping": "□", "cancelled": "—"}.get(state, "○")
-        self.status_label.setText(f'{symbol} {text}')
+        self.status_label.setText(text)
         self.status_label.setProperty("state", state)
+        self._status_dot.setProperty("state", state)
         refresh_style(self.status_label)
+        refresh_style(self._status_dot)
+        set_pulse(self._status_dot, state in ('running', 'warming'))
         self.status_label.setAccessibleName(tr(text))
-        self.status_label.setToolTip(tr(text))
+        self.status_pill.setToolTip(tr(text))
         if state not in ('running', 'stopping'):
             self.stage_focus.set_stage('—', text, self.stage_label.text())
 
@@ -1108,6 +1148,7 @@ class MainWindow(QMainWindow):
         self._pref_toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow)
         self._pref_container.setVisible(checked)
         if checked:
+            fade_in(self._pref_container, 160)
             QTimer.singleShot(0, lambda: self._pref_container.verticalScrollBar().setValue(self._pref_scroll_value))
         self._ui_settings.setValue('ui/preferencesVisible', checked)
         self._apply_compact_layout()
@@ -1123,14 +1164,20 @@ class MainWindow(QMainWindow):
             return
         compact = self.height() < 680
         # Leave a useful image viewport; additional preferences scroll inside the foldout.
-        self._pref_container.setMinimumHeight(120 if self._pref_toggle.isChecked() else 0)
-        self._pref_container.setMaximumHeight(max(120, min(280, self.height() - 440)))
-        if hasattr(self, '_preference_context_layout'):
-            self._preference_context_layout.setDirection(QHBoxLayout.TopToBottom if self._pref_container.width() < 580 else QHBoxLayout.LeftToRight)
+        expanded = self._pref_toggle.isChecked()
+        wide = self._pref_container.width() >= 680
+        available = max(200, self.height() - (376 if expanded else 436))
+        wanted = min(320, available)
+        if self.height() < 680:
+            wanted = min(wanted, 240)
+        self._pref_container.setMinimumHeight(wanted if expanded else 0)
+        self._pref_container.setMaximumHeight(wanted if expanded else 0)
+        if hasattr(self, '_pref_columns'):
+            self._pref_columns.setDirection(QHBoxLayout.LeftToRight if wide else QHBoxLayout.TopToBottom)
         self._brand_title.setFont(brand_font(28 if self.width() < 960 else 36 if self.width() < 1180 else 40))
         self._header_layout.setContentsMargins(12 if self.width() < 1120 else 20, 8, 12 if self.width() < 1120 else 20, 8)
-        self._nav_auto.setText(tr('自动处理') if self.width() < 1120 else tr('01  自动处理'))
-        self._nav_editor.setText(tr('嵌字精修') if self.width() < 1120 else tr('02  嵌字精修'))
+        self._nav_auto.setText(tr('自动处理') if (self.width() < 1120 or ui_language() != 'zh-CN') else tr('01  自动处理'))
+        self._nav_editor.setText(tr('嵌字精修') if (self.width() < 1120 or ui_language() != 'zh-CN') else tr('02  嵌字精修'))
         narrow = self.width() < 1120
         self._more_btn.setVisible(narrow)
         self._output_btn.setVisible(not narrow)
@@ -1141,29 +1188,53 @@ class MainWindow(QMainWindow):
         stacked = not inline and ui_language() != 'zh-CN'
         if stacked != self._language_stacked:
             self._language_stacked = stacked
-            fields = (self._source_caption, self._source_language, self._target_caption,
-                      self._target_language, self._pref_toggle)
+            fields = (self._source_caption, self._source_language, self._language_arrow,
+                      self._target_caption, self._target_language)
             for widget in fields:
                 self._language_grid.removeWidget(widget)
-            positions = ((0, 0), (1, 0), (0, 1), (1, 1), (1, 2)) if stacked else tuple((0, i) for i in range(5))
-            for widget, (row, column) in zip(fields, positions):
-                self._language_grid.addWidget(widget, row, column)
-            self._language_grid.setColumnStretch(5, 0 if stacked else 1)
+            if stacked:
+                self._language_grid.addWidget(self._source_caption, 0, 0)
+                self._language_grid.addWidget(self._source_language, 0, 1)
+                self._language_grid.addWidget(self._target_caption, 1, 0)
+                self._language_grid.addWidget(self._target_language, 1, 1)
+                self._language_arrow.setVisible(False)
+            else:
+                self._language_grid.addWidget(self._source_caption, 0, 0)
+                self._language_grid.addWidget(self._source_language, 0, 1)
+                self._language_grid.addWidget(self._language_arrow, 0, 2)
+                self._language_grid.addWidget(self._target_caption, 0, 3)
+                self._language_grid.addWidget(self._target_language, 0, 4)
+                self._language_arrow.setVisible(True)
+            self._language_grid.setColumnStretch(5, 1)
         if inline != self._controls_inline:
             self._controls_inline = inline
-            for widget in (self._language_controls, self._output_controls, self._start_btn):
+            for widget in (self._language_controls, self._output_controls, self._start_btn,
+                           self._pref_toggle, self._control_divider):
                 self._control_grid.removeWidget(widget)
-            self._control_grid.addWidget(self._language_controls, 0, 0, 1, 1 if inline else 2)
-            self._control_grid.addWidget(self._output_controls, 0 if inline else 1, 1 if inline else 0, 1, 1 if inline else 3)
-            self._control_grid.addWidget(self._start_btn, 0, 2)
-            self._control_grid.setColumnStretch(1, 1)
-        editing_preferences = compact and self._pref_toggle.isChecked()
-        self._output_controls.setVisible(self.height() >= 580 and not editing_preferences)
-        self.step_panel.setVisible((self.file_list.count() > 0 or self.worker is not None) and not editing_preferences)
-        self._elapsed_label.setVisible(not compact)
+            if inline:
+                self._control_grid.addWidget(self._language_controls, 0, 0)
+                self._control_grid.addWidget(self._control_divider, 0, 1)
+                self._control_grid.addWidget(self._output_controls, 0, 2)
+                self._control_grid.addWidget(self._pref_toggle, 0, 3)
+                self._control_grid.addWidget(self._start_btn, 0, 4)
+                self._control_divider.setVisible(True)
+            else:
+                self._control_grid.addWidget(self._language_controls, 0, 0, 1, 3)
+                self._control_grid.addWidget(self._pref_toggle, 0, 3, 1, 2, Qt.AlignRight)
+                self._control_grid.addWidget(self._output_controls, 1, 0, 1, 3)
+                self._control_grid.addWidget(self._start_btn, 1, 3, 1, 2, Qt.AlignRight)
+                self._control_divider.setVisible(False)
+            self._control_grid.setColumnStretch(1, 0)
+            self._control_grid.setColumnStretch(2, 1)
+        editing_preferences = self._pref_toggle.isChecked()
+        self._output_controls.setVisible(self.height() >= 580)
+        self.step_panel.setVisible((self.file_list.count() > 0 or self.worker is not None)
+                                   and not editing_preferences)
+        self._elapsed_label.setVisible(not compact and self.width() >= 1200)
         self.step_panel.set_compact(compact)
         self.preview_tabs.setVisible(True)
-        self._log_panel.setMaximumHeight(100 if compact else 16777215)
+        self._log_panel.setVisible(self._log_toggle.isChecked() and not editing_preferences)
+        self._log_panel.setMaximumHeight(100 if compact else (120 if editing_preferences else 16777215))
         self._log_toggle.setToolTip(tr('独立展开或收起详细日志'))
         margin = 12 if self.width() < 1180 else 20
         self._work_layout.setContentsMargins(margin, 8 if compact else 14, margin, 12)
@@ -1173,6 +1244,10 @@ class MainWindow(QMainWindow):
         self._file_selection_label.setVisible(not compact)
         self._drop_hint.setVisible(not compact)
         self._drop_title.setVisible(self.height() >= 580)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        apply_window_chrome(self)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1234,6 +1309,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr('设置未保存'), tr('无法保存设置：{error}', error=str(exc)))
             return
         self.api_config_page.load_config(self.config)
+        set_reduced_motion(self.config.get('ui_reduced_motion', False))
+        apply_theme(QApplication.instance(), self.config.get('ui_theme', 'auto'))
         self._font_picker.load_config(self.config)
         self._translation_color.set_color(self.config.get('text_color'))
         self.editor_page.set_watermark_enabled(bool(self.config.get("watermark_enabled", True)))

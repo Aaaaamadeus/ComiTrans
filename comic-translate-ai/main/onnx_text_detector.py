@@ -103,6 +103,16 @@ def _postprocess_mask_np(img: np.ndarray) -> np.ndarray:
     return img.astype(np.uint8)
 
 
+def create_text_detector(model_path, device="cpu", language="ja"):
+    from pathlib import Path
+    from comic_translate_core.detector_paths import REGION_FILE
+
+    if Path(model_path).name == REGION_FILE:
+        from onnx_split_detector import SplitTextDetector
+        return SplitTextDetector(model_path, device, language)
+    return OnnxTextDetector(model_path, device=device)
+
+
 class OnnxTextDetector:
     def __init__(self, model_path: str, input_size: int = 1024, device: str = "cpu", conf_thresh: float = 0.4, nms_thresh: float = 0.35, mask_thresh: float = 0.3):
         self.session = create_onnx_session(model_path, device)

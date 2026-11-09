@@ -1,0 +1,86 @@
+{
+  "cpu": {
+    "version": "2.5.0",
+    "frozen": true,
+    "success": true,
+    "providers": {
+      "detector": [
+        "CPUExecutionProvider"
+      ],
+      "inpainting": [
+        "CPUExecutionProvider"
+      ],
+      "ocr_vision": [
+        "CPUExecutionProvider"
+      ],
+      "ocr_decoder_prefill": [
+        "CPUExecutionProvider"
+      ],
+      "ocr_decoder_step": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "gpu_active": false,
+    "real_detection_and_ocr": true,
+    "native_repair_pixels": true,
+    "no_torch_import": true,
+    "translation_https_client": true,
+    "jpeg_paper_fill": true
+  },
+  "cuda": {
+    "version": "2.5.0",
+    "frozen": true,
+    "success": true,
+    "providers": {
+      "detector": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "inpainting": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "ocr_vision": [
+        "CPUExecutionProvider"
+      ],
+      "ocr_decoder_prefill": [
+        "CPUExecutionProvider"
+      ],
+      "ocr_decoder_step": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "gpu_active": true,
+    "real_detection_and_ocr": true,
+    "native_repair_pixels": true,
+    "no_torch_import": true,
+    "translation_https_client": true,
+    "jpeg_paper_fill": true
+  },
+  "portable_runtime_validation": {
+    "archive": "2.5.0",
+    "cuda_providers": {
+      "detector": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "inpainting": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "ocr_vision": [
+        "CPUExecutionProvider"
+      ],
+      "ocr_decoder_prefill": [
+        "CPUExecutionProvider"
+      ],
+      "ocr_decoder_step": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "cpu_control_version": "2.5.1",
+    "cpu_control_detection_and_ocr": true,
+    "runtime_source": "Downloaded pinned NVIDIA Windows wheels. Fresh app directory gpu-runtime/nvidia-cu12-v1/bin with empty CUDA and user runtime search paths."
+  },
+  "erase_quality_validation": "docs/models/white-paper-erase-validation.json"
+}

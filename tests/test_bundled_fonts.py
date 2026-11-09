@@ -120,6 +120,17 @@ class BundledFontTests(unittest.TestCase):
         self.assertIn(font_display_name(heavy), picker.name_label.text())
         self.assertTrue(picker.name_label.wordWrap())
 
+    def test_ui_font_never_falls_back_to_the_handwritten_log_face(self):
+        # This module runs offscreen, where Qt exposes no system fonts: exactly
+        # the environment that used to turn the whole UI into handwriting.
+        from comic_translate_desktop.ui.theme import (
+            UI_FALLBACK_FONT, UI_FONT_ALLOWLIST, _bundled_font_families, resolved_ui_font_family,
+        )
+        self.assertIn('Source Han Sans SC', _bundled_font_families(UI_FALLBACK_FONT))
+        family = resolved_ui_font_family()
+        self.assertIn(family, UI_FONT_ALLOWLIST)
+        self.assertNotIn('Aa', family)
+
     def test_original_name_search_selects_correct_reference_even_when_labels_match(self):
         combo = SearchableFontCombo()
         self.addCleanup(destroy_widget, combo)

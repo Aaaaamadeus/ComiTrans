@@ -1,0 +1,1207 @@
+{
+  "baseline-final": {
+    "backend": "baberu",
+    "model": "comic-translate-ai\\models\\baberu-ocr",
+    "threads": 0,
+    "ort": "1.23.2",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "processor": "AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD",
+    "cold_session_load_s": 0.4586461999999756,
+    "first_inference_s": 0.1917295999999169,
+    "memory": {
+      "working_set_bytes": 312811520,
+      "peak_working_set_bytes": 313311232,
+      "peak_commit_bytes": 803074048
+    },
+    "vram_bytes": 0,
+    "vram_note": "OCR sessions explicitly use CPU; GPU is not requested.",
+    "torch_imported": false,
+    "providers": {
+      "vision": [
+        "CPUExecutionProvider"
+      ],
+      "decoder_prefill": [
+        "CPUExecutionProvider"
+      ],
+      "decoder_step": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "aggregate": {
+      "samples": 28,
+      "reference_chars": 332,
+      "errors": 16,
+      "cer": 0.04819277108433735,
+      "exact": 0.6428571428571429,
+      "warm_median_ms": 158.73575000000528,
+      "warm_total_ms": 4496.053700000857
+    },
+    "groups": {
+      "real": {
+        "samples": 22,
+        "reference_chars": 278,
+        "errors": 12,
+        "cer": 0.04316546762589928,
+        "exact": 0.6363636363636364,
+        "warm_median_ms": 165.93775000001187,
+        "warm_total_ms": 3575.7231000004595
+      },
+      "synthetic": {
+        "samples": 6,
+        "reference_chars": 54,
+        "errors": 4,
+        "cer": 0.07407407407407407,
+        "exact": 0.6666666666666666,
+        "warm_median_ms": 153.69495000004463,
+        "warm_total_ms": 920.3306000003977
+      }
+    }
+  },
+  "candidate-final": {
+    "backend": "reference",
+    "model": "tmp\\model-upgrade\\baberu-v1.2",
+    "threads": 0,
+    "ort": "1.23.2",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "processor": "AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD",
+    "cold_session_load_s": 0.4604311000000507,
+    "first_inference_s": 0.16958849999991799,
+    "memory": {
+      "working_set_bytes": 313544704,
+      "peak_working_set_bytes": 314060800,
+      "peak_commit_bytes": 803799040
+    },
+    "vram_bytes": 0,
+    "vram_note": "OCR sessions explicitly use CPU; GPU is not requested.",
+    "torch_imported": false,
+    "providers": {
+      "vis": [
+        "CPUExecutionProvider"
+      ],
+      "pre": [
+        "CPUExecutionProvider"
+      ],
+      "stp": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "aggregate": {
+      "samples": 28,
+      "reference_chars": 332,
+      "errors": 11,
+      "cer": 0.03313253012048193,
+      "exact": 0.7142857142857143,
+      "warm_median_ms": 157.6865499998803,
+      "warm_total_ms": 4447.541899999351
+    },
+    "groups": {
+      "real": {
+        "samples": 22,
+        "reference_chars": 278,
+        "errors": 10,
+        "cer": 0.03597122302158273,
+        "exact": 0.6818181818181818,
+        "warm_median_ms": 163.88210000002346,
+        "warm_total_ms": 3544.4616999996015
+      },
+      "synthetic": {
+        "samples": 6,
+        "reference_chars": 54,
+        "errors": 1,
+        "cer": 0.018518518518518517,
+        "exact": 0.8333333333333334,
+        "warm_median_ms": 148.7842000000228,
+        "warm_total_ms": 903.0801999997493
+      }
+    }
+  },
+  "integrated": {
+    "backend": "baberu",
+    "model": "comic-translate-ai\\models\\baberu-ocr-v1.2",
+    "threads": 0,
+    "ort": "1.23.2",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "processor": "AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD",
+    "cold_session_load_s": 0.4959132999999838,
+    "first_inference_s": 0.17464620000009745,
+    "memory": {
+      "working_set_bytes": 312651776,
+      "peak_working_set_bytes": 313176064,
+      "peak_commit_bytes": 802783232
+    },
+    "vram_bytes": 0,
+    "vram_note": "OCR sessions explicitly use CPU; GPU is not requested.",
+    "torch_imported": false,
+    "providers": {
+      "vision": [
+        "CPUExecutionProvider"
+      ],
+      "decoder_prefill": [
+        "CPUExecutionProvider"
+      ],
+      "decoder_step": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "aggregate": {
+      "samples": 28,
+      "reference_chars": 332,
+      "errors": 11,
+      "cer": 0.03313253012048193,
+      "exact": 0.7142857142857143,
+      "warm_median_ms": 159.40354999997908,
+      "warm_total_ms": 4542.365199999267
+    },
+    "groups": {
+      "real": {
+        "samples": 22,
+        "reference_chars": 278,
+        "errors": 10,
+        "cer": 0.03597122302158273,
+        "exact": 0.6818181818181818,
+        "warm_median_ms": 166.86784999990323,
+        "warm_total_ms": 3632.219899999427
+      },
+      "synthetic": {
+        "samples": 6,
+        "reference_chars": 54,
+        "errors": 1,
+        "cer": 0.018518518518518517,
+        "exact": 0.8333333333333334,
+        "warm_median_ms": 150.38559999993595,
+        "warm_total_ms": 910.1452999998401
+      }
+    }
+  },
+  "manga-final": {
+    "backend": "manga",
+    "model": "comic-translate-ai\\models\\manga-ocr-onnx",
+    "threads": 0,
+    "ort": "1.23.2",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "processor": "AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD",
+    "cold_session_load_s": 0.3107139000001098,
+    "first_inference_s": 0.13511779999998907,
+    "memory": {
+      "working_set_bytes": 231481344,
+      "peak_working_set_bytes": 233897984,
+      "peak_commit_bytes": 720199680
+    },
+    "vram_bytes": 0,
+    "vram_note": "OCR sessions explicitly use CPU; GPU is not requested.",
+    "torch_imported": false,
+    "providers": {
+      "encoder": [
+        "CPUExecutionProvider"
+      ],
+      "decoder": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "aggregate": {
+      "samples": 28,
+      "reference_chars": 332,
+      "errors": 18,
+      "cer": 0.05421686746987952,
+      "exact": 0.6428571428571429,
+      "warm_median_ms": 85.26864999998907,
+      "warm_total_ms": 2848.8977999993494
+    },
+    "groups": {
+      "real": {
+        "samples": 22,
+        "reference_chars": 278,
+        "errors": 16,
+        "cer": 0.05755395683453238,
+        "exact": 0.5909090909090909,
+        "warm_median_ms": 116.92979999986619,
+        "warm_total_ms": 2360.778199999231
+      },
+      "synthetic": {
+        "samples": 6,
+        "reference_chars": 54,
+        "errors": 2,
+        "cer": 0.037037037037037035,
+        "exact": 0.8333333333333334,
+        "warm_median_ms": 81.25944999994772,
+        "warm_total_ms": 488.1196000001182
+      }
+    }
+  },
+  "ko-final": {
+    "backend": "ppocr",
+    "model": "comic-translate-ai\\models\\ppocr\\korean_PP-OCRv5_rec_mobile.onnx",
+    "threads": 0,
+    "ort": "1.23.2",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "processor": "AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD",
+    "cold_session_load_s": 0.3800337000000127,
+    "first_inference_s": 0.017998600000055376,
+    "memory": {
+      "working_set_bytes": 101273600,
+      "peak_working_set_bytes": 101773312,
+      "peak_commit_bytes": 600215552
+    },
+    "vram_bytes": 0,
+    "vram_note": "OCR sessions explicitly use CPU; GPU is not requested.",
+    "torch_imported": false,
+    "providers": {
+      "session": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "aggregate": {
+      "samples": 6,
+      "reference_chars": 54,
+      "errors": 9,
+      "cer": 0.16666666666666666,
+      "exact": 0.8333333333333334,
+      "warm_median_ms": 6.892649999940659,
+      "warm_total_ms": 41.28809999974692
+    },
+    "groups": {
+      "synthetic": {
+        "samples": 6,
+        "reference_chars": 54,
+        "errors": 9,
+        "cer": 0.16666666666666666,
+        "exact": 0.8333333333333334,
+        "warm_median_ms": 6.892649999940659,
+        "warm_total_ms": 41.28809999974692
+      }
+    }
+  },
+  "en-final": {
+    "backend": "ppocr",
+    "model": "comic-translate-ai\\models\\ppocr\\en_PP-OCRv5_rec_mobile.onnx",
+    "threads": 0,
+    "ort": "1.23.2",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "processor": "AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD",
+    "cold_session_load_s": 0.13361090000012155,
+    "first_inference_s": 0.007781299999805924,
+    "memory": {
+      "working_set_bytes": 91635712,
+      "peak_working_set_bytes": 92119040,
+      "peak_commit_bytes": 592220160
+    },
+    "vram_bytes": 0,
+    "vram_note": "OCR sessions explicitly use CPU; GPU is not requested.",
+    "torch_imported": false,
+    "providers": {
+      "session": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "aggregate": {
+      "samples": 6,
+      "reference_chars": 108,
+      "errors": 82,
+      "cer": 0.7592592592592593,
+      "exact": 0.16666666666666666,
+      "warm_median_ms": 6.328299999950104,
+      "warm_total_ms": 37.91240000009566
+    },
+    "groups": {
+      "synthetic": {
+        "samples": 6,
+        "reference_chars": 108,
+        "errors": 82,
+        "cer": 0.7592592592592593,
+        "exact": 0.16666666666666666,
+        "warm_median_ms": 6.328299999950104,
+        "warm_total_ms": 37.91240000009566
+      }
+    }
+  },
+  "candidate-threads1": {
+    "backend": "reference",
+    "model": "tmp\\model-upgrade\\baberu-v1.2",
+    "threads": 1,
+    "ort": "1.23.2",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "processor": "AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD",
+    "cold_session_load_s": 0.4340119999999388,
+    "first_inference_s": 0.49591609999993125,
+    "memory": {
+      "working_set_bytes": 305184768,
+      "peak_working_set_bytes": 305692672,
+      "peak_commit_bytes": 795676672
+    },
+    "vram_bytes": 0,
+    "vram_note": "OCR sessions explicitly use CPU; GPU is not requested.",
+    "torch_imported": false,
+    "providers": {
+      "vis": [
+        "CPUExecutionProvider"
+      ],
+      "pre": [
+        "CPUExecutionProvider"
+      ],
+      "stp": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "aggregate": {
+      "samples": 28,
+      "reference_chars": 332,
+      "errors": 11,
+      "cer": 0.03313253012048193,
+      "exact": 0.7142857142857143,
+      "warm_median_ms": 469.8661999999558,
+      "warm_total_ms": 13286.716499999784
+    },
+    "groups": {
+      "real": {
+        "samples": 22,
+        "reference_chars": 278,
+        "errors": 10,
+        "cer": 0.03597122302158273,
+        "exact": 0.6818181818181818,
+        "warm_median_ms": 479.75510000003396,
+        "warm_total_ms": 10486.660400000119
+      },
+      "synthetic": {
+        "samples": 6,
+        "reference_chars": 54,
+        "errors": 1,
+        "cer": 0.018518518518518517,
+        "exact": 0.8333333333333334,
+        "warm_median_ms": 465.929299999857,
+        "warm_total_ms": 2800.056099999665
+      }
+    }
+  },
+  "validation": {
+    "date": "2026-11-03",
+    "independent_reference_matches_integrated": true,
+    "matched_crops": 28,
+    "real_pages": 3,
+    "real_crops": 22,
+    "synthetic_crops_per_language": 6,
+    "labels": "Assistant visual transcription, not independent human gold",
+    "rights": "Repository pages authorized for local evaluation only; images and per-crop labels withheld",
+    "cold_definition": "Fresh process session creation; OS file cache was not flushed",
+    "warm_definition": "3 passes; sum of per-crop medians; images preloaded outside timing; preprocess/decode included",
+    "runtime": "ONNX Runtime 1.23.2 unchanged",
+    "paid_translation_api_calls": 0,
+    "focused_regression_tests": 79,
+    "legacy_outputs_unchanged_crops": 28,
+    "charspot_matches_reference_crops": 28,
+    "ui_language_tests": 16,
+    "selected": "CharSpot Small",
+    "comparative_run": "single_japanese_ocr"
+  },
+  "hardware": [
+    {
+      "device": "cpu",
+      "providers": {
+        "detector": [
+          "CPUExecutionProvider"
+        ],
+        "lama": [
+          "CPUExecutionProvider"
+        ]
+      },
+      "load_s": 6.373406000000159,
+      "detection_s": [
+        0.9422397999999248,
+        0.7521631999998135,
+        0.762491799999907
+      ],
+      "native_repair_s": [
+        0.3618311000000176,
+        0.3497498999997788,
+        0.348715699999957
+      ],
+      "detected_blocks": 9,
+      "memory": {
+        "working_set_bytes": 1409642496,
+        "peak_working_set_bytes": 1440509952,
+        "peak_commit_bytes": 2328936448
+      },
+      "native_dimensions_preserved": true,
+      "unmasked_pixels_identical": true,
+      "torch_imported": false,
+      "device_vram_snapshot_mib": "1543",
+      "vram_note": "Whole device snapshot after warm inference, includes other applications; not per-process peak."
+    },
+    {
+      "device": "cuda",
+      "providers": {
+        "detector": [
+          "CUDAExecutionProvider",
+          "CPUExecutionProvider"
+        ],
+        "lama": [
+          "CUDAExecutionProvider",
+          "CPUExecutionProvider"
+        ]
+      },
+      "load_s": 9.16156070000011,
+      "detection_s": [
+        0.8635842999999568,
+        0.11330679999991844,
+        0.12400819999993473
+      ],
+      "native_repair_s": [
+        0.27006180000012137,
+        0.06227250000006279,
+        0.05707119999988208
+      ],
+      "detected_blocks": 9,
+      "memory": {
+        "working_set_bytes": 1297367040,
+        "peak_working_set_bytes": 1440509952,
+        "peak_commit_bytes": 4086165504
+      },
+      "native_dimensions_preserved": true,
+      "unmasked_pixels_identical": true,
+      "torch_imported": false,
+      "device_vram_snapshot_mib": "3186",
+      "vram_note": "Whole device snapshot after warm inference, includes other applications; not per-process peak."
+    }
+  ],
+  "by_style": {
+    "baseline-final": {
+      "complex-background": {
+        "samples": 1,
+        "reference_chars": 3,
+        "errors": 1,
+        "cer": 0.3333333333333333,
+        "exact": 0.0,
+        "warm_median_ms": 124.37850000014805,
+        "warm_total_ms": 124.37850000014805
+      },
+      "horizontal": {
+        "samples": 1,
+        "reference_chars": 20,
+        "errors": 0,
+        "cer": 0.0,
+        "exact": 1.0,
+        "warm_median_ms": 184.34000000002015,
+        "warm_total_ms": 184.34000000002015
+      },
+      "horizontal-small": {
+        "samples": 1,
+        "reference_chars": 15,
+        "errors": 1,
+        "cer": 0.06666666666666667,
+        "exact": 0.0,
+        "warm_median_ms": 181.5819000000829,
+        "warm_total_ms": 181.5819000000829
+      },
+      "outline": {
+        "samples": 2,
+        "reference_chars": 33,
+        "errors": 4,
+        "cer": 0.12121212121212122,
+        "exact": 0.0,
+        "warm_median_ms": 172.56434999990233,
+        "warm_total_ms": 345.12869999980467
+      },
+      "vertical": {
+        "samples": 10,
+        "reference_chars": 138,
+        "errors": 2,
+        "cer": 0.014492753623188406,
+        "exact": 0.8,
+        "warm_median_ms": 166.5229500000578,
+        "warm_total_ms": 1670.7772000002024
+      },
+      "vertical-small": {
+        "samples": 6,
+        "reference_chars": 66,
+        "errors": 2,
+        "cer": 0.030303030303030304,
+        "exact": 0.8333333333333334,
+        "warm_median_ms": 159.37570000005508,
+        "warm_total_ms": 938.3765000002313
+      },
+      "white-on-black": {
+        "samples": 1,
+        "reference_chars": 3,
+        "errors": 2,
+        "cer": 0.6666666666666666,
+        "exact": 0.0,
+        "warm_median_ms": 131.14029999997,
+        "warm_total_ms": 131.14029999997
+      }
+    },
+    "integrated": {
+      "complex-background": {
+        "samples": 1,
+        "reference_chars": 3,
+        "errors": 0,
+        "cer": 0.0,
+        "exact": 1.0,
+        "warm_median_ms": 138.69879999992918,
+        "warm_total_ms": 138.69879999992918
+      },
+      "horizontal": {
+        "samples": 1,
+        "reference_chars": 20,
+        "errors": 0,
+        "cer": 0.0,
+        "exact": 1.0,
+        "warm_median_ms": 184.24759999993512,
+        "warm_total_ms": 184.24759999993512
+      },
+      "horizontal-small": {
+        "samples": 1,
+        "reference_chars": 15,
+        "errors": 1,
+        "cer": 0.06666666666666667,
+        "exact": 0.0,
+        "warm_median_ms": 192.0737000000372,
+        "warm_total_ms": 192.0737000000372
+      },
+      "outline": {
+        "samples": 2,
+        "reference_chars": 33,
+        "errors": 4,
+        "cer": 0.12121212121212122,
+        "exact": 0.0,
+        "warm_median_ms": 181.2620999999126,
+        "warm_total_ms": 362.5241999998252
+      },
+      "vertical": {
+        "samples": 10,
+        "reference_chars": 138,
+        "errors": 2,
+        "cer": 0.014492753623188406,
+        "exact": 0.8,
+        "warm_median_ms": 164.0053999999509,
+        "warm_total_ms": 1674.697100000003
+      },
+      "vertical-small": {
+        "samples": 6,
+        "reference_chars": 66,
+        "errors": 1,
+        "cer": 0.015151515151515152,
+        "exact": 0.8333333333333334,
+        "warm_median_ms": 164.31789999990087,
+        "warm_total_ms": 955.1446999996642
+      },
+      "white-on-black": {
+        "samples": 1,
+        "reference_chars": 3,
+        "errors": 2,
+        "cer": 0.6666666666666666,
+        "exact": 0.0,
+        "warm_median_ms": 124.83380000003308,
+        "warm_total_ms": 124.83380000003308
+      }
+    }
+  },
+  "single_japanese_ocr": {
+    "v10": {
+      "backend": "baberu",
+      "groups": {
+        "real": {
+          "samples": 22,
+          "reference_chars": 278,
+          "errors": 12,
+          "cer": 0.04316546762589928,
+          "exact": 0.6363636363636364,
+          "warm_median_ms": 189.8126000000957,
+          "warm_total_ms": 4111.885100001473
+        },
+        "synthetic": {
+          "samples": 6,
+          "reference_chars": 54,
+          "errors": 4,
+          "cer": 0.07407407407407407,
+          "exact": 0.6666666666666666,
+          "warm_median_ms": 173.5046000001148,
+          "warm_total_ms": 1030.9649999999237
+        }
+      },
+      "aggregate": {
+        "samples": 28,
+        "reference_chars": 332,
+        "errors": 16,
+        "cer": 0.04819277108433735,
+        "exact": 0.6428571428571429,
+        "warm_median_ms": 183.7980000002517,
+        "warm_total_ms": 5142.850100001397
+      },
+      "providers": {
+        "vision": [
+          "CPUExecutionProvider"
+        ],
+        "decoder_prefill": [
+          "CPUExecutionProvider"
+        ],
+        "decoder_step": [
+          "CPUExecutionProvider"
+        ]
+      },
+      "memory": {
+        "working_set_bytes": 312299520,
+        "peak_working_set_bytes": 312782848,
+        "peak_commit_bytes": 802598912
+      },
+      "cold_session_load_s": 0.6243154999997387,
+      "first_inference_s": 0.1952267000001484,
+      "torch_imported": false,
+      "vram_bytes": 0,
+      "real_by_style": {
+        "complex-background": {
+          "samples": 1,
+          "reference_chars": 3,
+          "errors": 1,
+          "cer": 0.3333333333333333,
+          "exact": 0.0,
+          "warm_median_ms": 149.3052999999236,
+          "warm_total_ms": 149.3052999999236
+        },
+        "horizontal": {
+          "samples": 1,
+          "reference_chars": 20,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 196.83450000002267,
+          "warm_total_ms": 196.83450000002267
+        },
+        "horizontal-small": {
+          "samples": 1,
+          "reference_chars": 15,
+          "errors": 1,
+          "cer": 0.06666666666666667,
+          "exact": 0.0,
+          "warm_median_ms": 216.3460000001578,
+          "warm_total_ms": 216.3460000001578
+        },
+        "outline": {
+          "samples": 2,
+          "reference_chars": 33,
+          "errors": 4,
+          "cer": 0.12121212121212122,
+          "exact": 0.0,
+          "warm_median_ms": 188.75215000002754,
+          "warm_total_ms": 377.5043000000551
+        },
+        "vertical": {
+          "samples": 10,
+          "reference_chars": 138,
+          "errors": 2,
+          "cer": 0.014492753623188406,
+          "exact": 0.8,
+          "warm_median_ms": 190.31109999991713,
+          "warm_total_ms": 1872.4919000010232
+        },
+        "vertical-small": {
+          "samples": 6,
+          "reference_chars": 66,
+          "errors": 2,
+          "cer": 0.030303030303030304,
+          "exact": 0.8333333333333334,
+          "warm_median_ms": 188.27854999994997,
+          "warm_total_ms": 1147.5374999999985
+        },
+        "white-on-black": {
+          "samples": 1,
+          "reference_chars": 3,
+          "errors": 2,
+          "cer": 0.6666666666666666,
+          "exact": 0.0,
+          "warm_median_ms": 151.86560000029203,
+          "warm_total_ms": 151.86560000029203
+        }
+      }
+    },
+    "v12": {
+      "backend": "baberu",
+      "groups": {
+        "real": {
+          "samples": 22,
+          "reference_chars": 278,
+          "errors": 10,
+          "cer": 0.03597122302158273,
+          "exact": 0.6818181818181818,
+          "warm_median_ms": 245.00719999991816,
+          "warm_total_ms": 5278.9467999996305
+        },
+        "synthetic": {
+          "samples": 6,
+          "reference_chars": 54,
+          "errors": 1,
+          "cer": 0.018518518518518517,
+          "exact": 0.8333333333333334,
+          "warm_median_ms": 254.97150000001056,
+          "warm_total_ms": 1521.3506000000052
+        }
+      },
+      "aggregate": {
+        "samples": 28,
+        "reference_chars": 332,
+        "errors": 11,
+        "cer": 0.03313253012048193,
+        "exact": 0.7142857142857143,
+        "warm_median_ms": 246.63769999983742,
+        "warm_total_ms": 6800.297399999636
+      },
+      "providers": {
+        "vision": [
+          "CPUExecutionProvider"
+        ],
+        "decoder_prefill": [
+          "CPUExecutionProvider"
+        ],
+        "decoder_step": [
+          "CPUExecutionProvider"
+        ]
+      },
+      "memory": {
+        "working_set_bytes": 312991744,
+        "peak_working_set_bytes": 313434112,
+        "peak_commit_bytes": 803299328
+      },
+      "cold_session_load_s": 0.5794820999999502,
+      "first_inference_s": 0.18997129999979734,
+      "torch_imported": false,
+      "vram_bytes": 0,
+      "real_by_style": {
+        "complex-background": {
+          "samples": 1,
+          "reference_chars": 3,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 175.9607000003598,
+          "warm_total_ms": 175.9607000003598
+        },
+        "horizontal": {
+          "samples": 1,
+          "reference_chars": 20,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 222.54609999981767,
+          "warm_total_ms": 222.54609999981767
+        },
+        "horizontal-small": {
+          "samples": 1,
+          "reference_chars": 15,
+          "errors": 1,
+          "cer": 0.06666666666666667,
+          "exact": 0.0,
+          "warm_median_ms": 272.01830000012706,
+          "warm_total_ms": 272.01830000012706
+        },
+        "outline": {
+          "samples": 2,
+          "reference_chars": 33,
+          "errors": 4,
+          "cer": 0.12121212121212122,
+          "exact": 0.0,
+          "warm_median_ms": 249.69175000001087,
+          "warm_total_ms": 499.38350000002174
+        },
+        "vertical": {
+          "samples": 10,
+          "reference_chars": 138,
+          "errors": 2,
+          "cer": 0.014492753623188406,
+          "exact": 0.8,
+          "warm_median_ms": 241.48189999982606,
+          "warm_total_ms": 2440.02429999955
+        },
+        "vertical-small": {
+          "samples": 6,
+          "reference_chars": 66,
+          "errors": 1,
+          "cer": 0.015151515151515152,
+          "exact": 0.8333333333333334,
+          "warm_median_ms": 243.61420000013823,
+          "warm_total_ms": 1399.9786999997923
+        },
+        "white-on-black": {
+          "samples": 1,
+          "reference_chars": 3,
+          "errors": 2,
+          "cer": 0.6666666666666666,
+          "exact": 0.0,
+          "warm_median_ms": 269.03519999996206,
+          "warm_total_ms": 269.03519999996206
+        }
+      }
+    },
+    "manga": {
+      "backend": "manga",
+      "groups": {
+        "real": {
+          "samples": 22,
+          "reference_chars": 278,
+          "errors": 16,
+          "cer": 0.05755395683453238,
+          "exact": 0.5909090909090909,
+          "warm_median_ms": 170.27660000007927,
+          "warm_total_ms": 3615.381100000377
+        },
+        "synthetic": {
+          "samples": 6,
+          "reference_chars": 54,
+          "errors": 2,
+          "cer": 0.037037037037037035,
+          "exact": 0.8333333333333334,
+          "warm_median_ms": 118.89025000004949,
+          "warm_total_ms": 738.9743000007911
+        }
+      },
+      "aggregate": {
+        "samples": 28,
+        "reference_chars": 332,
+        "errors": 18,
+        "cer": 0.05421686746987952,
+        "exact": 0.6428571428571429,
+        "warm_median_ms": 148.92680000002656,
+        "warm_total_ms": 4354.355400001168
+      },
+      "providers": {
+        "encoder": [
+          "CPUExecutionProvider"
+        ],
+        "decoder": [
+          "CPUExecutionProvider"
+        ]
+      },
+      "memory": {
+        "working_set_bytes": 231673856,
+        "peak_working_set_bytes": 234610688,
+        "peak_commit_bytes": 720658432
+      },
+      "cold_session_load_s": 0.6954921999999897,
+      "first_inference_s": 0.24841769999966345,
+      "torch_imported": false,
+      "vram_bytes": 0,
+      "real_by_style": {
+        "complex-background": {
+          "samples": 1,
+          "reference_chars": 3,
+          "errors": 2,
+          "cer": 0.6666666666666666,
+          "exact": 0.0,
+          "warm_median_ms": 75.51340000009077,
+          "warm_total_ms": 75.51340000009077
+        },
+        "horizontal": {
+          "samples": 1,
+          "reference_chars": 20,
+          "errors": 2,
+          "cer": 0.1,
+          "exact": 0.0,
+          "warm_median_ms": 217.50840000004246,
+          "warm_total_ms": 217.50840000004246
+        },
+        "horizontal-small": {
+          "samples": 1,
+          "reference_chars": 15,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 207.22230000001218,
+          "warm_total_ms": 207.22230000001218
+        },
+        "outline": {
+          "samples": 2,
+          "reference_chars": 33,
+          "errors": 4,
+          "cer": 0.12121212121212122,
+          "exact": 0.0,
+          "warm_median_ms": 220.88699999994788,
+          "warm_total_ms": 441.77399999989575
+        },
+        "vertical": {
+          "samples": 10,
+          "reference_chars": 138,
+          "errors": 3,
+          "cer": 0.021739130434782608,
+          "exact": 0.7,
+          "warm_median_ms": 166.37189999983093,
+          "warm_total_ms": 1704.7210999999152
+        },
+        "vertical-small": {
+          "samples": 6,
+          "reference_chars": 66,
+          "errors": 2,
+          "cer": 0.030303030303030304,
+          "exact": 0.8333333333333334,
+          "warm_median_ms": 163.41835000002902,
+          "warm_total_ms": 915.3381000005538
+        },
+        "white-on-black": {
+          "samples": 1,
+          "reference_chars": 3,
+          "errors": 3,
+          "cer": 1.0,
+          "exact": 0.0,
+          "warm_median_ms": 53.3037999998669,
+          "warm_total_ms": 53.3037999998669
+        }
+      }
+    },
+    "charspot": {
+      "backend": "charspot-reference",
+      "groups": {
+        "real": {
+          "samples": 22,
+          "reference_chars": 278,
+          "errors": 5,
+          "cer": 0.017985611510791366,
+          "exact": 0.8181818181818182,
+          "warm_median_ms": 27.790600000116683,
+          "warm_total_ms": 620.0116999989405
+        },
+        "synthetic": {
+          "samples": 6,
+          "reference_chars": 54,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 26.185549999809155,
+          "warm_total_ms": 159.76269999964643
+        }
+      },
+      "aggregate": {
+        "samples": 28,
+        "reference_chars": 332,
+        "errors": 5,
+        "cer": 0.015060240963855422,
+        "exact": 0.8571428571428571,
+        "warm_median_ms": 27.35989999996491,
+        "warm_total_ms": 779.7743999985869
+      },
+      "providers": {
+        "sess": [
+          "CPUExecutionProvider"
+        ]
+      },
+      "memory": {
+        "working_set_bytes": 166014976,
+        "peak_working_set_bytes": 166535168,
+        "peak_commit_bytes": 725315584
+      },
+      "cold_session_load_s": 0.4011960999996518,
+      "first_inference_s": 0.038575999999920896,
+      "torch_imported": false,
+      "vram_bytes": 0,
+      "real_by_style": {
+        "complex-background": {
+          "samples": 1,
+          "reference_chars": 3,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 28.15199999986362,
+          "warm_total_ms": 28.15199999986362
+        },
+        "horizontal": {
+          "samples": 1,
+          "reference_chars": 20,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 30.229399999825546,
+          "warm_total_ms": 30.229399999825546
+        },
+        "horizontal-small": {
+          "samples": 1,
+          "reference_chars": 15,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 31.472600000142847,
+          "warm_total_ms": 31.472600000142847
+        },
+        "outline": {
+          "samples": 2,
+          "reference_chars": 33,
+          "errors": 2,
+          "cer": 0.06060606060606061,
+          "exact": 0.5,
+          "warm_median_ms": 28.60210000017105,
+          "warm_total_ms": 57.2042000003421
+        },
+        "vertical": {
+          "samples": 10,
+          "reference_chars": 138,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 27.601450000020122,
+          "warm_total_ms": 283.46109999984037
+        },
+        "vertical-small": {
+          "samples": 6,
+          "reference_chars": 66,
+          "errors": 2,
+          "cer": 0.030303030303030304,
+          "exact": 0.6666666666666666,
+          "warm_median_ms": 27.48194999981024,
+          "warm_total_ms": 163.87039999926856
+        },
+        "white-on-black": {
+          "samples": 1,
+          "reference_chars": 3,
+          "errors": 1,
+          "cer": 0.3333333333333333,
+          "exact": 0.0,
+          "warm_median_ms": 25.62199999965742,
+          "warm_total_ms": 25.62199999965742
+        }
+      }
+    },
+    "integrated": {
+      "backend": "charspot",
+      "groups": {
+        "real": {
+          "samples": 22,
+          "reference_chars": 278,
+          "errors": 5,
+          "cer": 0.017985611510791366,
+          "exact": 0.8181818181818182,
+          "warm_median_ms": 22.93069999996078,
+          "warm_total_ms": 504.57850000066173
+        },
+        "synthetic": {
+          "samples": 6,
+          "reference_chars": 54,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 22.969900000134658,
+          "warm_total_ms": 137.33510000110982
+        }
+      },
+      "aggregate": {
+        "samples": 28,
+        "reference_chars": 332,
+        "errors": 5,
+        "cer": 0.015060240963855422,
+        "exact": 0.8571428571428571,
+        "warm_median_ms": 22.93069999996078,
+        "warm_total_ms": 641.9136000017716
+      },
+      "providers": {
+        "session": [
+          "CPUExecutionProvider"
+        ]
+      },
+      "memory": {
+        "working_set_bytes": 176312320,
+        "peak_working_set_bytes": 176857088,
+        "peak_commit_bytes": 735383552
+      },
+      "cold_session_load_s": 0.5941673000002083,
+      "first_inference_s": 0.025702100000216888,
+      "torch_imported": false,
+      "vram_bytes": 0,
+      "real_by_style": {
+        "complex-background": {
+          "samples": 1,
+          "reference_chars": 3,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 21.56159999958618,
+          "warm_total_ms": 21.56159999958618
+        },
+        "horizontal": {
+          "samples": 1,
+          "reference_chars": 20,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 23.89630000016041,
+          "warm_total_ms": 23.89630000016041
+        },
+        "horizontal-small": {
+          "samples": 1,
+          "reference_chars": 15,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 23.323200000049837,
+          "warm_total_ms": 23.323200000049837
+        },
+        "outline": {
+          "samples": 2,
+          "reference_chars": 33,
+          "errors": 2,
+          "cer": 0.06060606060606061,
+          "exact": 0.5,
+          "warm_median_ms": 22.01674999992065,
+          "warm_total_ms": 44.0334999998413
+        },
+        "vertical": {
+          "samples": 10,
+          "reference_chars": 138,
+          "errors": 0,
+          "cer": 0.0,
+          "exact": 1.0,
+          "warm_median_ms": 22.99805000006927,
+          "warm_total_ms": 233.3796000007169
+        },
+        "vertical-small": {
+          "samples": 6,
+          "reference_chars": 66,
+          "errors": 2,
+          "cer": 0.030303030303030304,
+          "exact": 0.6666666666666666,
+          "warm_median_ms": 22.666650000019217,
+          "warm_total_ms": 136.08120000026247
+        },
+        "white-on-black": {
+          "samples": 1,
+          "reference_chars": 3,
+          "errors": 1,
+          "cer": 0.3333333333333333,
+          "exact": 0.0,
+          "warm_median_ms": 22.30310000004465,
+          "warm_total_ms": 22.30310000004465
+        }
+      }
+    }
+  },
+  "page_detection_and_ocr": {
+    "method": "Same three native-resolution pages, CPU production detect_bubbles + run_ocr, preloaded images; three alternating warm passes after warming each engine, excludes translation/inpainting/IO",
+    "dimensions_wh": [
+      [
+        1220,
+        1762
+      ],
+      [
+        1220,
+        1756
+      ],
+      [
+        800,
+        1138
+      ]
+    ],
+    "detected_regions_per_page": [
+      5,
+      9,
+      10
+    ],
+    "total_seconds_per_pass": {
+      "baberu": [
+        9.965417399999751,
+        10.438723499999469,
+        11.240090100000089
+      ],
+      "charspot": [
+        4.10430980000001,
+        4.178954799999701,
+        4.276127899999665
+      ]
+    },
+    "median_seconds": {
+      "baberu": 10.438723499999469,
+      "charspot": 4.178954799999701
+    }
+  }
+}
