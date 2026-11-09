@@ -160,6 +160,8 @@ def main():
                 capture('settings-ocr', settings, (settings._save_btn,))
                 settings._sections.setCurrentIndex(2)
                 capture('settings-output', settings, (settings._save_btn,))
+                settings._sections.setCurrentIndex(3)
+                capture('settings-advanced', settings, (settings._save_btn,))
                 diagnosis = window.error_log_page
                 capture('diagnosis', diagnosis, (diagnosis._copy_prompt_btn,))
                 diagnosis._sections.setCurrentIndex(1)
@@ -291,6 +293,7 @@ def main():
                     window.resize(min(width, int(screen.width() * .94)), min(height, int(screen.height() * .94)))
                     capture(f'automatic-{width}', window.translate_tab,
                             (window._add_btn, window._start_btn))
+                    settings._sections.setCurrentIndex(2)
                     capture(f'settings-{width}', settings, (settings._save_btn,))
                     capture(f'diagnosis-{width}', diagnosis, (diagnosis._send_btn,))
                     window.tabs.setCurrentWidget(editor)
