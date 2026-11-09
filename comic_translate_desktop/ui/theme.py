@@ -254,9 +254,16 @@ QLabel#emptyPreviewTitle { font-size: 28px; font-weight: 800; }
 QLabel[muted="true"], QLabel#brandSubtitle, QLabel#dropHint { color: @secondary; font-size: 12px; }
 QLabel#fieldCaption { font-size: 13px; font-weight: 700; padding-top: 6px; }
 QLabel#fontChoiceName { color: @secondary; font-size: 12px; padding: 2px 0 4px 0; }
-QLabel#statusPill { padding: 6px 10px; border: none; background: transparent; font-size: 12px; color: @secondary; }
-QLabel#statusPill[state="running"], QLabel#statusPill[state="warming"] { color: @ink; font-weight: 700; }
-QLabel#statusPill[state="error"], QLabel#statusPill[state="warning"] { color: @ink; font-weight: 700; }
+QFrame#statusPill { background: transparent; border: none; }
+QLabel#statusText { font-size: 12px; color: @secondary; background: transparent; }
+QLabel#statusText[state="running"], QLabel#statusText[state="warming"],
+QLabel#statusText[state="error"], QLabel#statusText[state="warning"] { color: @ink; font-weight: 700; }
+QLabel#statusDot { background: @secondary; border: none; border-radius: 4px; }
+QLabel#statusDot[state="running"], QLabel#statusDot[state="warming"],
+QLabel#statusDot[state="ready"], QLabel#statusDot[state="success"],
+QLabel#statusDot[state="stopping"] { background: @ink; }
+QLabel#statusDot[state="warning"], QLabel#statusDot[state="error"] {
+    background: transparent; border: 2px solid @ink; }
 QPushButton, QToolButton { min-height: 26px; padding: 6px 14px; border: 1px solid transparent; border-radius: 8px; background: transparent; }
 QPushButton:hover, QToolButton:hover { background: @muted; }
 QPushButton:pressed, QToolButton:pressed { background: @rule; }

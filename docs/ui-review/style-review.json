@@ -277,10 +277,10 @@
       44
     ],
     "statusPill": [
-      1076,
-      28,
-      100,
-      28
+      1080,
+      30,
+      96,
+      24
     ],
     "设置": [
       1184,
@@ -321,7 +321,7 @@
     "edits_preserve_file_until_save": true,
     "saved_pixels_match_preview": true,
     "guide_excluded_from_export": true,
-    "cached_edit_ms": 7.0
+    "cached_edit_ms": 7.7
   },
   "editor_mask_drag": {
     "handles": 8,

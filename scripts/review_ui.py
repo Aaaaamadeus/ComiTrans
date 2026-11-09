@@ -56,7 +56,9 @@ def main():
               'ui_font': ui_font_family, 'captures': []}
 
     def check_action(window, button):
-        name = button.text() if hasattr(button, 'text') else button.currentText()
+        name = (button.text() if hasattr(button, 'text')
+                else button.currentText() if hasattr(button, 'currentText')
+                else button.objectName() or type(button).__name__)
         assert button.isVisible(), name
         for point in (button.rect().topLeft(), button.rect().bottomRight()):
             assert window.rect().contains(button.mapTo(window, point)), (name, window.size())
@@ -84,16 +86,18 @@ def main():
             for button in buttons:
                 check_action(window, button)
             header_widgets = [widget for widget in (window._brand_title, window._nav_auto, window._nav_editor,
-                              window.status_label, window._stop_btn, window._settings_btn, window._logs_btn,
+                              window.status_pill, window._stop_btn, window._settings_btn, window._logs_btn,
                               window._output_btn, window._issue_btn, window._more_btn) if widget.isVisible()]
             for first, second in zip(header_widgets, header_widgets[1:]):
-                assert not first.geometry().intersects(second.geometry()), (first.text(), second.text())
+                gap = second.mapTo(window, second.rect().topLeft()).x() - first.mapTo(
+                    window, first.rect().topRight()).x()
+                assert gap >= 0, (first.objectName() or first.text(), second.objectName() or second.text())
             for widget in header_widgets:
                 check_action(window, widget)
             if name == 'automatic':
                 report['topbar_geometry'] = {widget.objectName() or widget.text(): widget.geometry().getRect()
                                             for widget in (window._brand_title, window._nav_auto, window._nav_editor,
-                                                           window.status_label, window._settings_btn, window._logs_btn,
+                                                           window.status_pill, window._settings_btn, window._logs_btn,
                                                            window._output_btn, window._issue_btn, window._more_btn)
                                             if widget.isVisible()}
             path = output / f'{name}-style-review.png'

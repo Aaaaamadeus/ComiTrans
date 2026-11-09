@@ -617,5 +617,6 @@
   "修改会实时同步到右侧面板；Ctrl+S 保存图片。": "Edits sync to the inspector live; Ctrl+S saves the image.",
   "添加文件": "Add files",
   "导入译图 / PDF": "Import images / PDF",
-  "导入字体": "Import font"
+  "导入字体": "Import font",
+  "就绪": "Ready"
 }
