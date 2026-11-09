@@ -225,6 +225,12 @@ class EditorPage(QWidget):
         self._focus_btn.setProperty('compact', True)
         self._focus_btn.setToolTip(tr('收起侧栏与辅助信息，专注查看作品 · Ctrl+Shift+F'))
         toolbar.addWidget(self._focus_btn)
+        self._zoom_tool_btn = QPushButton(tr('缩放工具'))
+        self._zoom_tool_btn.setCheckable(True)
+        self._zoom_tool_btn.setProperty('role', 'utility')
+        self._zoom_tool_btn.setProperty('compact', True)
+        self._zoom_tool_btn.setToolTip(tr('点击放大，Alt+点击缩小 · Z'))
+        toolbar.addWidget(self._zoom_tool_btn)
         self._zoom = QComboBox()
         for name, value in [(tr('适应页面'), None), ('50%', .5), ('100%', 1.), ('150%', 1.5),
                             ('200%', 2.), (tr('适应宽度'), 'width')]:
@@ -301,6 +307,17 @@ class EditorPage(QWidget):
         self.preview.region_edited.connect(self._resize_region_from_canvas)
         self.preview.region_edit_finished.connect(self.apply_changes)
         self.preview.region_clicked.connect(self._select_block)
+        self.preview.installEventFilter(self)
+        self._zoom_tool_btn.toggled.connect(self.preview.set_zoom_tool)
+        self._canvas_frame = canvas
+        self._zoom_hud = QLabel(canvas)
+        self._zoom_hud.setObjectName('zoomHud')
+        self._zoom_hud.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._zoom_hud.hide()
+        self._zoom_hud_timer = QTimer(self)
+        self._zoom_hud_timer.setSingleShot(True)
+        self._zoom_hud_timer.setInterval(900)
+        self._zoom_hud_timer.timeout.connect(self._zoom_hud.hide)
         repair_toolbar = QHBoxLayout()
         self._repair_mode = QPushButton(tr('框选背景'))
         self._repair_mode.setCheckable(True)
@@ -556,6 +573,9 @@ class EditorPage(QWidget):
         self._text_editor_shortcut = QShortcut(QKeySequence('F2'), self)
         self._text_editor_shortcut.setContext(Qt.WidgetWithChildrenShortcut)
         self._text_editor_shortcut.activated.connect(self.open_text_editor)
+        self._zoom_tool_shortcut = QShortcut(QKeySequence('Z'), self)
+        self._zoom_tool_shortcut.setContext(Qt.WidgetWithChildrenShortcut)
+        self._zoom_tool_shortcut.activated.connect(self._toggle_zoom_tool)
         app = QApplication.instance()
         if app is not None:
             app.installEventFilter(self)
@@ -588,6 +608,26 @@ class EditorPage(QWidget):
         self._zoom.setCurrentIndex(-1)
         self._zoom.setEditText(text)
         self._zoom.blockSignals(False)
+        if hasattr(self, '_zoom_hud'):
+            self._zoom_hud.setText(text)
+            self._zoom_hud.adjustSize()
+            self._place_zoom_hud()
+            self._zoom_hud.show()
+            self._zoom_hud.raise_()
+            self._zoom_hud_timer.start()
+
+    def _place_zoom_hud(self):
+        if not hasattr(self, '_zoom_hud') or not self._zoom_hud.isVisible():
+            return
+        rect = self.preview.geometry()
+        self._zoom_hud.move(max(8, rect.right() - self._zoom_hud.width() - 16),
+                            max(8, rect.bottom() - self._zoom_hud.height() - 16))
+
+    def _toggle_zoom_tool(self):
+        focus = QApplication.focusWidget()
+        if isinstance(focus, (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)):
+            return
+        self._zoom_tool_btn.toggle()
 
     def save_ui_state(self):
         settings = QSettings()
@@ -811,6 +851,8 @@ class EditorPage(QWidget):
     def eventFilter(self, watched, event):
         if watched is self.page_list.viewport() and event.type() in (QEvent.Resize, QEvent.Show):
             self._thumbnail_timer.start(0)
+        elif watched is getattr(self, 'preview', None) and event.type() == QEvent.Resize:
+            self._place_zoom_hud()
         elif event.type() in (QEvent.KeyPress, QEvent.KeyRelease) and event.key() == Qt.Key_Space:
             if self._space_pans_canvas():
                 if event.isAutoRepeat():

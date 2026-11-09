@@ -345,6 +345,7 @@ QScrollArea { border: none; }
 QScrollArea#previewCanvas, QLabel#previewLabel { background: @canvas; color: @paper; }
 QWidget#emptyPreview { background: @paper; }
 QWidget#canvasState { background: @paper; }
+QLabel#zoomHud { background: @ink; color: @paper; border-radius: 10px; padding: 4px 10px; font-size: 12px; font-weight: 600; }
 QLabel#canvasStateTitle { font-size: 20px; font-weight: 700; color: @ink; }
 QProgressBar#canvasStateBar { background: @muted; border: none; border-radius: 2px; min-height: 4px; max-height: 4px; }
 QProgressBar#canvasStateBar::chunk { background: @ink; border-radius: 2px; }

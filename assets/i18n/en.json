@@ -626,5 +626,7 @@
   "正在加载 {_0}": "Loading {_0}",
   "动效": "Motion",
   "减少动效（关闭淡入与呼吸动画）": "Reduce motion (disable fades and pulsing)",
-  "开启后不再播放页面淡入与运行中呼吸动画。": "Stops page fades and the running-state pulse."
+  "开启后不再播放页面淡入与运行中呼吸动画。": "Stops page fades and the running-state pulse.",
+  "缩放工具": "Zoom tool",
+  "点击放大，Alt+点击缩小 · Z": "Click to zoom in, Alt+click to zoom out · Z"
 }

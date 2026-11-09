@@ -444,6 +444,7 @@ class ImagePreview(QWidget):
         self._scale = 1.0
         self._pan = None
         self._space_pan = False
+        self._zoom_tool = False
         self.setMinimumSize(120, 100)
         self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self._stack = QStackedLayout(self)
@@ -550,6 +551,11 @@ class ImagePreview(QWidget):
                                            or self._label._region_hit(event.position()) is not None):
                 return super().eventFilter(watched, event)
             self.set_zoom(None if self._zoom is not None or self._fit_width else 1.0)
+            return True
+        if (event.type() == QEvent.MouseButtonPress and self._zoom_tool
+                and not self._space_pan and event.button() == Qt.LeftButton and watched is self._label):
+            factor = self._scale / 1.6 if event.modifiers() & Qt.AltModifier else self._scale * 1.6
+            self._zoom_at(factor, self._viewport_position(watched, event))
             return True
         if event.type() == QEvent.MouseButtonPress and (
                 event.button() == Qt.MiddleButton
@@ -676,9 +682,20 @@ class ImagePreview(QWidget):
         """Temporary Hand tool, the way Photoshop binds the Space bar."""
         self._space_pan = bool(active)
         self._label.space_pan = self._space_pan
+        self._update_canvas_cursor()
+
+    def set_zoom_tool(self, active):
+        """Photoshop-style Zoom tool: click to zoom in, Alt+click to zoom out."""
+        self._zoom_tool = bool(active)
+        self._update_canvas_cursor()
+
+    def _update_canvas_cursor(self):
         if self._pan is not None:
             return
-        if self._space_pan:
+        if self._zoom_tool:
+            self._scroll.viewport().setCursor(Qt.CrossCursor)
+            self._label.setCursor(Qt.CrossCursor)
+        elif self._space_pan:
             self._scroll.viewport().setCursor(Qt.OpenHandCursor)
             self._label.setCursor(Qt.OpenHandCursor)
         else:
