@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 from ..config import mask_api_key
 from ..i18n import UI_LANGUAGES
 from comic_translate_core.languages import SOURCE_LANGUAGES
+from .advanced_config import AdvancedConfigSection
 from .manga_components import PanelHeading
 from .motion import set_reduced_motion
 from .theme import apply_theme
@@ -53,6 +54,7 @@ class ApiConfigPage(QWidget):
         root = self._add_section(tr('01  翻译服务'), tr('连接你的翻译服务'), tr('配置接口、翻译方式和输出水印，保存后将在下一次任务生效。'))
         ocr_root = self._add_section(tr('02  文字识别'), tr('选择语言与识别方式'), tr('本地识别和自定义 OCR 均在这里配置。'))
         runtime_root = self._add_section(tr('03  运行与输出'), tr('安排输出与运行选项'), tr('设置默认保存位置和硬件加速。'))
+        advanced_root = self._add_section(tr('04  详细配置'), tr('微调运行与模型细节'), tr('原先需要手动编辑 config.yaml 的选项集中在这里，保存后下一次任务生效。'))
 
         api_group = QGroupBox(tr('翻译服务'))
         api_form = QFormLayout(api_group)
@@ -226,6 +228,9 @@ class ApiConfigPage(QWidget):
         ocr_root.addWidget(self._custom_group)
         ocr_root.addStretch(1)
 
+        self._advanced = AdvancedConfigSection(config)
+        advanced_root.addWidget(self._advanced)
+
         footer = QFrame()
         footer.setObjectName('pageActions')
         actions = QHBoxLayout(footer)
@@ -248,7 +253,8 @@ class ApiConfigPage(QWidget):
         for check in self.findChildren(QCheckBox):
             if check is not self._show_key_check:
                 check.toggled.connect(self._mark_unsaved)
-        self._custom_timeout.valueChanged.connect(self._mark_unsaved)
+        for spin in self.findChildren(QSpinBox):
+            spin.valueChanged.connect(self._mark_unsaved)
 
     def _add_section(self, tab_title, title, description):
         scroll = QScrollArea()
@@ -370,6 +376,7 @@ class ApiConfigPage(QWidget):
         self._custom_key.setText(config.get("custom_ocr_api_key") or "")
         self._custom_model.setText(config.get("custom_ocr_model") or "")
         self._custom_timeout.setValue(int(config.get("custom_ocr_timeout") or 60))
+        self._advanced.load_config(config)
         self._refresh_custom_visibility()
         self._output_input.setText(config.get("page_output_dir", ""))
         self._watermark_check.setChecked(bool(config.get("watermark_enabled", True)))
@@ -415,6 +422,7 @@ class ApiConfigPage(QWidget):
             "ui_theme": self._theme.currentData(),
             "ui_reduced_motion": self._reduced_motion.isChecked(),
         }
+        data.update(self._advanced.values())
         key = self._key_input.text().strip()
         if key:
             data["api_key"] = key
