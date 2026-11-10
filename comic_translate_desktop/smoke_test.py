@@ -162,8 +162,9 @@ def run_smoke_test(app, output_dir, *, require_gpu=False):
             result['star_prompt_behavior'] = STAR_PROMPT_PROBABILITY == 0.15 and STAR_PROMPT_IDLE_MS == 8000
             chooser = InterfaceLanguageDialog()
             result['onboarding_default_chinese'] = chooser.selected_language == 'zh-CN'
-            chooser.language_combo.setCurrentIndex(chooser.language_combo.findData('ja'))
-            result['onboarding_japanese_preview'] = chooser.continue_button.text() == '続行'
+            chooser._radios['ja'].click()
+            result['onboarding_japanese_preview'] = (
+                chooser.selected_language == 'ja' and chooser.continue_button.text() == '続行')
             chooser.deleteLater()
             original_warmup = MainWindow._start_warmup
             try:
