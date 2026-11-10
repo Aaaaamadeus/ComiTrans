@@ -39,10 +39,44 @@ class ModelUpgradeTests(unittest.TestCase):
             self.assertEqual(config._detector_path(saved_default), old)
             new.parent.mkdir()
             new.touch()
+            self.assertEqual(config._detector_path("auto"), old)
             new.with_name(LINE_FILE).touch()
             self.assertEqual(config._detector_path(saved_default), new)
             self.assertEqual(config._detector_path("auto"), new)
             self.assertEqual(config._detector_path(str(old)), old)
+            with patch.object(config, "CONFIG_PATH", Path(directory) / "config.yaml"):
+                self.assertEqual(config.load_ai_config()["cuda_detector_model"], str(old))
+                self.assertIsNone(config.save_ai_config({"use_gpu": False})["cuda_detector_model"])
+                explicit = config.save_ai_config({"use_gpu": True, "detector_model": str(new)})
+                self.assertIsNone(explicit["cuda_detector_model"])
+
+    def test_auto_detector_uses_legacy_only_when_cuda_is_active(self):
+        from onnx_text_detector import create_text_detector
+        from comic_translate_core.detector_paths import REGION_FILE
+
+        with (patch('onnx_text_detector.create_onnx_session') as session,
+              patch('onnx_split_detector.SplitTextDetector') as split):
+            self.assertIs(create_text_detector(REGION_FILE, "cpu", cuda_model_path="fast.onnx"),
+                          split.return_value)
+            session.assert_not_called()
+            session.return_value.get_providers.return_value = ["CUDAExecutionProvider"]
+            fast = create_text_detector(REGION_FILE, "cuda", cuda_model_path="fast.onnx")
+            self.assertIs(fast.session, session.return_value)
+            session.assert_called_once_with("fast.onnx", "cuda", require_cuda=True)
+            session.side_effect = RuntimeError("CUDA unavailable")
+            self.assertIs(create_text_detector(REGION_FILE, "cuda", cuda_model_path="fast.onnx"),
+                          split.return_value)
+
+    def test_cuda_only_session_rejects_silent_cpu_fallback(self):
+        from comic_translate_core.onnx_session import create_onnx_session
+
+        with (patch('onnxruntime.get_available_providers', return_value=['CUDAExecutionProvider']),
+              patch('comic_translate_core.onnx_session._preload_cuda'),
+              patch('onnxruntime.InferenceSession') as session):
+            session.return_value.get_providers.return_value = ['CPUExecutionProvider']
+            with self.assertRaisesRegex(RuntimeError, 'did not activate CUDA'):
+                create_onnx_session("fast.onnx", "cuda", require_cuda=True)
+            session.assert_called_once()
 
     def test_overlapping_regions_own_lines_once_and_ignore_orphans(self):
         from onnx_split_detector import assign_lines, midpoint_box

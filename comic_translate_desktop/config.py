@@ -67,6 +67,24 @@ FONT_DEFAULTS = {
     "title": "font_file/CN/SourceHanSansSC-Heavy-2.otf",
 }
 
+# Relative defaults for the model files exposed by the detailed settings page.
+# `detector_model` keeps its own legacy-aware resolution in `_detector_path`.
+MODEL_DEFAULTS = {
+    "lama_model": "manga-lama/lama-manga-dynamic.onnx",
+    "charspot_ocr_model": "charspot-small",
+    "ocr_model": "manga-ocr-onnx",
+    "baberu_ocr_model": "baberu-ocr",
+}
+
+# Bounds for the tuning knobs on the detailed settings page. Values written by
+# hand in config.yaml are clamped here so the worker never receives unsafe input.
+ADVANCED_LIMITS = {
+    "font_size": (8, 96, 16),
+    "font_probe_samples": (1, 5, 3),
+    "max_workers": (1, 16, 4),
+    "pdf_dpi": (96, 400, 200),
+}
+
 
 def load_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
@@ -82,6 +100,16 @@ def _clean_text(value: Any) -> str:
     if value in (None, "", "none", "None"):
         return ""
     return str(value).strip()
+
+
+def _clamped_int(value: Any, key: str) -> int:
+    """Read an integer tuning knob and keep it inside its documented range."""
+    low, high, default = ADVANCED_LIMITS[key]
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(high, number))
 
 
 def _resolve_path(value: Any, default: str, base: Path | None = None) -> Path:
@@ -124,6 +152,12 @@ def load_ai_config() -> dict[str, Any]:
         ui_theme = "auto"
     ocr_config = {key: raw.get(key, default) for key, default in OCR_DEFAULTS.items()}
     ocr_config["source_language"] = str(raw.get("source_language") or "ja").strip().lower()
+    use_gpu = bool(raw.get("use_gpu", True))
+    detector_setting = detector_model_setting(raw.get("detector_model"))
+    detector_path = _detector_path(detector_setting)
+    legacy = MODELS_ROOT / LEGACY_PATH
+    cuda_detector = (legacy if use_gpu and detector_setting == "auto"
+                     and detector_path != legacy and _model_file_exists(legacy) else None)
 
     return {
         **ocr_config,
@@ -139,30 +173,32 @@ def load_ai_config() -> dict[str, Any]:
         "text_color": normalize_text_color(raw.get("text_color")),
         "translation_prompt": str(raw.get("translation_prompt") or ""),
         "chinese_names": str(raw.get("chinese_names") or ""),
-        "font_size": int(raw.get("font_size") or 16),
+        "font_size": _clamped_int(raw.get("font_size"), "font_size"),
         "multimodal": bool(raw.get("multimodal", False)),
         # 实验开关：多模态下是否让 AI 参与字体族判别（默认关闭，见 docs/FONT_STYLE_STRATEGY.md §4.14）
         "multimodal_font_probe": bool(raw.get("multimodal_font_probe", False)),
         # 关闭思考模式可显著省 token（翻译 completion 214→51，见 §4.15），默认开启
         "disable_thinking": bool(raw.get("disable_thinking", True)),
-        "font_probe_samples": int(raw.get("font_probe_samples") or 3),
+        "font_probe_samples": _clamped_int(raw.get("font_probe_samples"), "font_probe_samples"),
         "watermark_enabled": bool(raw.get("watermark_enabled", True)),
-        "max_workers": int(raw.get("max_workers") or 4),
-        "pdf_dpi": int(raw.get("pdf_dpi") or 200),
+        "max_workers": _clamped_int(raw.get("max_workers"), "max_workers"),
+        "pdf_dpi": _clamped_int(raw.get("pdf_dpi"), "pdf_dpi"),
         "resume_enabled": bool(raw.get("resume_enabled", True)),
         "issue_url": str(raw.get("issue_url") or ""),
-        "use_gpu": bool(raw.get("use_gpu", True)),
+        "use_gpu": use_gpu,
         "font_map": font_map,
         "style_font_map": style_font_map,
         "font_fallbacks": font_fallbacks,
         "translation_font": translation_font,
         "translation_font_active": translation_font_active,
-        "detector_model": str(_detector_path(raw.get("detector_model"))),
-        "lama_model": str(_resolve_path(raw.get("lama_model"), "manga-lama/lama-manga-dynamic.onnx", base=MODELS_ROOT)),
+        "detector_model": str(detector_path),
+        "detector_model_setting": detector_setting,
+        "cuda_detector_model": str(cuda_detector) if cuda_detector else None,
+        "lama_model": str(_resolve_path(raw.get("lama_model"), MODEL_DEFAULTS["lama_model"], base=MODELS_ROOT)),
         "ocr_backend": ocr_backend,
-        "charspot_ocr_model": str(_resolve_path(raw.get("charspot_ocr_model"), "charspot-small", base=MODELS_ROOT)),
-        "ocr_model": str(_resolve_path(raw.get("ocr_model"), "manga-ocr-onnx", base=MODELS_ROOT)),
-        "baberu_ocr_model": str(_resolve_path(raw.get("baberu_ocr_model"), "baberu-ocr", base=MODELS_ROOT)),
+        "charspot_ocr_model": str(_resolve_path(raw.get("charspot_ocr_model"), MODEL_DEFAULTS["charspot_ocr_model"], base=MODELS_ROOT)),
+        "ocr_model": str(_resolve_path(raw.get("ocr_model"), MODEL_DEFAULTS["ocr_model"], base=MODELS_ROOT)),
+        "baberu_ocr_model": str(_resolve_path(raw.get("baberu_ocr_model"), MODEL_DEFAULTS["baberu_ocr_model"], base=MODELS_ROOT)),
         "korean_ocr_model": str(_resolve_path(raw.get("korean_ocr_model"), "ppocr/korean_PP-OCRv5_rec_mobile.onnx", base=MODELS_ROOT)),
         "english_ocr_model": str(_resolve_path(raw.get("english_ocr_model"), "ppocr/en_PP-OCRv5_rec_mobile.onnx", base=MODELS_ROOT)),
         "page_input_dir": str(_resolve_path(raw.get("page_input_dir"), "page/test", base=PAGE_BASE)),
@@ -195,10 +231,12 @@ def config_fingerprint(config: dict[str, Any]) -> tuple:
     return (
         config["use_gpu"],
         config["detector_model"],
+        config.get("cuda_detector_model"),
         config["lama_model"],
         config["ocr_backend"],
         config["ocr_model"],
         config["baberu_ocr_model"],
+        config.get("charspot_ocr_model"),
         tuple(config.get(key, OCR_DEFAULTS.get(key, "")) for key in OCR_CONFIG_KEYS),
     )
 
@@ -225,21 +263,44 @@ def _baberu_ocr_complete(path: Path) -> bool:
     )
 
 
-def _detector_path(value):
+def detector_model_setting(value):
     # Older installations saved this relative default even without a user choice.
     # Absolute paths and other custom paths stay explicit.
     setting = _clean_text(value)
-    if setting and setting != "auto" and Path(setting) != Path("models") / LEGACY_PATH:
+    if (not setting or setting.lower() in ("auto", "none")
+            or Path(setting) == Path("models") / LEGACY_PATH):
+        return "auto"
+    return setting
+
+
+def _model_file_exists(path):
+    try:
+        return path.is_file()
+    except OSError:
+        # Leave diagnostics to missing_models; an unavailable candidate must
+        # not prevent the workbench from starting or using another detector.
+        return False
+
+
+def _detector_path(value):
+    setting = detector_model_setting(value)
+    if setting != "auto":
         return _resolve_path(setting, str(SPLIT_PATH), base=MODELS_ROOT)
     new = MODELS_ROOT / SPLIT_PATH
     old = MODELS_ROOT / LEGACY_PATH
-    try:
-        if not new.parent.exists() and old.is_file():
+    if not (_model_file_exists(new) and _model_file_exists(new.with_name(LINE_FILE))):
+        if _model_file_exists(old):
             return old
-    except PermissionError:
-        # Report access failures through the UI's model check.
-        pass
     return new
+
+
+def model_defaults() -> dict[str, str]:
+    """Absolute built-in model locations, used for path reset and comparisons."""
+    return {
+        "detector_model": str(_detector_path(None)),
+        **{key: str(_resolve_path(None, path, base=MODELS_ROOT))
+           for key, path in MODEL_DEFAULTS.items()},
+    }
 
 
 def missing_models(config: dict[str, Any]) -> list[str]:

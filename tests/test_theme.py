@@ -4,10 +4,11 @@ import os
 import unittest
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QPushButton
+from shiboken6 import delete
 
 from comic_translate_desktop.ui.theme import (
-    PALETTES, apply_theme, build_stylesheet, theme, theme_name,
+    PALETTES, apply_theme, build_stylesheet, set_themed_icon, theme, theme_name,
 )
 
 
@@ -49,6 +50,19 @@ class ThemeTests(unittest.TestCase):
             self.assertEqual(apply_theme(self.app, 'light'), 'light')
             self.assertNotIn('icons/dark', build_stylesheet(theme()))
             self.assertIn(apply_theme(self.app, 'auto'), ('light', 'dark'))
+        finally:
+            apply_theme(self.app, 'light')
+
+    def test_theme_change_skips_destroyed_buttons_and_updates_live_icons(self):
+        old, live = QPushButton(), QPushButton()
+        apply_theme(self.app, 'light')
+        set_themed_icon(old, 'chevron-down')
+        set_themed_icon(live, 'chevron-down')
+        old_key = live.icon().cacheKey()
+        delete(old)
+        try:
+            apply_theme(self.app, 'dark')
+            self.assertNotEqual(live.icon().cacheKey(), old_key)
         finally:
             apply_theme(self.app, 'light')
 

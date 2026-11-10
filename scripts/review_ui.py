@@ -123,9 +123,9 @@ def main():
                     report['illustrations'].append(dict(file=asset, width=pixmap.width(),
                                                        height=pixmap.height(), transparent=True))
                 capture('automatic', window.translate_tab,
-                        (window._add_btn, window._start_btn))
+                        (window._add_btn, window._cuda_toggle, window._start_btn))
                 window._pref_toggle.setChecked(True)
-                QTest.qWait(80)
+                QTest.qWait(320)
                 capture('automatic-preferences', window.translate_tab,
                         (window._font_picker.combo, window._font_picker.import_button,
                          window._font_picker.library_button))
@@ -160,6 +160,8 @@ def main():
                 capture('settings-ocr', settings, (settings._save_btn,))
                 settings._sections.setCurrentIndex(2)
                 capture('settings-output', settings, (settings._save_btn,))
+                settings._sections.setCurrentIndex(3)
+                capture('settings-advanced', settings, (settings._save_btn,))
                 diagnosis = window.error_log_page
                 capture('diagnosis', diagnosis, (diagnosis._copy_prompt_btn,))
                 diagnosis._sections.setCurrentIndex(1)
@@ -193,6 +195,13 @@ def main():
                 assert editor.load_page(page)
                 assert editor.apply_changes()
                 capture('editor', editor, (editor._save_btn, editor._apply_btn))
+                editor._repair_mode.setChecked(True)
+                editor._repair_box = (60, 120, 300, 320)
+                editor._update_region_guide()
+                editor._update_repair_controls()
+                capture('editor-fill', editor, (editor._fill_white_btn, editor._fill_black_btn))
+                editor._repair_mode.setChecked(False)
+                editor._update_repair_controls()
                 editor._focus_btn.setChecked(True)
                 capture('editor-focus', editor, (editor._save_btn, editor._focus_btn))
                 editor._focus_btn.setChecked(False)
@@ -287,11 +296,25 @@ def main():
                 QTest.qWait(60)
                 window._add_paths([page])
                 capture('automatic-preview', window.translate_tab)
+                window._on_image_done(str(page), str(page))
+                capture('automatic-complete', window.translate_tab)
                 for width, height in ((1024, 720), (960, 540), (820, 480)):
                     window.resize(min(width, int(screen.width() * .94)), min(height, int(screen.height() * .94)))
                     capture(f'automatic-{width}', window.translate_tab,
-                            (window._add_btn, window._start_btn))
+                            (window._add_btn, window._cuda_toggle, window._start_btn))
+                    settings._sections.setCurrentIndex(2)
                     capture(f'settings-{width}', settings, (settings._save_btn,))
+                    settings._sections.setCurrentIndex(3)
+                    window.tabs.setCurrentWidget(settings)
+                    app.processEvents()
+                    model_browser = settings._advanced._browse_buttons['detector_model']
+                    model_path = settings._advanced._path_fields['detector_model']
+                    scroll = settings._sections.currentWidget()
+                    scroll.ensureWidgetVisible(model_path, 0, 12)
+                    capture(f'settings-advanced-{width}', settings, (settings._save_btn, model_browser))
+                    for widget in (model_path, model_browser):
+                        for point in (widget.rect().topLeft(), widget.rect().bottomRight()):
+                            assert scroll.viewport().rect().contains(widget.mapTo(scroll.viewport(), point))
                     capture(f'diagnosis-{width}', diagnosis, (diagnosis._send_btn,))
                     window.tabs.setCurrentWidget(editor)
                     app.processEvents()

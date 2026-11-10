@@ -63,6 +63,8 @@ class Diagnostics:
                 f"- API Base URL: {config.get('api_base_url', '')}",
                 f"- API Key: {key_display}",
                 f"- 字体大小: {config.get('font_size', 16)}",
+                f"- 最大并行页数: {config.get('max_workers', 4)}",
+                f"- PDF DPI: {config.get('pdf_dpi', 200)}",
                 f"- 使用 GPU: {config.get('use_gpu', False)}",
                 f"- 检测模型: {config.get('detector_model', '')}",
                 f"- OCR 后端: {config.get('ocr_backend', 'auto')}",
