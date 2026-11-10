@@ -111,6 +111,21 @@ class TextMaskTests(unittest.TestCase):
         self.assertFalse(np.any(result.box_fill_mask[border] > 0))
         self.assertGreater(result.diagnostics['protected_box_pixels'], 0)
 
+    def test_box_fallback_preserves_sparse_art_outside_the_erase_mask(self):
+        image = np.full((120, 160, 3), 248, np.uint8)
+        seed = np.zeros(image.shape[:2], np.uint8)
+        for x in (45, 60):
+            image[46:66, x:x+6] = 10
+            seed[46:66, x:x+6] = 255
+        art = np.zeros(seed.shape, bool)
+        art[78, 73:118:3] = True  # fifteen isolated screen dots
+        art[70:73, 108:114] = True
+        image[78, 73:118:3] = 20
+        image[70:73, 108:114] = 238
+        result = AdaptiveTextMask().generate(MaskRequest(image, (32, 30, 126, 93), seed, 16))
+        self.assertIsNotNone(result.box_fill_mask)
+        self.assertFalse(np.any((result.erase_mask | result.box_fill_mask)[art]))
+
     def test_box_fallback_requires_its_own_seeds(self):
         image, truth, seed = self.fixture((255,)*3, (0,)*3)
         leak = np.zeros_like(seed)

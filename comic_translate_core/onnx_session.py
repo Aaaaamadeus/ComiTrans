@@ -39,7 +39,7 @@ def _preload_cuda(ort):
         _cuda_preloaded = True
 
 
-def create_onnx_session(model_path, device='cpu', *, sess_options=None):
+def create_onnx_session(model_path, device='cpu', *, sess_options=None, require_cuda=False):
     import onnxruntime as ort
 
     requested_cuda = str(device).startswith('cuda')
@@ -50,13 +50,15 @@ def create_onnx_session(model_path, device='cpu', *, sess_options=None):
         except (OSError, RuntimeError) as exc:
             print(f'[WARNING] CUDA 运行库加载失败: {exc}')
         providers.insert(0, 'CUDAExecutionProvider')
+    if require_cuda and len(providers) == 1:
+        raise RuntimeError('CUDAExecutionProvider is unavailable')
     kwargs = {'providers': providers}
     if sess_options is not None:
         kwargs['sess_options'] = sess_options
     try:
         session = ort.InferenceSession(str(model_path), **kwargs)
     except Exception as exc:
-        if len(providers) == 1:
+        if require_cuda or len(providers) == 1:
             raise
         print(f'[WARNING] {Path(model_path).name}: GPU 会话创建失败: {exc}')
         kwargs['providers'] = ['CPUExecutionProvider']
@@ -64,6 +66,8 @@ def create_onnx_session(model_path, device='cpu', *, sess_options=None):
 
     actual = session.get_providers()
     gpu_active = 'CUDAExecutionProvider' in actual
+    if require_cuda and not gpu_active:
+        raise RuntimeError('ONNX Runtime did not activate CUDAExecutionProvider')
     if requested_cuda and not gpu_active:
         print(f'[WARNING] {Path(model_path).name}: GPU 未能启用，实际使用 CPU，处理速度会降低；请打开“设置 → 运行与输出 → GPU 安装说明与下载”。安装指南: {GPU_SETUP_URL}')
     else:

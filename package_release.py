@@ -8,6 +8,7 @@ from pathlib import Path
 import zipfile
 
 from comic_translate_desktop import __version__
+from comic_translate_core.detector_paths import LEGACY_PATH
 from comic_translate_core.release_patch import MANIFEST_NAME, json_bytes, manifest_for_files
 
 ROOT = Path(__file__).resolve().parent
@@ -19,6 +20,7 @@ MODEL_FILES = [
 ]
 MODEL_BASELINE_BYTES = 584_467_185  # v2.5.0 archive members, uncompressed; docs/models/v2.5.0-manifest.json
 MODEL_LIMIT_BYTES = MODEL_BASELINE_BYTES * 3 // 2
+MODEL_ARCHIVE_PREFIX = "ComiTrans/comic-translate-ai/models/"
 SKIP_DIRS = {"models", "gpu-runtime", "user_fonts", "Log", "logs", "__pycache__", ".cache"}
 
 
@@ -75,10 +77,18 @@ def collect_app(dist: Path):
     return files
 
 
+def legacy_detector_entry():
+    baseline = json.loads((ROOT / "docs/models/v2.5.0-manifest.json").read_text(encoding="utf-8"))
+    return next(entry for entry in baseline["files"] if entry["path"] == LEGACY_PATH.as_posix())
+
+
 def collect_models():
     from scripts.model_package import verify
 
     files = [(MODELS_SRC / rel, rel) for rel in MODEL_FILES]
+    legacy = legacy_detector_entry()
+    verify(MODELS_SRC, {"files": [legacy]})
+    files.append((MODELS_SRC / LEGACY_PATH, legacy["path"]))
     for package in ("charspot-small", "split-detector"):
         manifest_path = ROOT / f"docs/models/{package}.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -89,7 +99,7 @@ def collect_models():
         names = [entry["path"] for entry in manifest["files"]] + ["model-manifest.json"]
         files.extend((folder / name, f"{folder.name}/{name}") for name in names)
     validate_model_budget(files)
-    return [(path, "ComiTrans/comic-translate-ai/models/" + rel) for path, rel in files]
+    return [(path, MODEL_ARCHIVE_PREFIX + rel) for path, rel in files]
 
 
 def validate_model_budget(files):
@@ -99,10 +109,10 @@ def validate_model_budget(files):
     return total
 
 
-def verify_reused_models(archive_path, inventory_path):
+def verify_reused_models(archive_path, inventory_path, *, additional_files=()):
     """App-only builds must reuse the audited model set for this release."""
     inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-    expected = {entry["path"]: entry for entry in inventory["files"]}
+    expected = {entry["path"]: entry for entry in (*inventory["files"], *additional_files)}
     with zipfile.ZipFile(archive_path) as archive:
         entries = archive.infolist()
         if (len(entries) != len(expected) or set(archive.namelist()) != set(expected)
@@ -151,7 +161,11 @@ def main():
     if args.app_only and not model_target.is_file():
         raise FileNotFoundError(f'--app-only requires an existing model archive: {model_target}')
     if args.app_only:
-        verify_reused_models(model_target, ROOT / "docs" / "models" / f"v{__version__}-inventory.json")
+        legacy = legacy_detector_entry()
+        verify_reused_models(
+            model_target, ROOT / "docs" / "models" / f"v{__version__}-inventory.json",
+            additional_files=[{**legacy, "path": MODEL_ARCHIVE_PREFIX + legacy["path"]}],
+        )
         model_files = None
     else:
         model_files = collect_models()

@@ -101,7 +101,8 @@ class ComicTranslatorPipeline:
                  target_language="zh-Hans",
                  vertical_alignment="center",
                  text_color=None,
-                 text_mask_generator=None):
+                 text_mask_generator=None,
+                 cuda_detector_model_path=None):
         self._translation_capabilities = ResponseFormatCapabilities()
         self.device = 'cuda' if use_gpu else 'cpu'
         self.translation_model = translation_model
@@ -144,7 +145,8 @@ class ComicTranslatorPipeline:
         print("初始化管线")
 
         print("[INFO] 加载 Comic Text Detector...")
-        self.detector = create_text_detector(det_model_path, self.device, self.source_language)
+        self.detector = create_text_detector(det_model_path, self.device, self.source_language,
+                                             cuda_model_path=cuda_detector_model_path)
 
         self.ocr_engine = create_ocr(self.ocr_config, self.device)
         self.ocr_backend_active = self.ocr_engine.name
