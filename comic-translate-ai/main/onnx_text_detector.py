@@ -103,10 +103,17 @@ def _postprocess_mask_np(img: np.ndarray) -> np.ndarray:
     return img.astype(np.uint8)
 
 
-def create_text_detector(model_path, device="cpu", language="ja"):
+def create_text_detector(model_path, device="cpu", language="ja", *, cuda_model_path=None):
     from pathlib import Path
     from comic_translate_core.detector_paths import REGION_FILE
 
+    if cuda_model_path and str(device).startswith('cuda'):
+        try:
+            return OnnxTextDetector(cuda_model_path, device=device, require_cuda=True)
+        except Exception as exc:
+            # The optional fast graph must never pin an installation to the
+            # heavier CPU detector when the CUDA runtime cannot load it.
+            print(f'[WARNING] CUDA 快速检测器不可用，改用默认检测器: {exc}')
     if Path(model_path).name == REGION_FILE:
         from onnx_split_detector import SplitTextDetector
         return SplitTextDetector(model_path, device, language)
@@ -114,8 +121,8 @@ def create_text_detector(model_path, device="cpu", language="ja"):
 
 
 class OnnxTextDetector:
-    def __init__(self, model_path: str, input_size: int = 1024, device: str = "cpu", conf_thresh: float = 0.4, nms_thresh: float = 0.35, mask_thresh: float = 0.3):
-        self.session = create_onnx_session(model_path, device)
+    def __init__(self, model_path: str, input_size: int = 1024, device: str = "cpu", conf_thresh: float = 0.4, nms_thresh: float = 0.35, mask_thresh: float = 0.3, *, require_cuda=False):
+        self.session = create_onnx_session(model_path, device, require_cuda=True) if require_cuda else create_onnx_session(model_path, device)
         self.input_size = input_size if isinstance(input_size, tuple) else (input_size, input_size)
         self.conf_thresh = conf_thresh
         self.nms_thresh = nms_thresh

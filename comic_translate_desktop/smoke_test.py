@@ -205,19 +205,23 @@ def run_smoke_test(app, output_dir, *, require_gpu=False):
             paper = cv2.imdecode(cv2.imencode('.jpg', paper, [cv2.IMWRITE_JPEG_QUALITY, 82])[1], 1)
             mask = AdaptiveTextMask().generate(MaskRequest(paper, (20, 20, 109, 79), strokes, 28))
             result['jpeg_paper_fill'] = mask.fill_color is not None and not mask.erase_mask[16, 16:113].any()
-            # The whole-box fallback has to ship as well: a mark the detector
-            # seed never covers must be repainted inside a plain white balloon.
+            # A glyph-sized mark near text should be covered without repainting
+            # the whole balloon or swallowing isolated artwork.
             balloon = np.full((120, 150, 3), 255, np.uint8)
             cv2.putText(balloon, 'Hi', (30, 78), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (10, 10, 10), 3)
             seeded = np.zeros(balloon.shape[:2], np.uint8)
             cv2.putText(seeded, 'Hi', (30, 78), cv2.FONT_HERSHEY_SIMPLEX, 1.4, 255, 3)
             seeded = cv2.erode(seeded, np.ones((3, 3), np.uint8))
-            cv2.circle(balloon, (120, 92), 3, (10, 10, 10), -1)   # missed punctuation
+            dot = np.zeros_like(seeded)
+            cv2.circle(dot, (108, 87), 3, 255, -1)   # missed punctuation
+            balloon[dot > 0] = 10
+            balloon[45, 100:127:3] = 20  # isolated screen dots
             fallback = AdaptiveTextMask().generate(MaskRequest(balloon, (20, 30, 130, 100), seeded, 28))
             covered = getattr(fallback, 'box_fill_mask', None)
             result['white_box_fallback'] = bool(
                 covered is not None and fallback.box_fill_color is not None
-                and int(covered[89:96, 117:124].min()) == 255)
+                and np.all(covered[dot > 0] == 255)
+                and not covered[45, 100:127:3].any())
             import httpx
             with httpx.Client(timeout=90.0):
                 result["translation_https_client"] = True

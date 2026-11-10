@@ -1,5 +1,5 @@
 {
-  "status": "Local v2.5.1 preview with midpoint split detector",
+  "status": "Historical v2.5.1 packaging evidence for the original split-only model set; not the checksums of later rebuilds",
   "archives": [
     {
       "name": "ComiTrans-v2.5.1-app.zip",

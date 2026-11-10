@@ -152,6 +152,12 @@ def load_ai_config() -> dict[str, Any]:
         ui_theme = "auto"
     ocr_config = {key: raw.get(key, default) for key, default in OCR_DEFAULTS.items()}
     ocr_config["source_language"] = str(raw.get("source_language") or "ja").strip().lower()
+    use_gpu = bool(raw.get("use_gpu", True))
+    detector_setting = detector_model_setting(raw.get("detector_model"))
+    detector_path = _detector_path(detector_setting)
+    legacy = MODELS_ROOT / LEGACY_PATH
+    cuda_detector = (legacy if use_gpu and detector_setting == "auto"
+                     and detector_path != legacy and _model_file_exists(legacy) else None)
 
     return {
         **ocr_config,
@@ -179,13 +185,15 @@ def load_ai_config() -> dict[str, Any]:
         "pdf_dpi": _clamped_int(raw.get("pdf_dpi"), "pdf_dpi"),
         "resume_enabled": bool(raw.get("resume_enabled", True)),
         "issue_url": str(raw.get("issue_url") or ""),
-        "use_gpu": bool(raw.get("use_gpu", True)),
+        "use_gpu": use_gpu,
         "font_map": font_map,
         "style_font_map": style_font_map,
         "font_fallbacks": font_fallbacks,
         "translation_font": translation_font,
         "translation_font_active": translation_font_active,
-        "detector_model": str(_detector_path(raw.get("detector_model"))),
+        "detector_model": str(detector_path),
+        "detector_model_setting": detector_setting,
+        "cuda_detector_model": str(cuda_detector) if cuda_detector else None,
         "lama_model": str(_resolve_path(raw.get("lama_model"), MODEL_DEFAULTS["lama_model"], base=MODELS_ROOT)),
         "ocr_backend": ocr_backend,
         "charspot_ocr_model": str(_resolve_path(raw.get("charspot_ocr_model"), MODEL_DEFAULTS["charspot_ocr_model"], base=MODELS_ROOT)),
@@ -223,6 +231,7 @@ def config_fingerprint(config: dict[str, Any]) -> tuple:
     return (
         config["use_gpu"],
         config["detector_model"],
+        config.get("cuda_detector_model"),
         config["lama_model"],
         config["ocr_backend"],
         config["ocr_model"],
@@ -254,20 +263,34 @@ def _baberu_ocr_complete(path: Path) -> bool:
     )
 
 
-def _detector_path(value):
+def detector_model_setting(value):
     # Older installations saved this relative default even without a user choice.
     # Absolute paths and other custom paths stay explicit.
     setting = _clean_text(value)
-    if setting and setting != "auto" and Path(setting) != Path("models") / LEGACY_PATH:
+    if (not setting or setting.lower() in ("auto", "none")
+            or Path(setting) == Path("models") / LEGACY_PATH):
+        return "auto"
+    return setting
+
+
+def _model_file_exists(path):
+    try:
+        return path.is_file()
+    except OSError:
+        # Leave diagnostics to missing_models; an unavailable candidate must
+        # not prevent the workbench from starting or using another detector.
+        return False
+
+
+def _detector_path(value):
+    setting = detector_model_setting(value)
+    if setting != "auto":
         return _resolve_path(setting, str(SPLIT_PATH), base=MODELS_ROOT)
     new = MODELS_ROOT / SPLIT_PATH
     old = MODELS_ROOT / LEGACY_PATH
-    try:
-        if not new.parent.exists() and old.is_file():
+    if not (_model_file_exists(new) and _model_file_exists(new.with_name(LINE_FILE))):
+        if _model_file_exists(old):
             return old
-    except PermissionError:
-        # Report access failures through the UI's model check.
-        pass
     return new
 
 
