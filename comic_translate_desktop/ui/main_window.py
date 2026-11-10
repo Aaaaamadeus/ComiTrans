@@ -1,6 +1,7 @@
 from __future__ import annotations
 from ..i18n import tr, ui_language
 
+from html import escape
 from pathlib import Path
 import json
 import random
@@ -331,7 +332,7 @@ class MainWindow(QMainWindow):
         self._control_grid.setContentsMargins(0, 0, 0, 0)
         self._control_grid.setHorizontalSpacing(10)
         self._control_grid.setVerticalSpacing(4)
-        self._controls_inline = None
+        self._controls_mode = None
         self._language_controls = QWidget()
         control_row = QGridLayout(self._language_controls)
         self._language_grid = control_row
@@ -378,7 +379,22 @@ class MainWindow(QMainWindow):
         self._cuda_toggle.setChecked(self.config['use_gpu'])
         self._cuda_toggle.setToolTip(tr('下次任务生效。自动检测模式会按 CUDA 是否可用选择模型。'))
         self._cuda_toggle.toggled.connect(self._toggle_cuda)
-        quick_layout.addWidget(self._cuda_toggle)
+        cuda_note = tr(
+            'CUDA 快速检测器在 GPU 上检测更快，能用笔画像素限定擦除范围。日漫样本中文字框覆盖较少，漏检处可能留字。\n\n'
+            '轻量双图检测器在 CPU 上检测更快，日漫样本中文字框覆盖更全。它靠文字框和文字行定位，复杂底纹或描边仍可能漏擦。\n\n'
+            '两套方案共用背景修补流程，主要区别在于擦除范围。')
+        self._cuda_help = QLabel('?')
+        self._cuda_help.setObjectName('cudaHelp')
+        self._cuda_help.setFixedSize(18, 18)
+        self._cuda_help.setAlignment(Qt.AlignCenter)
+        self._cuda_help.setAccessibleName(tr('检测器与修补说明'))
+        self._cuda_help.setAccessibleDescription(cuda_note)
+        self._cuda_help.setToolTip('<p>' + '</p><p>'.join(escape(cuda_note).split('\n\n')) + '</p>')
+        cuda_layout = QHBoxLayout()
+        cuda_layout.setSpacing(4)
+        cuda_layout.addWidget(self._cuda_toggle)
+        cuda_layout.addWidget(self._cuda_help, 0, Qt.AlignVCenter)
+        quick_layout.addLayout(cuda_layout)
         quick_layout.addWidget(self._pref_toggle)
         control_row.setColumnStretch(5, 1)
         self._control_divider = QFrame()
@@ -1368,7 +1384,8 @@ class MainWindow(QMainWindow):
         self._settings_btn.setVisible(self.width() >= 960)
         self._logs_btn.setVisible(self.width() >= 960)
         inline = self.width() >= (1400 if ui_language() == 'en' else 1280 if ui_language() == 'ja' else 1180)
-        stacked = not inline and ui_language() != 'zh-CN'
+        controls_mode = 'inline' if inline else 'narrow' if self.width() < 880 else 'split'
+        stacked = controls_mode == 'split' and ui_language() != 'zh-CN'
         if stacked != self._language_stacked:
             self._language_stacked = stacked
             fields = (self._source_caption, self._source_language, self._language_arrow,
@@ -1389,8 +1406,8 @@ class MainWindow(QMainWindow):
                 self._language_grid.addWidget(self._target_language, 0, 4)
                 self._language_arrow.setVisible(True)
             self._language_grid.setColumnStretch(5, 1)
-        if inline != self._controls_inline:
-            self._controls_inline = inline
+        if controls_mode != self._controls_mode:
+            self._controls_mode = controls_mode
             for widget in (self._language_controls, self._output_controls, self._start_btn,
                            self._quick_options, self._control_divider):
                 self._control_grid.removeWidget(widget)
@@ -1401,6 +1418,12 @@ class MainWindow(QMainWindow):
                 self._control_grid.addWidget(self._quick_options, 0, 3)
                 self._control_grid.addWidget(self._start_btn, 0, 4)
                 self._control_divider.setVisible(True)
+            elif controls_mode == 'narrow':
+                self._control_grid.addWidget(self._language_controls, 0, 0, 1, 5)
+                self._control_grid.addWidget(self._quick_options, 1, 0, 1, 3, Qt.AlignLeft)
+                self._control_grid.addWidget(self._start_btn, 1, 3, 1, 2, Qt.AlignRight)
+                self._control_grid.addWidget(self._output_controls, 2, 0, 1, 5)
+                self._control_divider.setVisible(False)
             else:
                 self._control_grid.addWidget(self._language_controls, 0, 0, 1, 3)
                 self._control_grid.addWidget(self._quick_options, 0, 3, 1, 2, Qt.AlignRight)

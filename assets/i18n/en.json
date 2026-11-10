@@ -1,5 +1,7 @@
 {
   "CUDA 加速": "CUDA",
+  "检测器与修补说明": "Detector and repair comparison",
+  "CUDA 快速检测器在 GPU 上检测更快，能用笔画像素限定擦除范围。日漫样本中文字框覆盖较少，漏检处可能留字。\n\n轻量双图检测器在 CPU 上检测更快，日漫样本中文字框覆盖更全。它靠文字框和文字行定位，复杂底纹或描边仍可能漏擦。\n\n两套方案共用背景修补流程，主要区别在于擦除范围。": "The fast CUDA detector runs faster on GPU and identifies stroke pixels to guide erasing. It covered fewer text regions in the Japanese manga sample, so missed text may remain.\n\nThe lightweight dual detector runs faster on CPU and covered more text regions in the sample. It uses text boxes and lines, so it can miss strokes on textured backgrounds or in outlined text.\n\nBoth detectors use the same background repair process. They mainly differ in what gets erased.",
   "下次任务生效。自动检测模式会按 CUDA 是否可用选择模型。": "Applies to the next job. Auto detection selects a model based on CUDA availability.",
   "CUDA 设置未保存": "CUDA setting not saved",
   "CUDA 设置未保存：{_0}": "Could not save the CUDA setting: {_0}",
