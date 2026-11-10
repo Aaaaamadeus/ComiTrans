@@ -330,6 +330,9 @@ QFrame#controlCard QPushButton, QFrame#controlCard QToolButton { min-height: 28p
 QFrame#controlCard QPushButton[role="primary"] { border-radius: 10px; min-height: 32px; }
 QFrame#optionDivider { background: @rule; border: none; margin: 6px 0; }
 QLabel#optionArrow { color: @secondary; padding: 0 2px; }
+QLabel#cudaHelp { background: @muted; color: @secondary; border: 1px solid @rule;
+    border-radius: 9px; font-size: 11px; font-weight: 700; }
+QLabel#cudaHelp:hover { color: @ink; border-color: @ruleStrong; }
 QComboBox QLineEdit#fontSearchEditor, QComboBox QLineEdit#fontSearchEditor:focus { padding: 0; min-height: 0; border: none; border-radius: 0; background: transparent; }
 QLineEdit#fontSearchEditor QToolButton { padding: 0; min-height: 0; min-width: 0; border: none; border-radius: 0; background: transparent; }
 QSpinBox::up-button, QSpinBox::down-button { width: 20px; border: none; background: transparent; }

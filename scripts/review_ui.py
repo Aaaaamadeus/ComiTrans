@@ -85,6 +85,9 @@ def main():
             QTest.qWait(80)
             for button in buttons:
                 check_action(window, button)
+            if page is window.translate_tab:
+                for field in (window._source_language, window._target_language):
+                    assert window._language_controls.rect().contains(field.geometry())
             header_widgets = [widget for widget in (window._brand_title, window._nav_auto, window._nav_editor,
                               window.status_pill, window._stop_btn, window._settings_btn, window._logs_btn,
                               window._output_btn, window._issue_btn, window._more_btn) if widget.isVisible()]
@@ -123,7 +126,7 @@ def main():
                     report['illustrations'].append(dict(file=asset, width=pixmap.width(),
                                                        height=pixmap.height(), transparent=True))
                 capture('automatic', window.translate_tab,
-                        (window._add_btn, window._cuda_toggle, window._start_btn))
+                        (window._add_btn, window._cuda_toggle, window._cuda_help, window._start_btn))
                 window._pref_toggle.setChecked(True)
                 QTest.qWait(320)
                 capture('automatic-preferences', window.translate_tab,
@@ -301,7 +304,7 @@ def main():
                 for width, height in ((1024, 720), (960, 540), (820, 480)):
                     window.resize(min(width, int(screen.width() * .94)), min(height, int(screen.height() * .94)))
                     capture(f'automatic-{width}', window.translate_tab,
-                            (window._add_btn, window._cuda_toggle, window._start_btn))
+                            (window._add_btn, window._cuda_toggle, window._cuda_help, window._start_btn))
                     settings._sections.setCurrentIndex(2)
                     capture(f'settings-{width}', settings, (settings._save_btn,))
                     settings._sections.setCurrentIndex(3)
