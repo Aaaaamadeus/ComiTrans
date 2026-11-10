@@ -18,6 +18,7 @@ from comic_translate_core.restoration import (
 from comic_translate_core.layout_options import VERTICAL_ALIGNMENTS, normalize_text_color
 from ..background_repair import BackgroundRepair, RepairWorker, save_editor_files
 from ..pdf_export import PdfExportWorker
+from ..pdf_utils import PdfProcessingError
 from ..editor_jobs import LatestJobQueue, read_page, read_project_pages, SaveRequest
 from .color_picker import TextColorPicker
 from .strip_preview import StripPreview
@@ -97,6 +98,14 @@ class EditorPage(QWidget):
         self._preview_timer.setSingleShot(True)
         self._preview_timer.setInterval(40)
         self._preview_timer.timeout.connect(self.apply_changes)
+        # Owned timers instead of QTimer.singleShot(bound method): a queued
+        # callback must not outlive the widget while another window pumps events.
+        self._reveal_timer = QTimer(self)
+        self._reveal_timer.setSingleShot(True)
+        self._reveal_timer.timeout.connect(self._reveal_text_editor)
+        self._adapt_timer = QTimer(self)
+        self._adapt_timer.setSingleShot(True)
+        self._adapt_timer.timeout.connect(self._adapt_width)
         self._init_typesetter()
         self._build_ui()
 
@@ -323,15 +332,24 @@ class EditorPage(QWidget):
         self._repair_mode.setCheckable(True)
         self._repair_mode.setToolTip(tr('拖动框选修补范围，拖动边角调整；Esc 取消本次拖动。'))
         self._repair_btn = QPushButton(tr('修补选区'))
+        self._fill_white_btn = QPushButton(tr('填白'))
+        self._fill_white_btn.setToolTip(tr('把框选区域整块填成白色（可撤回）。'))
+        self._fill_black_btn = QPushButton(tr('填黑'))
+        self._fill_black_btn.setToolTip(tr('把框选区域整块填成黑色（可撤回）。'))
         self._repair_undo = QPushButton(tr('撤回修补'))
         self._repair_undo.setToolTip(tr('使用处理前的图片逐步撤回；保存成功后清空缓存。'))
-        for button in (self._repair_mode, self._repair_btn, self._repair_undo):
+        for button in (self._repair_mode, self._repair_btn, self._fill_white_btn,
+                       self._fill_black_btn, self._repair_undo):
             button.setProperty('compact', True)
             button.setProperty('role', 'utility')
             repair_toolbar.addWidget(button)
         repair_toolbar.addStretch()
         self._repair_mode.toggled.connect(self._toggle_repair_mode)
         self._repair_btn.clicked.connect(self._start_background_repair)
+        self._fill_white_btn.clicked.connect(
+            lambda: self._fill_repair_region((255, 255, 255)))
+        self._fill_black_btn.clicked.connect(
+            lambda: self._fill_repair_region((0, 0, 0)))
         self._repair_undo.clicked.connect(self.undo_background_repair)
         canvas_layout.addLayout(repair_toolbar)
         canvas_layout.addWidget(self.preview, 1)
@@ -750,21 +768,30 @@ class EditorPage(QWidget):
         self._page_jobs.invalidate()
         revision, previous = self._edit_revision, self.output_path
         def read(cancelled):
-            result = []
+            result, failures = [], []
             for raw in paths:
                 if cancelled():
                     raise RuntimeError('页面索引已取消')
-                path = Path(raw).resolve()
-                if path.suffix.lower() == '.pdf' or path.name == 'project.json':
-                    result.append((path, read_project_pages(path, cancelled)))
-                else:
-                    reader = QImageReader(str(path))
-                    size = reader.size()
-                    if reader.transformation().value & 4:
-                        size.transpose()
-                    result.append((path, size))
-            return result
-        def accept(result):
+                try:
+                    path = Path(raw).resolve()
+                    if path.suffix.lower() == '.pdf' or path.name == 'project.json':
+                        result.append((path, read_project_pages(path, cancelled)))
+                    else:
+                        reader = QImageReader(str(path))
+                        size = reader.size()
+                        if not size.isValid():
+                            raise OSError(reader.errorString())
+                        if reader.transformation().value & 4:
+                            size.transpose()
+                        result.append((path, size))
+                except (PdfProcessingError, OSError, ValueError) as exc:
+                    failures.append((Path(raw).name, str(exc)))
+            return result, failures
+        def accept(payload):
+            result, failures = payload
+            notice = tr('跳过 {_0} 个无法导入的文件', _0=len(failures)) if failures else ''
+            details = '\n'.join(f'{name}: {error}' for name, error in failures)
+            self._status.setToolTip(details)
             rows, imported = [], []
             for path, data in result:
                 if isinstance(data, tuple):
@@ -800,10 +827,10 @@ class EditorPage(QWidget):
                     return
                 self._indexing = False
                 if imported and self.output_path == previous and self._edit_revision == revision:
-                    self._begin_page_load(imported[0])
+                    self._begin_page_load(imported[0], import_notice=notice)
                 else:
                     self._update_repair_controls()
-                    self._status.setText(tr('页面索引已读取，当前修改保留。'))
+                    self._status.setText(notice or tr('页面索引已读取，当前修改保留。'))
             append_batch()
         self._status.setText(tr('正在后台读取页面索引…'))
         self._import_jobs.submit(read, accept, self._page_load_failed, cancellable=True)
@@ -949,7 +976,7 @@ class EditorPage(QWidget):
         self._begin_page_load(path)
         return True
 
-    def _begin_page_load(self, path):
+    def _begin_page_load(self, path, *, import_notice=''):
         revision, previous = self._edit_revision, self.output_path
         settings = deepcopy(self.config)
         self._requesting_page = True
@@ -962,7 +989,8 @@ class EditorPage(QWidget):
                 self._status.setText(tr('加载期间当前页有新修改，已保留当前页；请重新选择目标页。'))
                 self._update_repair_controls()
                 return
-            self.load_page(path, _payload=data, _approved=True)
+            if self.load_page(path, _payload=data, _approved=True) and import_notice:
+                self._status.setText(f'{self._status.text()} · {import_notice}')
         self._page_jobs.submit(lambda cancelled: read_page(path, settings, cancelled), accept, self._page_load_failed, cancellable=True)
         self._update_repair_controls()
 
@@ -1341,7 +1369,7 @@ class EditorPage(QWidget):
         self._row_dirty = False
         if self.height() >= 700:
             self._properties_scroll.verticalScrollBar().setValue(0)
-        QTimer.singleShot(0, self._reveal_text_editor)
+        self._reveal_timer.start(0)
 
     def apply_changes(self):
         if self._cleaned_image is None:
@@ -1403,6 +1431,12 @@ class EditorPage(QWidget):
                 protected = True
         self._repair_btn.setEnabled(ready and self._repair_box is not None and not protected)
         self._repair_btn.setToolTip(tr('选区包含已还原气泡，请先恢复该气泡的处理结果再修补。') if protected else '')
+        fills_enabled = ready and self._repair_box is not None and not protected
+        self._fill_white_btn.setEnabled(fills_enabled)
+        self._fill_black_btn.setEnabled(fills_enabled)
+        fill_tip = tr('选区包含已还原气泡，请先恢复该气泡的处理结果再填色。') if protected else ''
+        self._fill_white_btn.setToolTip(fill_tip or tr('把框选区域整块填成白色（可撤回）。'))
+        self._fill_black_btn.setToolTip(fill_tip or tr('把框选区域整块填成黑色（可撤回）。'))
         selected = 0 <= self._loaded_row < len(self.items)
         self._restore_bubble_btn.setEnabled(ready and selected)
         self._restore_bubble_btn.setText(tr('恢复处理结果') if selected and self.items[self._loaded_row].get('restore_original') else tr('还原此气泡'))
@@ -1418,7 +1452,7 @@ class EditorPage(QWidget):
         self._update_region_guide()
         self._update_repair_controls()
         if enabled:
-            self._status.setText(tr('在画布拖动框选背景，再点击“修补选区”；译文保持独立。'))
+            self._status.setText(tr('在画布拖动框选背景，再点击“修补选区”或“填白 / 填黑”；译文保持独立。'))
 
     def _start_background_repair(self):
         if self._requesting_page or self._indexing or self._save_jobs.busy or self._repair_worker is not None or self._cleaned_image is None or self._repair_box is None:
@@ -1443,6 +1477,43 @@ class EditorPage(QWidget):
         self._update_repair_controls()
         self._status.setText(tr('正在修补背景，请稍候再保存或切换页面。'))
         worker.start()
+
+    def _fill_repair_region(self, color) -> None:
+        """Paint the selected rectangle with a flat colour on the cleaned base."""
+        if (self._requesting_page or self._indexing or self._save_jobs.busy
+                or self._repair_worker is not None or self._cleaned_image is None
+                or self._repair_box is None or self._export_worker is not None):
+            return
+        try:
+            box = tuple(map(int, self._repair_box))
+        except (TypeError, ValueError):
+            self._status.setText(tr('选区超出图片范围。'))
+            return
+        x1, y1, x2, y2 = box
+        if not (0 <= x1 < x2 <= self._cleaned_image.width
+                and 0 <= y1 < y2 <= self._cleaned_image.height):
+            self._status.setText(tr('选区超出图片范围。'))
+            return
+        try:
+            protected = intersects_restored_region(box, self.items, self._cleaned_image.size)
+        except (ValueError, KeyError, TypeError, OSError) as exc:
+            self._status.setText(tr('还原失败：{_0}', _0=exc))
+            return
+        if protected:
+            self._status.setText(tr('选区包含已还原气泡，请先恢复该气泡的处理结果再填色。'))
+            return
+        if not self.apply_changes():
+            return
+        before = self._cleaned_image.crop(box)
+        self._cleaned_image.paste(tuple(color), box)
+        self._repair_history.append((box, before, self._dirty, self._edit_revision))
+        self._layer_cache.clear()
+        self._dirty = self._preview_dirty = True
+        self._refresh_page_dirty_label()
+        if self.apply_changes():
+            self._status.setText(
+                tr('已把选区填为白色 · 未保存，可撤回修补。') if color == (255, 255, 255)
+                else tr('已把选区填为黑色 · 未保存，可撤回修补。'))
 
     def _accept_background_repair(self, box, patch):
         before = self._cleaned_image.crop(box)
@@ -1756,11 +1827,21 @@ class EditorPage(QWidget):
 
     def shutdown_jobs(self):
         self._indexing = False
+        for timer in (self._reveal_timer, self._adapt_timer,
+                      self._preview_timer, self._thumbnail_timer):
+            timer.stop()
         self._page_jobs.close()
         self._import_jobs.close()
         self._save_jobs.close()
         self._thumbnail_loader.request([])
         self.preview._thumbnail_loader.request([])
+        # Detach event filters before the window goes away; otherwise a deleted
+        # EditorPage can still be called for application-wide events.
+        app = QApplication.instance()
+        if app is not None:
+            app.removeEventFilter(self)
+        for watched in (self.page_list.viewport(), self.preview):
+            watched.removeEventFilter(self)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1781,7 +1862,7 @@ class EditorPage(QWidget):
         super().showEvent(event)
         self._store_properties()
         self._refresh_font_choices()
-        QTimer.singleShot(0, self._adapt_width)
+        self._adapt_timer.start(0)
 
     def hideEvent(self, event):
         self.preview.set_space_pan(False)
@@ -1792,4 +1873,4 @@ class EditorPage(QWidget):
             self._source_text.setFixedHeight(64 if self.height() < 700 else 110)
             self._apply_source_layout()
             self._apply_panel_layout()
-            QTimer.singleShot(0, self._reveal_text_editor)
+            self._reveal_timer.start(0)

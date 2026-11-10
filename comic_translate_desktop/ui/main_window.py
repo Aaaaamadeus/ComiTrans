@@ -2,12 +2,16 @@ from __future__ import annotations
 from ..i18n import tr, ui_language
 
 from pathlib import Path
+import json
 import random
 
 from PySide6.QtCore import (
+    QEasingCurve,
+    QPropertyAnimation,
     QSize,
     Qt,
     QSettings,
+    QSignalBlocker,
     QElapsedTimer,
     QTimer,
     QUrl,
@@ -64,7 +68,7 @@ from .editor_page import EditorPage
 from .error_log_page import ErrorLogPage
 from .step_panel import StepPanel
 from .theme import apply_theme, brand_font, refresh_style, set_themed_icon
-from .motion import fade_in, set_pulse, set_reduced_motion
+from .motion import reduced_motion, set_pulse, set_reduced_motion
 from .window_chrome import apply_window_chrome, watch_window_chrome
 from .preview import ImagePreview
 from .log_panel import LogPanel
@@ -85,6 +89,10 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(tr('ComiTrans 本地漫画翻译'))
         self.setWindowIcon(QIcon(str(app_config.ICON_PATH)))
         self._ui_settings = QSettings()
+        self._last_outputs = self._load_last_outputs()
+        self._opening_all_results = False
+        self._pref_animating = False
+        self._pref_animation = None
         self._stop_requested = False
         self._active_task_id = None
         self._warmup_task_id = None
@@ -237,7 +245,13 @@ class MainWindow(QMainWindow):
             if state is not None:
                 splitter.restoreState(state)
         self._log_toggle.setChecked(self._ui_settings.value("ui/logVisible", True, type=bool))
-        self._pref_toggle.setChecked(self._ui_settings.value("ui/preferencesVisible", False, type=bool))
+        preferences_visible = self._ui_settings.value("ui/preferencesVisible", False, type=bool)
+        self._pref_toggle.blockSignals(True)
+        self._pref_toggle.setChecked(preferences_visible)
+        self._pref_toggle.blockSignals(False)
+        self._pref_toggle.setArrowType(Qt.DownArrow if preferences_visible else Qt.RightArrow)
+        self._pref_container.setVisible(preferences_visible)
+        self._apply_compact_layout()
 
     def _build_file_panel(self) -> QWidget:
         group = QFrame()
@@ -356,6 +370,16 @@ class MainWindow(QMainWindow):
         self._pref_toggle.setArrowType(Qt.RightArrow)
         self._pref_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self._pref_toggle.setProperty("role", "quiet")
+        self._quick_options = QWidget()
+        quick_layout = QHBoxLayout(self._quick_options)
+        quick_layout.setContentsMargins(0, 0, 0, 0)
+        quick_layout.setSpacing(10)
+        self._cuda_toggle = QCheckBox(tr('CUDA 加速'))
+        self._cuda_toggle.setChecked(self.config['use_gpu'])
+        self._cuda_toggle.setToolTip(tr('下次任务生效。自动检测模式会按 CUDA 是否可用选择模型。'))
+        self._cuda_toggle.toggled.connect(self._toggle_cuda)
+        quick_layout.addWidget(self._cuda_toggle)
+        quick_layout.addWidget(self._pref_toggle)
         control_row.setColumnStretch(5, 1)
         self._control_divider = QFrame()
         self._control_divider.setObjectName('optionDivider')
@@ -460,8 +484,8 @@ class MainWindow(QMainWindow):
         self._prompt_input.setPlaceholderText(
             tr('可填写故事背景、世界观、人物关系、语气风格等，翻译时会自动附加到提示词中')
         )
-        self._prompt_input.setMinimumHeight(64)
-        self._prompt_input.setMaximumHeight(82)
+        self._prompt_input.setMinimumHeight(62)
+        self._prompt_input.setMaximumHeight(72)
         prompt_panel.addWidget(prompt_label)
         prompt_panel.addWidget(self._prompt_input)
 
@@ -472,8 +496,8 @@ class MainWindow(QMainWindow):
         self._names_input = QPlainTextEdit()
         self._names_input.setObjectName('prefInput')
         self._names_input.setPlaceholderText(tr('例如：\n路飞\n娜美\n索隆'))
-        self._names_input.setMinimumHeight(64)
-        self._names_input.setMaximumHeight(82)
+        self._names_input.setMinimumHeight(62)
+        self._names_input.setMaximumHeight(72)
         names_panel.addWidget(names_label)
         names_panel.addWidget(self._names_input)
         right_layout.addLayout(prompt_panel)
@@ -521,6 +545,10 @@ class MainWindow(QMainWindow):
         self._edit_result_btn.setProperty("compact", True)
         self._edit_result_btn.clicked.connect(lambda: self.tabs.setCurrentWidget(self.editor_page))
         content_header.addWidget(self._edit_result_btn)
+        self._edit_all_btn = QPushButton(tr('一键精修'))
+        self._edit_all_btn.setProperty("compact", True)
+        self._edit_all_btn.clicked.connect(self._open_all_in_editor)
+        content_header.addWidget(self._edit_all_btn)
         self._log_toggle = QToolButton()
         self._log_toggle.setText(tr('详细日志'))
         self._log_toggle.setCheckable(True)
@@ -594,6 +622,30 @@ class MainWindow(QMainWindow):
         self.config = updated
         self.editor_page.set_translation_fonts(updated)
         self._append_log(tr('译文字体已保存：{_0}，下次翻译生效。', _0=self._font_picker.combo.currentText()))
+
+    def _sync_cuda_toggle(self) -> None:
+        with QSignalBlocker(self._cuda_toggle):
+            self._cuda_toggle.setChecked(self.config['use_gpu'])
+
+    def _toggle_cuda(self, enabled: bool) -> None:
+        if self.worker is not None or self.warmup_worker is not None:
+            self._sync_cuda_toggle()
+            return
+        try:
+            self.config = save_ai_config({'use_gpu': enabled})
+        except OSError as exc:
+            self._sync_cuda_toggle()
+            self._set_status(tr('CUDA 设置未保存'), 'error')
+            self._append_log(tr('CUDA 设置未保存：{_0}', _0=exc))
+            return
+        self.pipeline = None
+        self.pipeline_fingerprint = None
+        with QSignalBlocker(self.api_config_page._gpu_check):
+            self.api_config_page._gpu_check.setChecked(enabled)
+        self.editor_page.set_repair_config(self.config)
+        message = tr('下次任务将尝试 CUDA 加速') if enabled else tr('下次任务将使用 CPU')
+        self._set_status(message, 'ready')
+        self._append_log(message)
 
     def _change_target_language(self) -> None:
         target = self._target_language.currentData()
@@ -956,6 +1008,7 @@ class MainWindow(QMainWindow):
         self._clear_btn.setEnabled(not running and count > 0)
         self.api_config_page.setEnabled(not running and not warming)
         self._source_language.setEnabled(not running and not warming)
+        self._cuda_toggle.setEnabled(not running and self.warmup_worker is None)
         self._target_language.setEnabled(not running and not warming)
         self._translation_alignment.setEnabled(not running and not warming)
         self._file_count_label.setText(tr('{_0} 个文件', _0=count))
@@ -972,6 +1025,11 @@ class MainWindow(QMainWindow):
         self._edit_result_btn.setEnabled(bool(output and (
             Path(output).suffix.lower() != ".pdf" or project_link_path(output).is_file())))
         self._edit_result_btn.setToolTip(tr('精修已生成的图片或 PDF') if self._edit_result_btn.isEnabled() else tr('请选择已完成且带精修资料的图片或 PDF'))
+        editable = self._editable_outputs()
+        self._edit_all_btn.setEnabled(bool(editable) and not running)
+        self._edit_all_btn.setToolTip(
+            tr('把上次任务生成的全部图片或 PDF 加入嵌字精修列表') if editable
+            else tr('上次任务还没有可精修的结果'))
         if warming:
             self._start_btn.setToolTip(tr('本地模型正在准备，完成后即可开始'))
         elif not count:
@@ -1015,6 +1073,10 @@ class MainWindow(QMainWindow):
     def _on_image_done(self, input_path: str, output_path: str) -> None:
         key = str(Path(input_path).resolve())
         self.results[key] = output_path
+        current = self._current_result_paths()
+        if current:
+            self._last_outputs = current
+            self._save_last_outputs()
         for i in range(self.file_list.count()):
             item = self.file_list.item(i)
             if item.data(Qt.UserRole) == key:
@@ -1045,6 +1107,10 @@ class MainWindow(QMainWindow):
             self.worker.wait()
             self.worker.deleteLater()
             self.worker = None
+        current = self._current_result_paths()
+        if current:
+            self._last_outputs = current
+            self._save_last_outputs()
         self._elapsed_timer.stop()
         self._update_elapsed()
         self._set_running(False)
@@ -1128,7 +1194,7 @@ class MainWindow(QMainWindow):
             self.error_log_page.refresh()
         if page is self.editor_page:
             selected = self.file_list.selectedItems()
-            if selected:
+            if selected and not self._opening_all_results:
                 output = self.results.get(selected[-1].data(Qt.UserRole))
                 if output:
                     self.editor_page.request_page(output)
@@ -1140,18 +1206,137 @@ class MainWindow(QMainWindow):
     def _refresh_error_page(self) -> None:
         self.error_log_page.refresh()
 
+    def _load_last_outputs(self) -> list[str]:
+        raw = self._ui_settings.value('ui/lastBatchOutputs', '')
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+        except (TypeError, ValueError):
+            return []
+        if not isinstance(data, list):
+            return []
+        return [str(item) for item in data if isinstance(item, str) and item.strip()]
+
+    def _save_last_outputs(self) -> None:
+        try:
+            self._ui_settings.setValue(
+                'ui/lastBatchOutputs', json.dumps(self._last_outputs, ensure_ascii=False))
+        except (TypeError, ValueError):
+            pass
+
+    def _current_result_paths(self) -> list[str]:
+        outputs = []
+        for index in range(self.file_list.count()):
+            key = self.file_list.item(index).data(Qt.UserRole)
+            output = self.results.get(key)
+            if output:
+                outputs.append(str(output))
+        return outputs
+
+    def _editable_outputs(self) -> list[str]:
+        outputs, seen = [], set()
+        for raw in self._last_outputs:
+            path = Path(raw)
+            key = str(path)
+            if key in seen or not path.exists():
+                continue
+            if path.suffix.lower() == '.pdf' and not project_link_path(path).is_file():
+                continue
+            seen.add(key)
+            outputs.append(key)
+        return outputs
+
+    def _open_all_in_editor(self) -> None:
+        outputs = self._editable_outputs()
+        if not outputs:
+            return
+        # Skip the single-page hand-off in _on_tab_changed so the batch import
+        # is not cancelled by a second request_page().
+        self._opening_all_results = True
+        try:
+            self.tabs.setCurrentWidget(self.editor_page)
+        finally:
+            self._opening_all_results = False
+        if self.editor_page.request_import(outputs):
+            self._append_log(tr('正在导入 {_0} 个结果到精修列表…', _0=len(outputs)))
+
     def _toggle_preferences(self, checked: bool) -> None:
         if not checked:
             self._pref_scroll_value = self._pref_container.verticalScrollBar().value()
             if self._pref_save_timer.isActive():
                 self._save_translation_preferences()
         self._pref_toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow)
-        self._pref_container.setVisible(checked)
-        if checked:
-            fade_in(self._pref_container, 160)
-            QTimer.singleShot(0, lambda: self._pref_container.verticalScrollBar().setValue(self._pref_scroll_value))
         self._ui_settings.setValue('ui/preferencesVisible', checked)
+        # Animate the foldout height and leave the log alone. Hiding the log in
+        # one step (and fading the scroll area through a QGraphicsOpacityEffect)
+        # is what made the old transition stutter instead of animate.
+        self._pref_animating = True
+        self._animate_preferences(checked)
         self._apply_compact_layout()
+
+    def _pref_target_height(self) -> int:
+        if self.height() >= 760:
+            # Keep the log panel visible so nothing jumps when the foldout opens.
+            return min(280, max(220, self.height() - 620))
+        available = max(160, self.height() - 376)
+        return min(240, available)
+
+    def _animate_preferences(self, expand: bool) -> None:
+        container = self._pref_container
+        previous = self._pref_animation
+        if previous is not None:
+            previous.stop()
+            previous.deleteLater()
+            self._pref_animation = None
+        target = self._pref_target_height() if expand else 0
+        duration = 220 if expand else 180
+        if reduced_motion() or self.height() < 760:
+            # Short windows hide the log while the foldout is open; animating
+            # that layout swap reads as a snap, so switch instantly instead.
+            self._pref_animating = False
+            container.setVisible(expand)
+            container.setMinimumHeight(target)
+            container.setMaximumHeight(target)
+            if expand:
+                self._restore_preferences_scroll()
+            self._apply_compact_layout()
+            return
+        start = container.maximumHeight() if container.isVisible() else 0
+        if start > 10000:
+            start = 0
+        container.setVisible(True)
+        container.setMinimumHeight(start)
+        container.setMaximumHeight(start)
+        animation = QPropertyAnimation(container, b"minimumHeight", self)
+        animation.setDuration(duration)
+        animation.setStartValue(start)
+        animation.setEndValue(target)
+        animation.setEasingCurve(QEasingCurve.OutCubic)
+        animation.valueChanged.connect(
+            lambda value: container.setMaximumHeight(int(value)))
+        animation.finished.connect(
+            lambda: self._finish_preferences_animation(expand, target))
+        self._pref_animation = animation
+        animation.start()
+
+    def _finish_preferences_animation(self, expand: bool, target: int) -> None:
+        self._pref_animating = False
+        self._pref_animation = None
+        if expand:
+            target = self._pref_target_height()
+        else:
+            target = 0
+        container = self._pref_container
+        container.setMinimumHeight(target)
+        container.setMaximumHeight(target)
+        if expand:
+            self._restore_preferences_scroll()
+        else:
+            container.setVisible(False)
+        self._apply_compact_layout()
+
+    def _restore_preferences_scroll(self) -> None:
+        QTimer.singleShot(
+            0, lambda: self._pref_container.verticalScrollBar().setValue(self._pref_scroll_value))
 
     def _toggle_log_panel(self, visible: bool) -> None:
         self._log_panel.setVisible(visible)
@@ -1166,12 +1351,10 @@ class MainWindow(QMainWindow):
         # Leave a useful image viewport; additional preferences scroll inside the foldout.
         expanded = self._pref_toggle.isChecked()
         wide = self._pref_container.width() >= 680
-        available = max(200, self.height() - (376 if expanded else 436))
-        wanted = min(320, available)
-        if self.height() < 680:
-            wanted = min(wanted, 240)
-        self._pref_container.setMinimumHeight(wanted if expanded else 0)
-        self._pref_container.setMaximumHeight(wanted if expanded else 0)
+        if not self._pref_animating:
+            wanted = self._pref_target_height() if expanded else 0
+            self._pref_container.setMinimumHeight(wanted)
+            self._pref_container.setMaximumHeight(wanted)
         if hasattr(self, '_pref_columns'):
             self._pref_columns.setDirection(QHBoxLayout.LeftToRight if wide else QHBoxLayout.TopToBottom)
         self._brand_title.setFont(brand_font(28 if self.width() < 960 else 36 if self.width() < 1180 else 40))
@@ -1209,18 +1392,18 @@ class MainWindow(QMainWindow):
         if inline != self._controls_inline:
             self._controls_inline = inline
             for widget in (self._language_controls, self._output_controls, self._start_btn,
-                           self._pref_toggle, self._control_divider):
+                           self._quick_options, self._control_divider):
                 self._control_grid.removeWidget(widget)
             if inline:
                 self._control_grid.addWidget(self._language_controls, 0, 0)
                 self._control_grid.addWidget(self._control_divider, 0, 1)
                 self._control_grid.addWidget(self._output_controls, 0, 2)
-                self._control_grid.addWidget(self._pref_toggle, 0, 3)
+                self._control_grid.addWidget(self._quick_options, 0, 3)
                 self._control_grid.addWidget(self._start_btn, 0, 4)
                 self._control_divider.setVisible(True)
             else:
                 self._control_grid.addWidget(self._language_controls, 0, 0, 1, 3)
-                self._control_grid.addWidget(self._pref_toggle, 0, 3, 1, 2, Qt.AlignRight)
+                self._control_grid.addWidget(self._quick_options, 0, 3, 1, 2, Qt.AlignRight)
                 self._control_grid.addWidget(self._output_controls, 1, 0, 1, 3)
                 self._control_grid.addWidget(self._start_btn, 1, 3, 1, 2, Qt.AlignRight)
                 self._control_divider.setVisible(False)
@@ -1228,13 +1411,17 @@ class MainWindow(QMainWindow):
             self._control_grid.setColumnStretch(2, 1)
         editing_preferences = self._pref_toggle.isChecked()
         self._output_controls.setVisible(self.height() >= 580)
-        self.step_panel.setVisible((self.file_list.count() > 0 or self.worker is not None)
-                                   and not editing_preferences)
+        if not self._pref_animating or editing_preferences:
+            self.step_panel.setVisible((self.file_list.count() > 0 or self.worker is not None)
+                                       and not editing_preferences)
         self._elapsed_label.setVisible(not compact and self.width() >= 1200)
         self.step_panel.set_compact(compact)
         self.preview_tabs.setVisible(True)
-        self._log_panel.setVisible(self._log_toggle.isChecked() and not editing_preferences)
-        self._log_panel.setMaximumHeight(100 if compact else (120 if editing_preferences else 16777215))
+        if not self._pref_animating or editing_preferences:
+            hide_log_for_preferences = editing_preferences and self.height() < 760
+            self._log_panel.setVisible(
+                self._log_toggle.isChecked() and not hide_log_for_preferences)
+            self._log_panel.setMaximumHeight(100 if compact else 16777215)
         self._log_toggle.setToolTip(tr('独立展开或收起详细日志'))
         margin = 12 if self.width() < 1180 else 20
         self._work_layout.setContentsMargins(margin, 8 if compact else 14, margin, 12)
@@ -1309,6 +1496,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr('设置未保存'), tr('无法保存设置：{error}', error=str(exc)))
             return
         self.api_config_page.load_config(self.config)
+        self._sync_cuda_toggle()
         set_reduced_motion(self.config.get('ui_reduced_motion', False))
         apply_theme(QApplication.instance(), self.config.get('ui_theme', 'auto'))
         self._font_picker.load_config(self.config)
@@ -1401,6 +1589,10 @@ class MainWindow(QMainWindow):
             self.worker.wait()
         if self.warmup_worker is not None and self.warmup_worker.isRunning():
             self.warmup_worker.wait()
+        current = self._current_result_paths()
+        if current:
+            self._last_outputs = current
+            self._save_last_outputs()
         self.error_log_page.shutdown()
         self._log_panel.flush_all()
         self.editor_page.save_ui_state()

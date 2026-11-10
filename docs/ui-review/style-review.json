@@ -68,6 +68,13 @@
       "actions_visible": true
     },
     {
+      "file": "settings-advanced-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
       "file": "diagnosis-style-review.png",
       "width": 1440,
       "height": 900,
@@ -83,6 +90,13 @@
     },
     {
       "file": "editor-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-fill-style-review.png",
       "width": 1440,
       "height": 900,
       "dpr": 1.0,
@@ -132,6 +146,13 @@
     },
     {
       "file": "automatic-preview-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "automatic-complete-style-review.png",
       "width": 1440,
       "height": 900,
       "dpr": 1.0,
@@ -321,7 +342,7 @@
     "edits_preserve_file_until_save": true,
     "saved_pixels_match_preview": true,
     "guide_excluded_from_export": true,
-    "cached_edit_ms": 7.7
+    "cached_edit_ms": 9.0
   },
   "editor_mask_drag": {
     "handles": 8,

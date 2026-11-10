@@ -201,6 +201,7 @@ class BatchWorker(QThread):
         with self._capture_pipeline_output():
             pipeline = ComicTranslatorPipeline(
                 det_model_path=self._config["detector_model"],
+                cuda_detector_model_path=self._config.get("cuda_detector_model"),
                 font_map=self._config["font_map"],
                 font_size=self._config["font_size"],
                 fallback_fonts=self._config.get('font_fallbacks'),

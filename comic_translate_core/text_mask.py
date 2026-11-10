@@ -62,7 +62,7 @@ def _dilate(mask, radius):
 
 
 def _white_box_fallback(image, inside, seeds, erase, size):
-    """Repaint a plain balloon interior, including marks the detector missed.
+    """Repair missed glyphs near detected text on plain balloon paper.
 
     The decision must be local to this box: the detector domain is dilated by up
     to 8px, so `np.any(seeds)` can be satisfied by a neighbouring balloon while
@@ -167,11 +167,27 @@ def _white_box_fallback(image, inside, seeds, erase, size):
     # safe to repaint, so the plain verdict overrides this veto.
     if protect_pixels > area * .30 and not plain:
         return None
-    mask = box & ~protect
     # Leave visibly coloured artwork to the colour-aware normal path.
     chroma = np.ptp(image.astype(np.int16),axis=2)
     if np.mean(chroma[box] > 20) > .005:
         return None
+    # A white box is not evidence that all its pixels belong to text. Extend
+    # the original mask only around glyph-sized ink components near its seeds.
+    nearby_text = _dilate(local_seeds, max(4, round(size * 2))) & box
+    nearby_labels = set(np.unique(labels[nearby_text]))
+    extra_components = np.zeros(count, bool)
+    for i in (relevant & nearby_labels) - supported:
+        x, y, w, h, component_area = stats[i]
+        if protected[i] or not max(4, round(size * .15)) <= component_area <= size * size * 4:
+            continue
+        local_labels = labels[y:y+h, x:x+w] == i
+        if np.all(box[y:y+h, x:x+w][local_labels]):
+            extra_components[i] = True
+    extra = extra_components[labels]
+    # Leave separate ink and low-contrast artwork outside the small collar
+    # untouched, even when the paper passes every uniformity check.
+    collar = cv2.dilate(extra.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    mask = box & ~protect & (erase | (collar & (~ink | extra)))
     return mask,tuple(map(int,paper)),protect_pixels,('loose' if loose else 'strict'),plain
 
 
