@@ -6,6 +6,10 @@
 
 ## 更新内容
 
+本分支新构建的模型包同时提供两套检测器（379,381,876 字节，约为 v2.5.0 的 64.9%）。自动模式下，开启 GPU 且 CUDA 会话成功启用时优先使用旧版 Comic Text Detector；关闭 GPU 时优先使用轻量双图检测器。快速模型缺失或 CUDA 无法启动时，仍可使用轻量方案；只有完整旧模型时仍可使用旧检测器。手动填写的检测器路径始终优先。源码用户可运行 `python scripts/download_cuda_detector.py` 按固定提交和 SHA-256 安装快速模型。
+
+白气泡补擦仅在检测文字附近补上符合形状条件的遗漏笔画和标点。已存在的稀疏网点和其他无关画面不会被整框涂掉。
+
 修复白色漫画气泡擦字后出现灰斑的问题：先检查框内纸色和笔画周围的像素，纸面足够均匀时，在已有擦除掩膜内按原纸色填充。
 
 在「设置 → 运行与输出 → GPU 安装说明与下载」点击「下载安装便携 GPU 运行库」，完成后重启。首次下载约 1.53 GB，需要兼容的 NVIDIA 驱动。DLL 保存在程序旁的 gpu-runtime 目录，无需另外安装 Python 或配置 PATH。
@@ -14,7 +18,7 @@
 
 Windows 源码安装的模型现在继承模型库的访问权限。如果某个模型无法读取，工作台仍可打开，并在诊断中显示对应路径。
 
-默认检测器改用 ogkalu Small INT8 提供文字框、PP-OCRv6 manga v0.2 提供文字行，取原框和文字行外接框对应边的中点作为最终边界。孤立行不会自动送去擦字。两张图均支持 ONNX Runtime CPU/CUDA。日语 OCR 使用 CharSpot Small（CPU），韩英继续使用 PP-OCRv5，背景修补使用 LaMa。模型包含所有必要配置、词表、清单及许可证共 **284,712,120 字节**，是 v2.5.0 的 **48.71%**。CharSpot 权重以 CC BY-NC-SA 4.0 供非商业使用，两张新检测图的模型卡标注 Apache-2.0。
+轻量检测器使用 ogkalu Small INT8 提供文字框、PP-OCRv6 manga v0.2 提供文字行，取原框和文字行外接框对应边的中点作为最终边界。孤立行不会自动送去擦字。两张图均支持 ONNX Runtime CPU/CUDA。日语 OCR 使用 CharSpot Small（CPU），韩英继续使用 PP-OCRv5，背景修补使用 LaMa。原版发布的轻量模型包共 **284,712,120 字节**，是 v2.5.0 的 **48.71%**。CharSpot 权重以 CC BY-NC-SA 4.0 供非商业使用，两张新检测图的模型卡标注 Apache-2.0。
 
 仅有完整 v2.5.0 模型包时，新程序仍可使用旧检测器和旧 OCR。要在两套模型共存时指定旧检测器，请将 detector_model 设为现有 comic-text-detector.onnx 的绝对路径。切回新版设为 auto。完整回退可直接启动保留的旧安装。使用新输出目录比较，以免复用已有结果。
 
@@ -24,4 +28,4 @@ Windows 源码安装的模型现在继承模型库的访问权限。如果某个
 
 ## English
 
-Windows source installs now inherit the model library permissions. The workbench can open and report an inaccessible model path. Extract both ZIPs into a fresh directory and run ComiTrans.exe. The default detector combines ogkalu Small INT8 with PP-OCRv6 manga line detection and midpoint box refinement. Both graphs run in ONNX Runtime on CPU or CUDA. The package includes CharSpot Small for Japanese, PP-OCRv5 for Korean and English, and LaMa for repair. Its uncompressed model inventory is 284,712,120 bytes. On three Japanese pages the new pipeline matched 23 of 32 coarse regions at IoU ≥ 0.5, the same as the legacy detector, and covered at least 80% of 25 regions versus 20. Existing legacy model directories remain usable. Set detector_model to the absolute path of the old ONNX file to select it explicitly. See SHA256SUMS.txt to verify the archives.
+Extract both ZIPs into a fresh directory and run ComiTrans.exe. Rebuilt model bundles include both detectors. Auto mode uses the legacy Comic Text Detector when CUDA starts successfully and prefers the lightweight ogkalu Small INT8 + PP-OCRv6 manga detector on CPU. An explicit detector path takes priority. Japanese OCR uses CharSpot Small on CPU; Korean and English use PP-OCRv5. See the SHA256SUMS.txt shipped with each build for its own checksums.
