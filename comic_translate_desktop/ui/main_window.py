@@ -11,6 +11,7 @@ from PySide6.QtCore import (
     QSize,
     Qt,
     QSettings,
+    QSignalBlocker,
     QElapsedTimer,
     QTimer,
     QUrl,
@@ -369,6 +370,16 @@ class MainWindow(QMainWindow):
         self._pref_toggle.setArrowType(Qt.RightArrow)
         self._pref_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self._pref_toggle.setProperty("role", "quiet")
+        self._quick_options = QWidget()
+        quick_layout = QHBoxLayout(self._quick_options)
+        quick_layout.setContentsMargins(0, 0, 0, 0)
+        quick_layout.setSpacing(10)
+        self._cuda_toggle = QCheckBox(tr('CUDA 加速'))
+        self._cuda_toggle.setChecked(self.config['use_gpu'])
+        self._cuda_toggle.setToolTip(tr('下次任务生效。自动检测模式会按 CUDA 是否可用选择模型。'))
+        self._cuda_toggle.toggled.connect(self._toggle_cuda)
+        quick_layout.addWidget(self._cuda_toggle)
+        quick_layout.addWidget(self._pref_toggle)
         control_row.setColumnStretch(5, 1)
         self._control_divider = QFrame()
         self._control_divider.setObjectName('optionDivider')
@@ -611,6 +622,30 @@ class MainWindow(QMainWindow):
         self.config = updated
         self.editor_page.set_translation_fonts(updated)
         self._append_log(tr('译文字体已保存：{_0}，下次翻译生效。', _0=self._font_picker.combo.currentText()))
+
+    def _sync_cuda_toggle(self) -> None:
+        with QSignalBlocker(self._cuda_toggle):
+            self._cuda_toggle.setChecked(self.config['use_gpu'])
+
+    def _toggle_cuda(self, enabled: bool) -> None:
+        if self.worker is not None or self.warmup_worker is not None:
+            self._sync_cuda_toggle()
+            return
+        try:
+            self.config = save_ai_config({'use_gpu': enabled})
+        except OSError as exc:
+            self._sync_cuda_toggle()
+            self._set_status(tr('CUDA 设置未保存'), 'error')
+            self._append_log(tr('CUDA 设置未保存：{_0}', _0=exc))
+            return
+        self.pipeline = None
+        self.pipeline_fingerprint = None
+        with QSignalBlocker(self.api_config_page._gpu_check):
+            self.api_config_page._gpu_check.setChecked(enabled)
+        self.editor_page.set_repair_config(self.config)
+        message = tr('下次任务将尝试 CUDA 加速') if enabled else tr('下次任务将使用 CPU')
+        self._set_status(message, 'ready')
+        self._append_log(message)
 
     def _change_target_language(self) -> None:
         target = self._target_language.currentData()
@@ -973,6 +1008,7 @@ class MainWindow(QMainWindow):
         self._clear_btn.setEnabled(not running and count > 0)
         self.api_config_page.setEnabled(not running and not warming)
         self._source_language.setEnabled(not running and not warming)
+        self._cuda_toggle.setEnabled(not running and self.warmup_worker is None)
         self._target_language.setEnabled(not running and not warming)
         self._translation_alignment.setEnabled(not running and not warming)
         self._file_count_label.setText(tr('{_0} 个文件', _0=count))
@@ -1221,7 +1257,7 @@ class MainWindow(QMainWindow):
         finally:
             self._opening_all_results = False
         if self.editor_page.request_import(outputs):
-            self._append_log(tr('已把 {_0} 个结果加入精修列表。', _0=len(outputs)))
+            self._append_log(tr('正在导入 {_0} 个结果到精修列表…', _0=len(outputs)))
 
     def _toggle_preferences(self, checked: bool) -> None:
         if not checked:
@@ -1356,18 +1392,18 @@ class MainWindow(QMainWindow):
         if inline != self._controls_inline:
             self._controls_inline = inline
             for widget in (self._language_controls, self._output_controls, self._start_btn,
-                           self._pref_toggle, self._control_divider):
+                           self._quick_options, self._control_divider):
                 self._control_grid.removeWidget(widget)
             if inline:
                 self._control_grid.addWidget(self._language_controls, 0, 0)
                 self._control_grid.addWidget(self._control_divider, 0, 1)
                 self._control_grid.addWidget(self._output_controls, 0, 2)
-                self._control_grid.addWidget(self._pref_toggle, 0, 3)
+                self._control_grid.addWidget(self._quick_options, 0, 3)
                 self._control_grid.addWidget(self._start_btn, 0, 4)
                 self._control_divider.setVisible(True)
             else:
                 self._control_grid.addWidget(self._language_controls, 0, 0, 1, 3)
-                self._control_grid.addWidget(self._pref_toggle, 0, 3, 1, 2, Qt.AlignRight)
+                self._control_grid.addWidget(self._quick_options, 0, 3, 1, 2, Qt.AlignRight)
                 self._control_grid.addWidget(self._output_controls, 1, 0, 1, 3)
                 self._control_grid.addWidget(self._start_btn, 1, 3, 1, 2, Qt.AlignRight)
                 self._control_divider.setVisible(False)
@@ -1460,6 +1496,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr('设置未保存'), tr('无法保存设置：{error}', error=str(exc)))
             return
         self.api_config_page.load_config(self.config)
+        self._sync_cuda_toggle()
         set_reduced_motion(self.config.get('ui_reduced_motion', False))
         apply_theme(QApplication.instance(), self.config.get('ui_theme', 'auto'))
         self._font_picker.load_config(self.config)

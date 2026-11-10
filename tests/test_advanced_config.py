@@ -11,6 +11,7 @@ from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication, QGroupBox, QLabel
 
 from comic_translate_desktop import config
+from comic_translate_core.detector_paths import LEGACY_PATH, LINE_FILE, SPLIT_PATH
 from comic_translate_desktop.i18n import set_ui_language, tr
 from comic_translate_desktop.ui.advanced_config import AdvancedConfigSection
 from comic_translate_desktop.ui.api_config_page import ApiConfigPage
@@ -127,6 +128,39 @@ class AdvancedConfigTests(unittest.TestCase):
         self.assertEqual(page.values()['max_workers'], 9)
         self.assertEqual(page.values()['pdf_dpi'], 300)
         self.assertEqual(Path(page.values()['lama_model']), Path('D:/models/custom-lama.onnx'))
+
+    def test_saving_settings_keeps_automatic_detector_selection(self):
+        models = self.root / 'models'
+        with patch.object(config, 'MODELS_ROOT', models):
+            legacy = models / LEGACY_PATH
+            legacy.parent.mkdir(parents=True)
+            legacy.touch()
+            loaded = config.load_ai_config()
+            self.assertEqual(Path(loaded['detector_model']), legacy)
+            page = ApiConfigPage(loaded)
+            self.addCleanup(destroy_widget, page)
+            page._advanced._workers.setValue(6)
+            config.save_ai_config(page.values())
+            for part in (SPLIT_PATH, SPLIT_PATH.with_name(LINE_FILE)):
+                path = models / part
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch()
+            self.assertEqual(Path(config.load_ai_config()['detector_model']), models / SPLIT_PATH)
+
+    def test_an_inaccessible_model_does_not_prevent_opening_settings(self):
+        blocked = self.root / 'unreadable.onnx'
+        loaded = config.save_ai_config({'detector_model': str(blocked)})
+        original = Path.is_file
+
+        def check(path):
+            if path == blocked:
+                raise PermissionError('Access denied')
+            return original(path)
+
+        with patch.object(Path, 'is_file', check):
+            page = ApiConfigPage(loaded)
+        self.addCleanup(destroy_widget, page)
+        self.assertIn(str(blocked), page._advanced._model_status.toolTip())
 
     def test_new_page_strings_are_translated_in_english_and_japanese(self):
         expected = {

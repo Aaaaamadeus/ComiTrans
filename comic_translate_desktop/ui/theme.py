@@ -4,6 +4,7 @@ from functools import lru_cache
 from weakref import ref as weakref
 from PySide6.QtCore import QObject, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QFontInfo, QIcon, QPalette
+from shiboken6 import isValid
 from ..config import AI_ROOT, ICON_PATH
 from ..i18n import ui_language
 
@@ -231,7 +232,7 @@ def refresh_themed_icons():
     alive = []
     for reference in _icon_buttons:
         widget = reference()
-        if widget is None:
+        if widget is None or not isValid(widget):
             continue
         name = widget.property('themedIcon')
         if name:

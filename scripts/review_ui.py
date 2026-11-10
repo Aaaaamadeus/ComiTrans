@@ -123,7 +123,7 @@ def main():
                     report['illustrations'].append(dict(file=asset, width=pixmap.width(),
                                                        height=pixmap.height(), transparent=True))
                 capture('automatic', window.translate_tab,
-                        (window._add_btn, window._start_btn))
+                        (window._add_btn, window._cuda_toggle, window._start_btn))
                 window._pref_toggle.setChecked(True)
                 QTest.qWait(320)
                 capture('automatic-preferences', window.translate_tab,
@@ -301,9 +301,20 @@ def main():
                 for width, height in ((1024, 720), (960, 540), (820, 480)):
                     window.resize(min(width, int(screen.width() * .94)), min(height, int(screen.height() * .94)))
                     capture(f'automatic-{width}', window.translate_tab,
-                            (window._add_btn, window._start_btn))
+                            (window._add_btn, window._cuda_toggle, window._start_btn))
                     settings._sections.setCurrentIndex(2)
                     capture(f'settings-{width}', settings, (settings._save_btn,))
+                    settings._sections.setCurrentIndex(3)
+                    window.tabs.setCurrentWidget(settings)
+                    app.processEvents()
+                    model_browser = settings._advanced._browse_buttons['detector_model']
+                    model_path = settings._advanced._path_fields['detector_model']
+                    scroll = settings._sections.currentWidget()
+                    scroll.ensureWidgetVisible(model_path, 0, 12)
+                    capture(f'settings-advanced-{width}', settings, (settings._save_btn, model_browser))
+                    for widget in (model_path, model_browser):
+                        for point in (widget.rect().topLeft(), widget.rect().bottomRight()):
+                            assert scroll.viewport().rect().contains(widget.mapTo(scroll.viewport(), point))
                     capture(f'diagnosis-{width}', diagnosis, (diagnosis._send_btn,))
                     window.tabs.setCurrentWidget(editor)
                     app.processEvents()

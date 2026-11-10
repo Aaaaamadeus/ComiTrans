@@ -13,6 +13,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from comic_translate_desktop import config
+from comic_translate_desktop.pdf_project import project_link_path
 from comic_translate_desktop.ui.main_window import MainWindow
 from comic_translate_desktop.ui.motion import set_reduced_motion
 from tests.qt_utils import destroy_widget
@@ -114,6 +115,36 @@ class RetouchAndMotionTests(unittest.TestCase):
         window._last_outputs = [str(missing)]
         window._update_actions()
         self.assertFalse(window._edit_all_btn.isEnabled())
+
+    def test_one_click_retouch_keeps_valid_pages_when_a_pdf_link_is_invalid(self):
+        _, output = self.fixture()
+        broken = output.with_name('broken.pdf')
+        broken.touch()
+        project_link_path(broken).write_text('{}', encoding='utf-8')
+        window = self.window()
+        window._last_outputs = [str(broken), str(output)]
+        window._update_actions()
+        window._edit_all_btn.click()
+        self.wait_editor(window)
+        self.assertEqual(window.editor_page.page_list.count(), 1)
+        self.assertEqual(window.editor_page.output_path, output)
+        self.assertIn('broken.pdf', window.editor_page._status.toolTip())
+
+    def test_translation_cuda_toggle_persists_and_reloads_the_pipeline(self):
+        config.save_ai_config({'use_gpu': True})
+        window = self.window()
+        self.assertTrue(window._cuda_toggle.isChecked())
+        window.pipeline = object()
+        window.pipeline_fingerprint = ('cached',)
+        window._cuda_toggle.click()
+        self.assertFalse(config.load_ai_config()['use_gpu'])
+        self.assertFalse(window.api_config_page._gpu_check.isChecked())
+        self.assertIsNone(window.pipeline)
+        self.assertIsNone(window.pipeline_fingerprint)
+        restored = self.window()
+        self.assertFalse(restored._cuda_toggle.isChecked())
+        restored._cuda_toggle.click()
+        self.assertTrue(config.load_ai_config()['use_gpu'])
 
     def test_preferences_height_animates_without_an_opacity_effect(self):
         window = self.window()

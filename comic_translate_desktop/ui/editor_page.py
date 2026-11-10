@@ -18,6 +18,7 @@ from comic_translate_core.restoration import (
 from comic_translate_core.layout_options import VERTICAL_ALIGNMENTS, normalize_text_color
 from ..background_repair import BackgroundRepair, RepairWorker, save_editor_files
 from ..pdf_export import PdfExportWorker
+from ..pdf_utils import PdfProcessingError
 from ..editor_jobs import LatestJobQueue, read_page, read_project_pages, SaveRequest
 from .color_picker import TextColorPicker
 from .strip_preview import StripPreview
@@ -767,21 +768,30 @@ class EditorPage(QWidget):
         self._page_jobs.invalidate()
         revision, previous = self._edit_revision, self.output_path
         def read(cancelled):
-            result = []
+            result, failures = [], []
             for raw in paths:
                 if cancelled():
                     raise RuntimeError('页面索引已取消')
-                path = Path(raw).resolve()
-                if path.suffix.lower() == '.pdf' or path.name == 'project.json':
-                    result.append((path, read_project_pages(path, cancelled)))
-                else:
-                    reader = QImageReader(str(path))
-                    size = reader.size()
-                    if reader.transformation().value & 4:
-                        size.transpose()
-                    result.append((path, size))
-            return result
-        def accept(result):
+                try:
+                    path = Path(raw).resolve()
+                    if path.suffix.lower() == '.pdf' or path.name == 'project.json':
+                        result.append((path, read_project_pages(path, cancelled)))
+                    else:
+                        reader = QImageReader(str(path))
+                        size = reader.size()
+                        if not size.isValid():
+                            raise OSError(reader.errorString())
+                        if reader.transformation().value & 4:
+                            size.transpose()
+                        result.append((path, size))
+                except (PdfProcessingError, OSError, ValueError) as exc:
+                    failures.append((Path(raw).name, str(exc)))
+            return result, failures
+        def accept(payload):
+            result, failures = payload
+            notice = tr('跳过 {_0} 个无法导入的文件', _0=len(failures)) if failures else ''
+            details = '\n'.join(f'{name}: {error}' for name, error in failures)
+            self._status.setToolTip(details)
             rows, imported = [], []
             for path, data in result:
                 if isinstance(data, tuple):
@@ -817,10 +827,10 @@ class EditorPage(QWidget):
                     return
                 self._indexing = False
                 if imported and self.output_path == previous and self._edit_revision == revision:
-                    self._begin_page_load(imported[0])
+                    self._begin_page_load(imported[0], import_notice=notice)
                 else:
                     self._update_repair_controls()
-                    self._status.setText(tr('页面索引已读取，当前修改保留。'))
+                    self._status.setText(notice or tr('页面索引已读取，当前修改保留。'))
             append_batch()
         self._status.setText(tr('正在后台读取页面索引…'))
         self._import_jobs.submit(read, accept, self._page_load_failed, cancellable=True)
@@ -966,7 +976,7 @@ class EditorPage(QWidget):
         self._begin_page_load(path)
         return True
 
-    def _begin_page_load(self, path):
+    def _begin_page_load(self, path, *, import_notice=''):
         revision, previous = self._edit_revision, self.output_path
         settings = deepcopy(self.config)
         self._requesting_page = True
@@ -979,7 +989,8 @@ class EditorPage(QWidget):
                 self._status.setText(tr('加载期间当前页有新修改，已保留当前页；请重新选择目标页。'))
                 self._update_repair_controls()
                 return
-            self.load_page(path, _payload=data, _approved=True)
+            if self.load_page(path, _payload=data, _approved=True) and import_notice:
+                self._status.setText(f'{self._status.text()} · {import_notice}')
         self._page_jobs.submit(lambda cancelled: read_page(path, settings, cancelled), accept, self._page_load_failed, cancellable=True)
         self._update_repair_controls()
 

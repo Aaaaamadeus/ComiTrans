@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -74,6 +75,7 @@ class AdvancedConfigSection(QWidget):
         self._style_form(models_form)
         models_form.setVerticalSpacing(8)
         self._path_fields: dict[str, QLineEdit] = {}
+        self._browse_buttons: dict[str, QPushButton] = {}
         for key, label in (
             ('detector_model', '检测模型'),
             ('lama_model', '修复模型'),
@@ -94,6 +96,7 @@ class AdvancedConfigSection(QWidget):
             row.addWidget(button)
             models_form.addRow(tr(label), row)
             self._path_fields[key] = field
+            self._browse_buttons[key] = button
         self._model_status = QLabel()
         self._model_status.setWordWrap(True)
         self._model_status.setProperty('muted', True)
@@ -108,11 +111,13 @@ class AdvancedConfigSection(QWidget):
         self._reset_btn.setToolTip(tr('只恢复本页字段，点击「保存配置」后才会写入。'))
         self._reset_btn.clicked.connect(self.reset_to_defaults)
         defaults_row.addWidget(self._reset_btn)
-        defaults_row.addStretch(1)
         location = QLabel(tr('配置文件：{_0}', _0=str(app_config.CONFIG_PATH)))
         location.setProperty('muted', True)
+        location.setWordWrap(True)
+        location.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         location.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        defaults_row.addWidget(location)
+        location.setToolTip(str(app_config.CONFIG_PATH))
+        defaults_row.addWidget(location, 1)
         layout.addLayout(defaults_row)
         layout.addStretch(1)
         self.load_config(config)
@@ -136,13 +141,15 @@ class AdvancedConfigSection(QWidget):
         return box
 
     def _browse_model(self, field: QLineEdit, key: str) -> None:
-        current = field.text().strip()
-        if current and Path(current).is_file():
-            start = str(Path(current).parent)
-        elif current and Path(current).is_dir():
-            start = current
-        else:
-            start = str(app_config.MODELS_ROOT)
+        current = self._model_path(key, field.text())
+        start = str(app_config.MODELS_ROOT)
+        try:
+            if current.is_file():
+                start = str(current.parent)
+            elif current.is_dir():
+                start = str(current)
+        except OSError:
+            pass
         if key in ('ocr_model', 'baberu_ocr_model', 'charspot_ocr_model'):
             path = QFileDialog.getExistingDirectory(self, tr('选择模型目录'), start)
         else:
@@ -158,7 +165,11 @@ class AdvancedConfigSection(QWidget):
         self._font_size.setValue(int(config.get('font_size') or 16))
         self._probe_samples.setValue(int(config.get('font_probe_samples') or 3))
         for key, field in self._path_fields.items():
-            field.setText(str(config.get(key) or ''))
+            if key == 'detector_model':
+                field.setText(str(config.get('detector_model_setting') or 'auto'))
+                field.setToolTip(tr('自动模式按 CUDA 状态选择检测器；手动选择模型可固定路径。'))
+            else:
+                field.setText(str(config.get(key) or ''))
         self._refresh_model_status()
 
     def values(self) -> dict:
@@ -179,15 +190,32 @@ class AdvancedConfigSection(QWidget):
         self._font_size.setValue(app_config.ADVANCED_LIMITS['font_size'][2])
         self._probe_samples.setValue(app_config.ADVANCED_LIMITS['font_probe_samples'][2])
         for key, field in self._path_fields.items():
-            field.setText(defaults.get(key, ''))
+            field.setText('auto' if key == 'detector_model' else defaults.get(key, ''))
         self._refresh_model_status()
 
+    @staticmethod
+    def _model_path(key, value):
+        if key == 'detector_model':
+            return app_config._detector_path(value)
+        return app_config._resolve_path(value, app_config.MODEL_DEFAULTS[key], app_config.MODELS_ROOT)
+
     def _refresh_model_status(self) -> None:
-        existing = sum(1 for field in self._path_fields.values()
-                       if field.text().strip() and Path(field.text().strip()).exists())
+        existing = 0
+        inaccessible = []
+        for key, field in self._path_fields.items():
+            path = field.text()
+            try:
+                path = self._model_path(key, path)
+                existing += path.is_file() if key in ('detector_model', 'lama_model') else path.is_dir()
+            except (OSError, ValueError):
+                inaccessible.append(str(path))
         total = len(self._path_fields)
+        self._model_status.setToolTip('\n'.join(inaccessible))
+        if inaccessible:
+            self._model_status.setText(tr('无法读取模型路径：{_0}', _0=inaccessible[0]))
+            return
         if existing == total:
             self._model_status.setText(tr('全部 {_0} 个路径存在', _0=total))
         else:
             self._model_status.setText(
-                tr('{_0}/{_1} 个路径存在，缺失项会在开始翻译前提示', _0=existing, _1=total))
+                tr('{_0}/{_1} 个路径存在；开始翻译前会检查当前使用的模型。', _0=existing, _1=total))
