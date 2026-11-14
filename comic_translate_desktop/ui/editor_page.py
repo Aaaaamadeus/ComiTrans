@@ -289,6 +289,7 @@ class EditorPage(QWidget):
         add.clicked.connect(self._import_pages)
         left.addWidget(add)
         self.page_list = QListWidget()
+        self.page_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.page_list.viewport().installEventFilter(self)
         self.page_list.verticalScrollBar().valueChanged.connect(lambda: self._thumbnail_timer.start(25))
         self.page_list.setUniformItemSizes(True)
@@ -296,7 +297,17 @@ class EditorPage(QWidget):
         self.page_list.setWordWrap(True)
         self.page_list.setTextElideMode(Qt.ElideMiddle)
         self.page_list.currentItemChanged.connect(self._select_page)
+        self.page_list.itemSelectionChanged.connect(self._update_repair_controls)
         left.addWidget(self.page_list, 1)
+        page_actions = QHBoxLayout()
+        self._remove_pages_btn = QPushButton(tr('移除选中'))
+        self._clear_pages_btn = QPushButton(tr('清空'))
+        for button in (self._remove_pages_btn, self._clear_pages_btn):
+            button.setProperty('compact', True)
+            page_actions.addWidget(button)
+        self._remove_pages_btn.clicked.connect(self._remove_selected_pages)
+        self._clear_pages_btn.clicked.connect(self._clear_pages)
+        left.addLayout(page_actions)
         self.splitter.addWidget(self._pages_panel)
         canvas = QFrame()
         canvas.setObjectName('canvasPanel')
@@ -972,6 +983,93 @@ class EditorPage(QWidget):
         if current:
             self.request_page(current.data(Qt.UserRole))
 
+    def _remove_selected_pages(self):
+        selected = list(self.page_list.selectedItems())
+        if not selected or self.page_io_busy or self._repair_worker is not None or self._export_worker is not None:
+            return False
+        keys = [str(Path(item.data(Qt.UserRole)).resolve()) for item in selected]
+        current_key = str(self.output_path) if self.output_path is not None else None
+        if current_key in keys and self._dirty:
+            if not self._allow_navigation(lambda: self._remove_pages(keys)):
+                return False
+            return self._remove_pages(keys)
+        return self._remove_pages(keys)
+
+    def _remove_pages(self, keys):
+        keys = {str(Path(key).resolve()) for key in keys}
+        rows = [self.page_list.row(item) for item in self.page_list.selectedItems()
+                if str(Path(item.data(Qt.UserRole)).resolve()) in keys]
+        first_row = min(rows) if rows else 0
+        current_key = str(self.output_path) if self.output_path is not None else None
+        current_removed = current_key in keys
+        remaining_items = [self.page_list.item(index) for index in range(self.page_list.count())
+                           if str(Path(self.page_list.item(index).data(Qt.UserRole)).resolve()) not in keys]
+        for key in keys:
+            self.preview.remove_page(key)
+            self._page_items.pop(key, None)
+            self._pdf_sources.pop(key, None)
+            self._pdf_projects.pop(key, None)
+            self._thumbnail_lru.pop(key, None)
+        self.page_list.blockSignals(True)
+        for index in reversed(range(self.page_list.count())):
+            item = self.page_list.item(index)
+            if str(Path(item.data(Qt.UserRole)).resolve()) in keys:
+                self.page_list.takeItem(index)
+        self.page_list.blockSignals(False)
+        if not current_removed:
+            self._restore_page_selection()
+            self._update_repair_controls()
+            return True
+        self._dirty = False
+        if remaining_items:
+            next_index = min(first_row, len(remaining_items) - 1)
+            next_key = remaining_items[next_index].data(Qt.UserRole)
+            self.page_list.blockSignals(True)
+            self.page_list.setCurrentRow(next_index)
+            self.page_list.blockSignals(False)
+            self.request_page(next_key)
+        else:
+            self._clear_loaded_page()
+        self._update_repair_controls()
+        return True
+
+    def _clear_pages(self):
+        if not self.page_list.count() or self.page_io_busy or self._repair_worker is not None or self._export_worker is not None:
+            return False
+        keys = [self.page_list.item(index).data(Qt.UserRole)
+                for index in range(self.page_list.count())]
+        if self._dirty:
+            if not self._allow_navigation(lambda: self._remove_pages(keys)):
+                return False
+            return True
+        return self._remove_pages(keys)
+
+    def _clear_loaded_page(self):
+        self._page_jobs.invalidate()
+        self._preview_timer.stop()
+        self._thumbnail_timer.stop()
+        self._thumbnail_loader.request([])
+        self._requesting_page = False
+        self._repair_history.clear()
+        self._repair_box = None
+        self._repair_mode.setChecked(False)
+        self._add_bubble_btn.setChecked(False)
+        self.output_path = self.cleaned_path = self.layout_path = None
+        self.items = []
+        self._loaded_row = -1
+        self._row_dirty = False
+        self._font_choice_dirty = False
+        self._rendered = None
+        self._cleaned_image = None
+        self._original_image = None
+        self._preview_dirty = False
+        self._layer_cache.clear()
+        self.block_list.clear()
+        self._export_pdf_btn.setEnabled(False)
+        self.preview.clear(tr('选择一页，开始精修'))
+        self._set_editable(False)
+        self._status.setText(tr('已清空页面列表。'))
+
     def _restore_page_selection(self):
         self.page_list.blockSignals(True)
         self.page_list.setCurrentItem(self._page_items.get(str(self.output_path)))
@@ -1577,7 +1675,10 @@ class EditorPage(QWidget):
                        and (self._original_image is not None or find_original(self.output_path) is not None))
         self._repair_undo.setEnabled(ready and (bool(self._repair_history) or can_restore))
         self._save_btn.setEnabled(ready)
-        self.page_list.setEnabled(not busy and self._export_worker is None)
+        page_list_busy = (busy or self._export_worker is not None or self.page_io_busy)
+        self.page_list.setEnabled(not page_list_busy)
+        self._remove_pages_btn.setEnabled(not page_list_busy and bool(self.page_list.selectedItems()))
+        self._clear_pages_btn.setEnabled(not page_list_busy and self.page_list.count() > 0)
         self.preview.setEnabled(not busy)
 
     def _toggle_repair_mode(self, enabled):

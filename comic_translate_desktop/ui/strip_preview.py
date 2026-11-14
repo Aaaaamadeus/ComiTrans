@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt, QSize, QEvent, QTimer, Signal
 from PySide6.QtGui import QImageReader, QPixmap
 from PySide6.QtWidgets import QAbstractScrollArea
 
+from ..i18n import tr
 from .preview import ImagePreview, PageCanvas
 from .thumbnail_loader import ThumbnailLoader
 
@@ -65,6 +66,29 @@ class StripPreview(ImagePreview):
         self._layout_signature = None
         if self._continuous:
             self._visible_timer.start(0)
+
+    def remove_page(self, path):
+        """Remove a page from the strip without touching its image file."""
+        key = str(Path(path).resolve())
+        if key not in self._pages:
+            return False
+        self.cancel_region_drag()
+        label = self._pages[key][0]
+        if label is not None:
+            self._unmount(label)
+        self._pages.pop(key, None)
+        self._keys.remove(key)
+        self._indices = {page: index for index, page in enumerate(self._keys)}
+        self._layout_signature = None
+        self._thumbnail_loader.request([])
+        if self._active_path == key:
+            self._active_path = None
+            self._label = self._single_label
+            super().clear(tr('选择一页，开始精修'))
+        if self._continuous:
+            self._visible_timer.start(0)
+        self._trim_spares()
+        return True
 
     def _mount(self, key):
         existing = self._pages[key][0]
