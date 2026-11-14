@@ -7,7 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 from PySide6.QtCore import Qt, QSize, QSettings, QTimer, QEvent, QPoint
 from PySide6.QtGui import QPixmap, QIcon, QImageReader, QShortcut, QKeySequence
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QGroupBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QGroupBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView)
 from ..config import load_ai_config, MAIN_DIR
 from ..font_library import available_fonts, font_description, font_display_name, font_reference, inspect_font, resolve_font_reference
 from comic_translate_core.page_compositor import compose_page, layer_bounds
@@ -20,6 +20,7 @@ from ..background_repair import BackgroundRepair, RepairWorker, save_editor_file
 from ..pdf_export import PdfExportWorker
 from ..pdf_utils import PdfProcessingError
 from ..editor_jobs import LatestJobQueue, read_page, read_project_pages, SaveRequest
+from ..lettering_transform import text_transform, transform_layer, outline_width
 from .color_picker import TextColorPicker
 from .strip_preview import StripPreview
 from .thumbnail_loader import ThumbnailLoader
@@ -316,6 +317,7 @@ class EditorPage(QWidget):
         self.preview.region_edited.connect(self._resize_region_from_canvas)
         self.preview.region_edit_finished.connect(self.apply_changes)
         self.preview.region_clicked.connect(self._select_block)
+        self.preview.bubble_created.connect(self._add_bubble_from_canvas)
         self.preview.installEventFilter(self)
         self._zoom_tool_btn.toggled.connect(self.preview.set_zoom_tool)
         self._canvas_frame = canvas
@@ -331,20 +333,24 @@ class EditorPage(QWidget):
         self._repair_mode = QPushButton(tr('框选背景'))
         self._repair_mode.setCheckable(True)
         self._repair_mode.setToolTip(tr('拖动框选修补范围，拖动边角调整；Esc 取消本次拖动。'))
+        self._add_bubble_btn = QPushButton(tr('添加气泡框'))
+        self._add_bubble_btn.setCheckable(True)
+        self._add_bubble_btn.setToolTip(tr('在画布上拖动一个矩形，添加可自由编辑的文字气泡框。'))
         self._repair_btn = QPushButton(tr('修补选区'))
         self._fill_white_btn = QPushButton(tr('填白'))
         self._fill_white_btn.setToolTip(tr('把框选区域整块填成白色（可撤回）。'))
         self._fill_black_btn = QPushButton(tr('填黑'))
         self._fill_black_btn.setToolTip(tr('把框选区域整块填成黑色（可撤回）。'))
         self._repair_undo = QPushButton(tr('撤回修补'))
-        self._repair_undo.setToolTip(tr('使用处理前的图片逐步撤回；保存成功后清空缓存。'))
-        for button in (self._repair_mode, self._repair_btn, self._fill_white_btn,
+        self._repair_undo.setToolTip(tr('优先撤回手动修补；没有手动记录时，还原选中气泡的自动修补与嵌字。旧结果请先关联原图。'))
+        for button in (self._repair_mode, self._add_bubble_btn, self._repair_btn, self._fill_white_btn,
                        self._fill_black_btn, self._repair_undo):
             button.setProperty('compact', True)
             button.setProperty('role', 'utility')
             repair_toolbar.addWidget(button)
         repair_toolbar.addStretch()
         self._repair_mode.toggled.connect(self._toggle_repair_mode)
+        self._add_bubble_btn.toggled.connect(self._toggle_bubble_creation)
         self._repair_btn.clicked.connect(self._start_background_repair)
         self._fill_white_btn.clicked.connect(
             lambda: self._fill_repair_region((255, 255, 255)))
@@ -483,6 +489,19 @@ class EditorPage(QWidget):
         self._effect_combo.setAccessibleName(tr('文字描边效果'))
         for label, value in [(tr('默认效果'), 'auto'), (tr('白色描边'), 'outlined'), (tr('黑色描边（空心）'), 'hollow')]:
             self._effect_combo.addItem(tr(label), value)
+        self._outline_width = QDoubleSpinBox()
+        self._outline_width.setRange(-1, 30)
+        self._outline_width.setDecimals(1)
+        self._outline_width.setSingleStep(1)
+        self._outline_width.setSuffix(' px')
+        self._outline_width.setSpecialValueText(tr('自动'))
+        self._outline_width.setValue(-1)
+        self._outline_width.setToolTip(tr('描边宽度按原图像素计算；自动保留原效果，0 为无描边。白边和黑边均可调整。'))
+        self._hollow_preset_btn = QPushButton(tr('白字黑边竖排'))
+        self._hollow_preset_btn.setProperty('compact', True)
+        self._hollow_preset_btn.setProperty('role', 'quiet')
+        self._hollow_preset_btn.setToolTip(tr('应用示例效果：竖排、白色字心、黑色描边；保留当前字体。'))
+        self._hollow_preset_btn.clicked.connect(self._apply_hollow_preset)
         self._text_color = TextColorPicker()
         self._text_color.setAccessibleName(tr('当前文本块文字颜色'))
         self._text_color.setToolTip(tr('只修改当前文本块；默认黑字，空心效果默认白字。自选颜色保留描边效果。'))
@@ -503,6 +522,8 @@ class EditorPage(QWidget):
         form.addRow(tr('排版方向'), self._direction_combo)
         form.addRow(tr('竖排列对齐'), self._vertical_alignment_combo)
         form.addRow(tr('文字效果'), self._effect_combo)
+        form.addRow(tr('描边大小'), self._outline_width)
+        form.addRow(self._hollow_preset_btn)
         props.addWidget(group)
         group = QGroupBox(tr('位置与蒙版'))
         form = QFormLayout(group)
@@ -525,6 +546,25 @@ class EditorPage(QWidget):
         form.addRow(tr('Y 偏移'), self._offset_y)
         form.addRow(tr('蒙版宽度'), self._mask_width)
         form.addRow(tr('蒙版高度'), self._mask_height)
+        self._text_scale_x, self._text_scale_y = QSpinBox(), QSpinBox()
+        for spin in (self._text_scale_x, self._text_scale_y):
+            spin.setRange(10, 400)
+            spin.setValue(100)
+            spin.setSuffix(' %')
+            spin.setToolTip(tr('以文字中心拉伸；100% 保持原样，不改变换行与蒙版。'))
+        self._text_rotation = QDoubleSpinBox()
+        self._text_rotation.setRange(-180, 180)
+        self._text_rotation.setDecimals(1)
+        self._text_rotation.setSuffix('°')
+        self._text_rotation.setToolTip(tr('以文字中心旋转；正数顺时针，负数逆时针。'))
+        self._reset_transform_btn = QPushButton(tr('重置文字变形'))
+        self._reset_transform_btn.setProperty('compact', True)
+        self._reset_transform_btn.setProperty('role', 'quiet')
+        self._reset_transform_btn.clicked.connect(self._reset_text_transform)
+        form.addRow(tr('横向拉伸'), self._text_scale_x)
+        form.addRow(tr('纵向拉伸'), self._text_scale_y)
+        form.addRow(tr('文字旋转'), self._text_rotation)
+        form.addRow(self._reset_transform_btn)
         form.addRow(tr(self._show_mask))
         form.addRow(tr(self._box_label))
         drag_hint = QLabel(tr('拖动蒙版边角调整大小，框内拖动位置'))
@@ -726,7 +766,7 @@ class EditorPage(QWidget):
 
     def _set_editable(self, enabled):
         restored = 0 <= self._loaded_row < len(self.items) and self.items[self._loaded_row].get('restore_original', False)
-        for widget in (self._text_input, self._line_break_btn, self._style_combo, self._font_library_btn, self._direction_combo, self._vertical_alignment_combo, self._effect_combo, self._text_color, *self._layout_spins(), self._show_mask, self._apply_btn, self._save_btn):
+        for widget in (self._text_input, self._line_break_btn, self._style_combo, self._font_library_btn, self._direction_combo, self._vertical_alignment_combo, self._effect_combo, self._text_color, self._hollow_preset_btn, self._reset_transform_btn, *self._layout_spins(), self._show_mask, self._apply_btn, self._save_btn):
             widget.setEnabled(enabled and not restored)
         self._show_mask.setEnabled(enabled)
         self._update_vertical_alignment_enabled()
@@ -1218,7 +1258,20 @@ class EditorPage(QWidget):
         self._text_input.setPlainText(text)
 
     def _layout_spins(self):
-        return (self._size_spin, self._offset_x, self._offset_y, self._mask_width, self._mask_height)
+        return (self._size_spin, self._offset_x, self._offset_y, self._mask_width, self._mask_height,
+                self._text_scale_x, self._text_scale_y, self._text_rotation, self._outline_width)
+
+    def _reset_text_transform(self):
+        self._text_scale_x.setValue(100)
+        self._text_scale_y.setValue(100)
+        self._text_rotation.setValue(0)
+
+    def _apply_hollow_preset(self):
+        self._direction_combo.setCurrentIndex(self._direction_combo.findData(1))
+        self._effect_combo.setCurrentIndex(self._effect_combo.findData('hollow'))
+        self._text_color.set_color(None)
+        self._outline_width.setValue(2)
+        self._schedule_preview()
 
     def _schedule_preview(self):
         if self._loading or self._loaded_row < 0:
@@ -1304,6 +1357,67 @@ class EditorPage(QWidget):
             self._loading = False
         self._schedule_preview()
 
+    def _toggle_bubble_creation(self, enabled):
+        enabled = bool(enabled)
+        if enabled and self._repair_mode.isChecked():
+            self._repair_mode.blockSignals(True)
+            self._repair_mode.setChecked(False)
+            self._repair_mode.blockSignals(False)
+            self._toggle_repair_mode(False)
+        self.preview.set_bubble_creation(enabled)
+        if enabled:
+            self._status.setText(tr('在画布拖动矩形添加气泡框，添加后可直接输入译文。'))
+        self._update_repair_controls()
+
+    def _add_bubble_from_canvas(self, box):
+        if self._loading or self._cleaned_image is None or not box:
+            return
+        try:
+            x1, y1, x2, y2 = map(int, box[:4])
+        except (TypeError, ValueError):
+            return
+        width, height = x2 - x1, y2 - y1
+        if width < 2 or height < 2:
+            return
+        image_width, image_height = self._cleaned_image.size
+        x1, y1 = max(0, x1), max(0, y1)
+        x2, y2 = min(image_width, x2), min(image_height, y2)
+        if x2 - x1 < 2 or y2 - y1 < 2:
+            return
+        self._store_properties()
+        item = {
+            'box': [x1, y1, x2, y2],
+            'mask_box': [x1, y1, x2, y2],
+            'source_text': tr('手动添加'),
+            'source_language': self.config.get('source_language', 'ja'),
+            'text': '',
+            'style': 'dialogue',
+            'direction': -1,
+            'font_size': None,
+            'rendered_font_size': None,
+            'non_bubble': False,
+            'manual_layout': True,
+            'offset_x': 0,
+            'offset_y': 0,
+            'mask_width': x2 - x1,
+            'mask_height': y2 - y1,
+            'text_effect': 'auto',
+            'text_color': None,
+            'vertical_alignment': 'center',
+        }
+        self.items.append(item)
+        index = len(self.items) - 1
+        block = QListWidgetItem(self._block_label(index))
+        block.setToolTip(tr('手动添加的气泡框，输入译文后即可嵌字。'))
+        self.block_list.addItem(block)
+        self._edit_revision += 1
+        self._dirty = True
+        self._preview_dirty = True
+        self._refresh_page_dirty_label()
+        self.block_list.setCurrentRow(index)
+        self._text_input.setFocus()
+        self._status.setText(tr('已添加气泡框 {_0}，请输入译文。', _0=index + 1))
+
     def _store_properties(self):
         if not self._row_dirty or self._loaded_row < 0 or self._loaded_row >= len(self.items):
             return
@@ -1321,8 +1435,14 @@ class EditorPage(QWidget):
             self._font_choice_dirty = False
         item.update(text=self._text_input.toPlainText(), font_size=self._size_spin.value(), direction=int(self._direction_combo.currentData()), offset_x=self._offset_x.value(), offset_y=self._offset_y.value(), mask_width=self._mask_width.value(), mask_height=self._mask_height.value(), manual_layout=True)
         item['text_effect'] = self._effect_combo.currentData()
-        item['text_color'] = self._text_color.color
+        # Store the same canonical RGB value used by the automatic pipeline.
+        # Older layouts can contain mixed-case values, so normalize on every save.
+        item['text_color'] = normalize_text_color(self._text_color.color)
         item['vertical_alignment'] = self._vertical_alignment_combo.currentData()
+        item.update(text_scale_x=self._text_scale_x.value() / 100,
+                    text_scale_y=self._text_scale_y.value() / 100,
+                    text_rotation=self._text_rotation.value(),
+                    outline_width=None if self._outline_width.value() < 0 else self._outline_width.value())
         self.block_list.item(self._loaded_row).setText(self._block_label(self._loaded_row))
         self._row_dirty = False
 
@@ -1357,6 +1477,12 @@ class EditorPage(QWidget):
         self._vertical_alignment_combo.setCurrentIndex(alignment_index if alignment_index >= 0 else 1)
         self._offset_x.setValue(int(item.get('offset_x', 0)))
         self._offset_y.setValue(int(item.get('offset_y', 0)))
+        scale_x, scale_y, rotation = text_transform(item)
+        self._text_scale_x.setValue(round(scale_x * 100))
+        self._text_scale_y.setValue(round(scale_y * 100))
+        self._text_rotation.setValue(rotation)
+        stroke = outline_width(item)
+        self._outline_width.setValue(-1 if stroke is None else stroke)
         box = self._mask_box(item)
         self._mask_width.setValue(box[2] - box[0])
         self._mask_height.setValue(box[3] - box[1])
@@ -1423,6 +1549,12 @@ class EditorPage(QWidget):
                  and not self._save_jobs.busy and not self._requesting_page
                  and not self._indexing and not self._import_jobs.busy)
         self._repair_mode.setEnabled(ready)
+        self._add_bubble_btn.setEnabled(ready)
+        if not ready and self._add_bubble_btn.isChecked():
+            self._add_bubble_btn.blockSignals(True)
+            self._add_bubble_btn.setChecked(False)
+            self._add_bubble_btn.blockSignals(False)
+            self.preview.set_bubble_creation(False)
         protected = False
         if ready and self._repair_box is not None:
             try:
@@ -1441,12 +1573,19 @@ class EditorPage(QWidget):
         self._restore_bubble_btn.setEnabled(ready and selected)
         self._restore_bubble_btn.setText(tr('恢复处理结果') if selected and self.items[self._loaded_row].get('restore_original') else tr('还原此气泡'))
         self._link_original_btn.setEnabled(ready)
-        self._repair_undo.setEnabled(ready and bool(self._repair_history))
+        can_restore = (selected and not self.items[self._loaded_row].get('restore_original')
+                       and (self._original_image is not None or find_original(self.output_path) is not None))
+        self._repair_undo.setEnabled(ready and (bool(self._repair_history) or can_restore))
         self._save_btn.setEnabled(ready)
         self.page_list.setEnabled(not busy and self._export_worker is None)
         self.preview.setEnabled(not busy)
 
     def _toggle_repair_mode(self, enabled):
+        if enabled and self._add_bubble_btn.isChecked():
+            self._add_bubble_btn.blockSignals(True)
+            self._add_bubble_btn.setChecked(False)
+            self._add_bubble_btn.blockSignals(False)
+            self._toggle_bubble_creation(False)
         self.preview.set_region_creation(enabled)
         self._repair_box = None
         self._update_region_guide()
@@ -1536,8 +1675,17 @@ class EditorPage(QWidget):
         self._update_repair_controls()
 
     def undo_background_repair(self):
-        if self._requesting_page or self._indexing or self._save_jobs.busy or self._repair_worker is not None or not self._repair_history:
+        if (self._requesting_page or self._indexing or self._save_jobs.busy
+                or self._repair_worker is not None or self._export_worker is not None
+                or self._cleaned_image is None):
             return False
+        if not self._repair_history:
+            if not 0 <= self._loaded_row < len(self.items) or self.items[self._loaded_row].get('restore_original'):
+                return False
+            if self._original_image is None and find_original(self.output_path) is None:
+                self._status.setText(tr('缺少处理前原图，请先关联原图。'))
+                return False
+            return self.toggle_bubble_original()
         self._store_properties()
         box, before, was_dirty, revision = self._repair_history.pop()
         self._cleaned_image.paste(before, box)
@@ -1580,7 +1728,8 @@ class EditorPage(QWidget):
                    size, bool(item.get('non_bubble', False)),
                    typesetter.font_map.get(item.get('style', 'dialogue')), item.get('text_effect', 'auto'),
                    item.get('source_outline_ratio'),
-                   item.get('vertical_alignment', 'center'), normalize_text_color(item.get('text_color')))
+                   item.get('vertical_alignment', 'center'), normalize_text_color(item.get('text_color')),
+                   text_transform(item), outline_width(item))
             cached = self._layer_cache.get(index)
             if cached is not None and cached[0] == key:
                 _, surface, left, top, actual_size = cached
@@ -1601,11 +1750,12 @@ class EditorPage(QWidget):
                 text_effect=item.get('text_effect', 'auto'),
                 source_outline_ratio=item.get('source_outline_ratio'),
                 vertical_alignment=item.get('vertical_alignment', 'center'),
-                text_color=item.get('text_color'),
+                text_color=normalize_text_color(item.get('text_color')),
+                outline_width=outline_width(item),
                 composite=False,
             )
             item['rendered_font_size'] = typesetter.last_font_size
-            layer = typesetter.last_render_layer
+            layer = transform_layer(typesetter.last_render_layer, text_transform(item))
             if layer is not None:
                 surface, left, top = layer
                 layers.append(layer)

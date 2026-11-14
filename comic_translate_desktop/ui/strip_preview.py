@@ -80,6 +80,7 @@ class StripPreview(ImagePreview):
             label.region_edited.connect(self.region_edited)
             label.region_edit_finished.connect(self.region_edit_finished)
             label.region_clicked.connect(self.region_clicked)
+            label.bubble_created.connect(self.bubble_created)
         label.setToolTip(Path(key).name)
         self._pages[key][0] = label
         self._canvas_keys[label] = key
@@ -90,7 +91,7 @@ class StripPreview(ImagePreview):
         self._pages[key][0] = None
         label.cancel_region_drag()
         label.region = None
-        label.region_editable = label.region_creation = False
+        label.region_editable = label.region_creation = label.bubble_creation = False
         label.clear()
         label.hide()
         self._spares.append(label)
@@ -116,13 +117,15 @@ class StripPreview(ImagePreview):
         self.cancel_region_drag()
         previous = self._label
         region, editable, creation = previous.region, previous.region_editable, previous.region_creation
+        bubble_creation = previous.bubble_creation
         previous.region = None
-        previous.region_editable = previous.region_creation = False
+        previous.region_editable = previous.region_creation = previous.bubble_creation = False
         previous.update()
         self._continuous = enabled
         self._label = self._mount(self._active_path) if enabled and self._active_path else self._single_label
         self._label.image_size = self._original.size()
         self._label.region_creation = creation
+        self._label.bubble_creation = bubble_creation
         self.set_region(region, editable=editable)
         self._apply_regions()
         if not self._original.isNull():
@@ -141,7 +144,7 @@ class StripPreview(ImagePreview):
         if self._active_path != key:
             self.cancel_region_drag()
             self._label.region = None
-            self._label.region_editable = self._label.region_creation = False
+            self._label.region_editable = self._label.region_creation = self._label.bubble_creation = False
             self._label.clear()
         self._active_path = key
         self._label = self._mount(key) if self._continuous else self._single_label

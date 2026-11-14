@@ -78,12 +78,14 @@ class PageCanvas(QLabel):
     region_edited = Signal(object)
     region_edit_finished = Signal()
     region_clicked = Signal(int)
+    bubble_created = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.region = self.image_size = None
         self.region_editable = False
         self.region_creation = False
+        self.bubble_creation = False
         self.stretch_pixmap = False
         self.space_pan = False
         self.regions = []
@@ -201,7 +203,7 @@ class PageCanvas(QLabel):
                    'n': Qt.SizeVerCursor, 's': Qt.SizeVerCursor,
                    'w': Qt.SizeHorCursor, 'e': Qt.SizeHorCursor, 'move': Qt.OpenHandCursor}
         if hit is None:
-            if self.region_creation:
+            if self.region_creation or self.bubble_creation:
                 self.setCursor(Qt.CrossCursor)
             else:
                 self.unsetCursor()
@@ -216,6 +218,13 @@ class PageCanvas(QLabel):
 
     def mousePressEvent(self, event):
         hit = self._region_hit(event.position())
+        if (self.bubble_creation and event.button() == Qt.LeftButton
+                and self.page_rect().contains(event.position())):
+            self._region_drag = ('bubble_create', QPointF(event.position()), self.region)
+            self.setFocus(Qt.MouseFocusReason)
+            self.grabMouse()
+            event.accept()
+            return
         if (self.region_creation and event.button() == Qt.LeftButton
                 and self.page_rect().contains(event.position()) and hit is None):
             self._region_drag = ('create', QPointF(event.position()), self.region)
@@ -247,7 +256,7 @@ class PageCanvas(QLabel):
         page = self.page_rect()
         dx = round((point.x() - start.x()) * self.image_size.width() / page.width())
         dy = round((point.y() - start.y()) * self.image_size.height() / page.height())
-        if hit == 'create':
+        if hit in ('create', 'bubble_create'):
             def image_point(position):
                 return (max(0, min(self.image_size.width(), round((position.x() - page.left()) * self.image_size.width() / page.width()))),
                         max(0, min(self.image_size.height(), round((position.y() - page.top()) * self.image_size.height() / page.height()))))
@@ -258,7 +267,8 @@ class PageCanvas(QLabel):
             if box != self.region:
                 self.region = box
                 self.update()
-                self.region_edited.emit(box)
+                if hit == 'create':
+                    self.region_edited.emit(box)
             return
         x1, y1, x2, y2 = map(int, original)
         if hit == 'move':
@@ -299,6 +309,15 @@ class PageCanvas(QLabel):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton and self._region_drag is not None:
             self._drag_region_to(event.position())
+            drag = self._region_drag
+            if drag[0] == 'bubble_create' and self.region is not None:
+                created = tuple(self.region)
+                self.cancel_region_drag()
+                self.region = None
+                self.update()
+                self.bubble_created.emit(created)
+                event.accept()
+                return
             self.cancel_region_drag()
             self._region_cursor(self._region_hit(event.position()))
             self.region_edit_finished.emit()
@@ -308,6 +327,12 @@ class PageCanvas(QLabel):
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape and self._region_drag is not None:
+            if self._region_drag[0] == 'bubble_create':
+                self.cancel_region_drag()
+                self.region = None
+                self.update()
+                event.accept()
+                return
             original = self._region_drag[2]
             self.cancel_region_drag()
             self.region = original
@@ -432,6 +457,7 @@ class ImagePreview(QWidget):
     region_edited = Signal(object)
     region_edit_finished = Signal()
     region_clicked = Signal(int)
+    bubble_created = Signal(object)
     zoom_changed = Signal(object)
 
     MIN_ZOOM, MAX_ZOOM = 0.05, 8.0
@@ -518,6 +544,7 @@ class ImagePreview(QWidget):
         self._label.region_edited.connect(self.region_edited)
         self._label.region_edit_finished.connect(self.region_edit_finished)
         self._label.region_clicked.connect(self.region_clicked)
+        self._label.bubble_created.connect(self.bubble_created)
         self._label.installEventFilter(self)
         self._label.setObjectName('previewLabel')
         self._label.setAlignment(Qt.AlignCenter)
@@ -735,6 +762,13 @@ class ImagePreview(QWidget):
     def set_region_creation(self, enabled):
         self.cancel_region_drag()
         self._label.region_creation = enabled
+        self._label.bubble_creation = False
+        self.set_region(None)
+
+    def set_bubble_creation(self, enabled):
+        self.cancel_region_drag()
+        self._label.bubble_creation = bool(enabled)
+        self._label.region_creation = False
         self.set_region(None)
 
     def set_regions(self, regions, visible=True):
@@ -745,10 +779,13 @@ class ImagePreview(QWidget):
         """Canvas-only selection guide; never alter the rendered/exported pixels."""
         self._label.region = tuple(box) if box is not None else None
         self._label.region_editable = editable and box is not None
-        self._label.setFocusPolicy(Qt.StrongFocus if self._label.region_editable or self._label.region_creation else Qt.NoFocus)
+        self._label.setFocusPolicy(Qt.StrongFocus if (self._label.region_editable
+                               or self._label.region_creation or self._label.bubble_creation)
+                               else Qt.NoFocus)
         self._label.setToolTip(tr(tr('拖动边角调整蒙版大小，框内拖动位置；Esc 恢复本次拖动前的范围')
                                if self._label.region_editable else ''))
-        if not self._label.region_editable and not self._label.region_creation:
+        if (not self._label.region_editable and not self._label.region_creation
+                and not self._label.bubble_creation):
             self.cancel_region_drag()
         self._label.update()
 

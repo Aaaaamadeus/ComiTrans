@@ -166,7 +166,7 @@ class VerticalTypesetter:
         font_size,
         stroke_width,
     ):
-        padding = max(5, int(math.ceil(font_size * 0.22)) + stroke_width)
+        padding = max(5, int(math.ceil(font_size * 0.22 + stroke_width)))
         left = max(0, int(math.floor(center_x - box_width / 2)) - padding)
         top = max(0, int(math.floor(center_y - box_height / 2)) - padding)
         right = min(image.width, int(math.ceil(center_x + box_width / 2)) + padding)
@@ -508,6 +508,7 @@ class VerticalTypesetter:
         text_color=None,
         source_outline_ratio=None,
         composite=True,
+        outline_width=None,
     ):
         """执行竖排绘制 (使用绝对居中算法 anchor='mm')"""
         try:
@@ -748,6 +749,12 @@ class VerticalTypesetter:
                 stroke_width = max(1, int(round(best_size * ratio)))
             if text_effect == "hollow":
                 text_color, stroke_color = "white", "black"
+            # Only explicit manual lettering uses this editor control. Automatic
+            # processing and layouts without an override keep their original pixels.
+            manual_outline = (manual_layout and type(outline_width) in (int, float)
+                              and math.isfinite(outline_width) and 0 <= outline_width <= 30)
+            if manual_outline:
+                stroke_width = outline_width
             text_color = requested_color or text_color
             text_surface, draw, render_left, render_top, render_scale = (
                 self._make_render_surface(
@@ -761,7 +768,7 @@ class VerticalTypesetter:
                 )
             )
             scaled_font_size = best_size * render_scale
-            scaled_stroke_width = stroke_width * render_scale
+            scaled_stroke_width = int(round(stroke_width * render_scale))
 
             if is_horizontal:
                 row_height = max(1, best_size)
@@ -851,7 +858,7 @@ class VerticalTypesetter:
                                 font_size=scaled_font_size,
                                 stroke_width=scaled_stroke_width,
                                 fill=text_color, stroke_fill=stroke_color,
-                                outlined=text_effect in ("outlined", "hollow"),
+                                outlined=text_effect in ("outlined", "hollow") or manual_outline,
                             )
                             current_y += punctuation_run * (cell_size + char_spacing)
                             row_index += punctuation_run
