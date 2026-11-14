@@ -291,6 +291,20 @@ class DesktopUiTests(unittest.TestCase):
             self.assertTrue(window._settings_btn.isChecked())
             self.assertFalse(window._nav_auto.isChecked())
 
+    def test_startup_keeps_model_loading_out_of_window_creation(self):
+        from comic_translate_desktop import config
+        with patch.object(config, 'CONFIG_PATH', self.root / 'defaults.yaml'), \
+             patch.object(config, 'PROJECT_ROOT', self.root), \
+             patch.object(MainWindow, '_start_warmup') as warmup:
+            window = MainWindow()
+            self.addCleanup(destroy_widget, window)
+            self.assertFalse(window._warmup_timer.isActive())
+            window.show()
+            self.app.processEvents()
+            self.assertTrue(window._warmup_timer.isActive())
+        warmup.assert_not_called()
+        self.assertIsNone(window.warmup_worker)
+
     def test_compact_settings_and_diagnosis_keep_primary_actions_visible(self):
         from comic_translate_desktop import config
         with patch.object(config, 'CONFIG_PATH', self.root / 'defaults.yaml'), \

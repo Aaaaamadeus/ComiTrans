@@ -15,6 +15,7 @@ from PySide6.QtCore import (
     QSignalBlocker,
     QElapsedTimer,
     QTimer,
+    QThread,
     QUrl,
 )
 from PySide6.QtGui import (
@@ -101,6 +102,12 @@ class MainWindow(QMainWindow):
         self._elapsed_timer = QTimer(self)
         self._elapsed_timer.setInterval(1000)
         self._elapsed_timer.timeout.connect(self._update_elapsed)
+        self._warmup_timer = QTimer(self)
+        self._warmup_timer.setSingleShot(True)
+        self._warmup_timer.setTimerType(Qt.CoarseTimer)
+        self._warmup_timer.setInterval(1800)
+        self._warmup_timer.timeout.connect(self._start_warmup)
+        self._warmup_scheduled = False
         self.resize(1440, 900)
         screen = QApplication.primaryScreen().availableGeometry()
         self.resize(min(1440, int(screen.width() * .94)), min(900, int(screen.height() * .94)))
@@ -126,7 +133,6 @@ class MainWindow(QMainWindow):
         if self.config["api_key"] and self.config["api_key"] == self.config["translation_model"]:
             self._append_log(tr('警告：API Key 与模型名相同，看起来把模型名填到了密钥栏。'))
         self._update_actions()
-        self._start_warmup()
 
     def _build_ui(self) -> None:
         apply_theme(QApplication.instance(), self.config.get('ui_theme', 'auto'))
@@ -873,6 +879,7 @@ class MainWindow(QMainWindow):
             self._elapsed_label.setText(tr('耗时 {_0:02d}:{_1:02d}', _0=seconds // 60, _1=seconds % 60))
 
     def _start_warmup(self) -> None:
+        self._warmup_timer.stop()
         if self.pipeline is not None or self.warmup_worker is not None:
             return
         self.warmup_worker = BatchWorker(
@@ -886,7 +893,8 @@ class MainWindow(QMainWindow):
         self.warmup_worker.log.connect(self._on_warmup_log)
         self.warmup_worker.pipeline_ready.connect(self._on_pipeline_ready)
         self.warmup_worker.finished.connect(self._on_warmup_finished)
-        self.warmup_worker.start()
+        # Let the first paint and normal input handling win over model I/O.
+        self.warmup_worker.start(QThread.LowPriority)
         self.stage_label.setText(tr('正在加载本地模型，可先添加待处理文件'))
         self._progress_label.setText(tr('模型预热'))
         self._set_status(tr('模型准备中'), "warming")
@@ -915,6 +923,7 @@ class MainWindow(QMainWindow):
     def _start_translation(self) -> None:
         if self.worker is not None or self.warmup_worker is not None:
             return
+        self._warmup_timer.stop()
         self._stop_requested = False
         files = self._all_files()
         if not files:
@@ -1458,6 +1467,9 @@ class MainWindow(QMainWindow):
     def showEvent(self, event):
         super().showEvent(event)
         apply_window_chrome(self)
+        if not self._warmup_scheduled and self.pipeline is None:
+            self._warmup_scheduled = True
+            self._warmup_timer.start()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1591,6 +1603,7 @@ class MainWindow(QMainWindow):
         event.acceptProposedAction()
 
     def closeEvent(self, event) -> None:
+        self._warmup_timer.stop()
         if (self._pref_save_timer.isActive() or self._pref_save_error) and not self._save_translation_preferences():
             self._set_status(tr('偏好未保存，请重试'), 'error')
             event.ignore()

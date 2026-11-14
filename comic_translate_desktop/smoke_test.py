@@ -37,6 +37,9 @@ def run_smoke_test(app, output_dir, *, require_gpu=False):
     window = MainWindow()
     window.setAttribute(Qt.WA_DontShowOnScreen, True)
     window.show()
+    # The desktop client delays warmup until after the first paint. Smoke
+    # verification explicitly requests it so the complete model stack is tested.
+    window._start_warmup()
     result = {"version": __version__, "frozen": bool(getattr(sys, "frozen", False))}
 
     def finish():
