@@ -1,5 +1,6 @@
 """Translation requests isolated from detection, rendering and file output."""
 import base64
+import json
 import time
 import cv2
 
@@ -15,13 +16,14 @@ THINKING_DISABLED = {"thinking": {"type": "disabled"}}
 
 class TranslationClient:
     def __init__(self, settings, capabilities, *, client_factory, convert_text,
-                 report_progress, check_cancelled):
+                 report_progress, check_cancelled, context_prompt=''):
         self.settings = settings
         self.capabilities = capabilities
         self.client_factory = client_factory
         self.convert_text = convert_text
         self.report_progress = report_progress
         self.check_cancelled = check_cancelled
+        self.context_prompt = context_prompt
 
     def translate(self, ocr_texts, image_input):
         self.check_cancelled()
@@ -81,7 +83,7 @@ class TranslationClient:
 3. 保留说话人的语气、敬语、称呼和情绪强度。
 4. OCR 为空、纯符号或明显无法识别时返回空字符串，不得臆造内容。
 5. 拟声词优先使用自然的中文拟声表达。
-6. 人名和术语在整页内保持一致。
+6. 先理解整页及前文的剧情、角色关系和指代，再翻译当前条目；人名、称呼和术语跨页保持一致。
 7. 不得在译文中加入解释、注释、序号或引号。"""
 
         custom_context = []
@@ -155,6 +157,14 @@ class TranslationClient:
                         f"上次响应校验未通过（{format_problem}）。请重新输出下列全部条目，务必输出完整闭合的 JSON。\n"
                         + user_prompt
                     )
+                references = []
+                if self.context_prompt:
+                    references.append(self.context_prompt)
+                if translations:
+                    references.append('本页已完成的前缀仅供理解，不要重复输出：\n' + json.dumps(
+                        list(zip(ocr_texts[:len(translations)], translations)), ensure_ascii=False))
+                if references:
+                    user_prompt += '\n\n【前文参考】\n' + '\n\n'.join(references)
 
                 response = None
                 last_error = None

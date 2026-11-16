@@ -28,6 +28,7 @@ lama_model: models/manga-lama/lama-manga-dynamic.onnx
 max_workers: null
 pdf_dpi: 200
 resume_enabled: true  # 默认按页续传；false 从头翻译，仍记录本次进度
+retain_translation_context: false  # 仅在任务开始时判断；false 先清空前文，true 跨任务保留且强制续传。每次成功翻译均保存缓存。
 multimodal: false
 multimodal_font_probe: false   # 实验：让 AI 参与字体族判别（默认关闭，见 docs/FONT_STYLE_STRATEGY.md §4.14）
 disable_thinking: true   # 关闭思考模式省 token（见 docs/FONT_STYLE_STRATEGY.md §4.15）
