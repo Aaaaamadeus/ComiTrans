@@ -5,6 +5,7 @@ import io
 import json
 import re
 import time
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import cv2
@@ -15,6 +16,7 @@ from manga_lama import MangaLama
 from comic_translate_core.errors import TaskCancelledError, TranslationError, TypesettingError
 from comic_translate_core.pipeline_settings import TranslationSettings
 from comic_translate_core.translation import TranslationClient
+from comic_translate_core.translation_context import TranslationContext
 from comic_translate_core.translation_format import (
     ResponseFormatCapabilities, TranslationFormatError, validate_translations,
     parse_translation_response as _parse_translation_response,
@@ -360,12 +362,19 @@ class ComicTranslatorPipeline:
     def translate_page_batch(self, ocr_texts, image_input):
         if not hasattr(self, '_translation_capabilities'):
             self._translation_capabilities = ResponseFormatCapabilities()
+        if not hasattr(self, 'translation_context'):
+            self.translation_context = TranslationContext()
+        settings = TranslationSettings.from_pipeline(self)
         client = TranslationClient(
-            TranslationSettings.from_pipeline(self), self._translation_capabilities,
+            settings, self._translation_capabilities,
             client_factory=OpenAI, convert_text=convert_chinese,
             report_progress=self._report_progress, check_cancelled=self._check_cancelled,
+            context_prompt=self.translation_context.prompt(settings),
         )
-        return client.translate(ocr_texts, image_input)
+        result = client.translate(ocr_texts, image_input)
+        if not getattr(self, 'translation_context_managed', False):
+            self.translation_context.record(None, ocr_texts, result, settings)
+        return result
 
     def configure_fonts(self, bubble_metadata, image_input):
         """A′：本地生成三个候选，模型只做 1-of-3 判别；字号与方向都归本地。
@@ -651,8 +660,19 @@ class ComicTranslatorPipeline:
         # 这一步会去除原有文字，生成适合嵌字的底图
         # Empty/failed OCR or empty translation must leave the source pixels intact.
         erase_boxes = [box for box, item in zip(bubbles_data, processed_data) if item['trans']]
-        self.current_bubble_restore_regions = {}
-        final_canvas = self.inpaint_bubbles(img_cv, erase_boxes)
+        repaired = prepared.pop('repaired', None)
+        # A provisional repair has no translation dependency. If any item is
+        # intentionally untranslated, redo the exact accepted mask at the join;
+        # restoring rectangles alone cannot undo LaMa's surrounding changes.
+        if repaired is not None:
+            if repaired['boxes'] != erase_boxes:
+                repaired = self.repair_comic_page(prepared, translated_list)
+            final_canvas = repaired.pop('canvas')
+            for name, value in repaired['state'].items():
+                setattr(self, name, value)
+        else:
+            self.current_bubble_restore_regions = {}
+            final_canvas = self.inpaint_bubbles(img_cv, erase_boxes)
         # A neighbouring translated bubble's padding can overlap a preserved region.
         for item in processed_data:
             if not item['trans']:
@@ -761,7 +781,28 @@ class ComicTranslatorPipeline:
         self._report_progress("save", f"已保存: {os.path.basename(output_path)}")
         print(f"处理完成！已保存至: {output_path}")
 
+    def repair_comic_page(self, prepared, translated_list=None):
+        """Run the image branch using isolated page state; never publish files."""
+        if not hasattr(self, '_repair_lock'):
+            self._repair_lock = threading.RLock()
+        boxes = [box for index, (box, item) in enumerate(zip(
+            prepared['bubbles_data'], prepared['bubble_metadata']))
+            if item['raw'].strip() and not self._preserve_english(box)
+            and (translated_list is None or translated_list[index])]
+        branch = copy(self)
+        branch.last_detector_mask = prepared.get('mask')
+        with self._repair_lock:
+            canvas = branch.inpaint_bubbles(prepared['img_cv'], boxes)
+        state = {name: getattr(branch, name, {} if name in (
+            'current_bubble_restore_regions', 'current_outline_ratios') else None) for name in (
+            'current_mask_image', 'current_erase_mask', 'current_bubble_restore_regions',
+            'current_outline_ratios', 'last_mask_diagnostics')}
+        return {'canvas': canvas, 'boxes': boxes, 'state': state}
+
     def process_comic_page(self, input_path, output_path):
         prepared = self.prepare_comic_page(input_path)
-        translated_list = self.translate_page_batch(prepared["ocr_texts"], prepared["img_cv"])
+        with ThreadPoolExecutor(max_workers=1, thread_name_prefix='page-repair') as branch:
+            repair = branch.submit(self.repair_comic_page, prepared)
+            translated_list = self.translate_page_batch(prepared["ocr_texts"], prepared["img_cv"])
+            prepared['repaired'] = repair.result()
         self.finish_comic_page(output_path, prepared, translated_list)

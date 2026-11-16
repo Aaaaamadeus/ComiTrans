@@ -151,6 +151,7 @@ def load_ai_config() -> dict[str, Any]:
         "max_workers": int(raw.get("max_workers") or 4),
         "pdf_dpi": int(raw.get("pdf_dpi") or 200),
         "resume_enabled": bool(raw.get("resume_enabled", True)),
+        "retain_translation_context": bool(raw.get("retain_translation_context", False)),
         "issue_url": str(raw.get("issue_url") or ""),
         "use_gpu": use_gpu,
         "font_map": font_map,
