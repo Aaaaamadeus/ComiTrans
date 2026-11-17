@@ -288,10 +288,10 @@ class MainWindow(QMainWindow):
         drop.addWidget(label)
         self._add_btn = QPushButton(tr('添加文件'))
         set_themed_icon(self._add_btn, 'plus')
-        self._add_btn.setProperty('role', 'quiet')
+        self._add_btn.setProperty('role', 'chip')
         self._folder_btn = QPushButton(tr('添加文件夹'))
         set_themed_icon(self._folder_btn, 'folder')
-        self._folder_btn.setProperty("role", "quiet")
+        self._folder_btn.setProperty("role", "chip")
         drop.addWidget(self._add_btn)
         drop.addWidget(self._folder_btn)
         hint = QLabel('PNG / JPG / WEBP / BMP / PDF')
@@ -313,6 +313,7 @@ class MainWindow(QMainWindow):
         self._clear_btn = QPushButton(tr('清空'))
         for button in (self._remove_btn, self._clear_btn):
             button.setProperty("compact", True)
+            button.setProperty("role", "chip")
             buttons.addWidget(button)
         layout.addLayout(buttons)
         self._remove_btn.clicked.connect(self._remove_selected)
@@ -472,11 +473,26 @@ class MainWindow(QMainWindow):
         alignment_row.addStretch(1)
         left_layout.addLayout(alignment_row)
 
+        self._retain_translation_context = QCheckBox(tr('保留上下文缓存'))
+        self._retain_translation_context.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self._retain_translation_context.setChecked(self.config.get('retain_translation_context', False))
+        self._retain_translation_context.setToolTip(tr('开启后多次翻译沿用同一上下文，并锁定断点续传；仅在任务开始时检查。'))
+        left_layout.addWidget(self._retain_translation_context)
+        context_hint = QLabel(tr('上下文始终参与翻译。关闭后，下次任务开始前清空前文；缓存仍会保存。'))
+        context_hint.setObjectName('translationContextHint')
+        context_hint.setWordWrap(True)
+        context_hint.setMaximumWidth(520)
+        context_hint.setProperty('muted', True)
+        left_layout.addWidget(context_hint)
+
         self._resume_enabled = QCheckBox(tr('断点续传：跳过已完成页面'))
+        self._resume_enabled.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         self._resume_enabled.setChecked(self.config.get('resume_enabled', True))
         self._resume_enabled.setToolTip(tr('中断后重新添加原文件并使用同一输出目录，即可继续。取消勾选将从头翻译。'))
         self._resume_enabled.toggled.connect(self._save_translation_preferences)
         left_layout.addWidget(self._resume_enabled)
+        self._sync_context_retention()
+        self._retain_translation_context.toggled.connect(self._context_retention_changed)
 
         self._pref_scroll_value = 0
         self._pref_save_error = False
@@ -558,6 +574,7 @@ class MainWindow(QMainWindow):
         progress_header.addWidget(self._progress_label)
         layout.addLayout(progress_header)
         self.step_panel = StepPanel()
+        self._sync_step_panel_config()
         layout.addWidget(self.step_panel)
         content_header = QHBoxLayout()
         preview_label = PanelHeading("02", tr('检查结果'))
@@ -565,10 +582,12 @@ class MainWindow(QMainWindow):
         content_header.addWidget(self._elapsed_label)
         self._edit_result_btn = QPushButton(tr('进入精修 →'))
         self._edit_result_btn.setProperty("compact", True)
+        self._edit_result_btn.setProperty("role", "chip")
         self._edit_result_btn.clicked.connect(lambda: self.tabs.setCurrentWidget(self.editor_page))
         content_header.addWidget(self._edit_result_btn)
         self._edit_all_btn = QPushButton(tr('一键精修'))
         self._edit_all_btn.setProperty("compact", True)
+        self._edit_all_btn.setProperty("role", "chip")
         self._edit_all_btn.clicked.connect(self._open_all_in_editor)
         content_header.addWidget(self._edit_all_btn)
         self._log_toggle = QToolButton()
@@ -779,6 +798,9 @@ class MainWindow(QMainWindow):
             if skipped:
                 details.append(tr('{_0} 个不支持的项目', _0=skipped))
             self._append_log(tr('已跳过{_0}。', _0='、'.join(details)))
+        if added and self.step_panel._task_phase != 'idle':
+            self.step_panel.reset()
+        self._sync_step_panel_queue()
         self._update_actions()
 
     def _thumbnail_icon(self, path: Path) -> QIcon:
@@ -846,6 +868,10 @@ class MainWindow(QMainWindow):
         else:
             self.original_view.clear(tr('选择文件后显示原图'))
             self.result_view.clear(tr('处理完成后显示译文'))
+            self.step_panel.reset()
+        if added and self.step_panel._task_phase != 'idle':
+            self.step_panel.reset()
+        self._sync_step_panel_queue()
         self._update_actions()
 
     def _clear_files(self) -> None:
@@ -857,6 +883,7 @@ class MainWindow(QMainWindow):
         self._progress_label.setText(tr('0 / 0 个文件'))
         self._page_progress_label.setText(tr('页数待确定'))
         self.step_panel.reset()
+        self._sync_step_panel_queue()
         if self.warmup_worker is None:
             self._set_status(tr('等待任务'), "idle")
         self._update_actions()
@@ -932,6 +959,8 @@ class MainWindow(QMainWindow):
 
         self._apply_output_dir()
         self.step_panel.reset()
+        self._sync_step_panel_config()
+        self._sync_step_panel_queue()
         if not self._save_translation_preferences():
             self._set_status(tr('偏好未保存，请重试'), 'error')
             return
@@ -982,6 +1011,7 @@ class MainWindow(QMainWindow):
         self.worker.progress.connect(self._on_progress)
         self.worker.log.connect(self._append_log)
         self.worker.stage_event.connect(self._on_stage_event)
+        self.worker.workflow_event.connect(self._on_workflow_event)
         self.worker.page_progress.connect(self._on_page_progress)
         self.worker.pipeline_ready.connect(self._on_pipeline_ready)
         self.worker.image_done.connect(self._on_image_done)
@@ -1037,11 +1067,11 @@ class MainWindow(QMainWindow):
         self._target_language.setEnabled(not running and not warming)
         self._translation_alignment.setEnabled(not running and not warming)
         self._file_count_label.setText(tr('{_0} 个文件', _0=count))
-        self.step_panel.setVisible((count > 0 or running)
-                                   and not (self.height() < 680 and self._pref_toggle.isChecked()))
-        self.stage_focus.setVisible(count > 0 or running or warming)
-        self._page_progress_label.setVisible(count > 0 or running)
-        self._progress_label.setVisible(count > 0 or running)
+        compact_pref = self.height() < 680 and self._pref_toggle.isChecked()
+        self.step_panel.setVisible((count > 0 or running) and not compact_pref)
+        self.stage_focus.setVisible((count > 0 or running or warming) and not compact_pref)
+        self._page_progress_label.setVisible((count > 0 or running) and not compact_pref)
+        self._progress_label.setVisible((count > 0 or running) and not compact_pref)
         self._file_selection_label.setText(
             tr('已选 {_0} 个', _0=selected_count) if selected_count else tr('支持图片与 PDF')
         )
@@ -1065,6 +1095,29 @@ class MainWindow(QMainWindow):
     def _on_progress(self, done: int, total: int, message: str) -> None:
         self._progress_label.setText(tr('{_0} / {_1} 个文件', _0=done, _1=total))
         self.stage_label.setText(tr(message))
+
+    def _sync_step_panel_config(self) -> None:
+        if hasattr(self, 'step_panel'):
+            self.step_panel.set_pipeline_config(
+                max_workers=int(self.config.get('max_workers') or 4),
+                retain_context=bool(self.config.get('retain_translation_context', False)),
+                resume_enabled=bool(self.config.get('resume_enabled', True)),
+            )
+
+    def _sync_step_panel_queue(self) -> None:
+        if hasattr(self, 'step_panel'):
+            names = [
+                self.file_list.item(i).data(Qt.UserRole + 1) or Path(self.file_list.item(i).data(Qt.UserRole)).name
+                for i in range(self.file_list.count())
+            ]
+            self.step_panel.set_queued_files(len(names), names)
+
+    def _on_workflow_event(self, event) -> None:
+        if self.worker is None or event.get('task_id') != self.worker.task_id:
+            return
+        self.step_panel.consume_workflow_event(event)
+        if event.get('type') == 'publish' and event.get('state') == 'running':
+            self.stage_focus.set_stage('07', tr('合成译文 PDF'), event.get('document_name', ''))
 
     def _on_stage_event(self, event) -> None:
         if self.worker is None or event['task_id'] != self.worker.task_id:
@@ -1112,6 +1165,8 @@ class MainWindow(QMainWindow):
         if selected and selected[-1].data(Qt.UserRole) == key:
             self.result_view.set_image(output_path)
             self.preview_tabs.setCurrentWidget(self.result_view)
+        if self.worker is None and self.file_list.count() > 0 and len(self.results) >= self.file_list.count():
+            self.step_panel.mark_done()
         self._update_actions()
 
     def _on_image_failed(self, name: str, message: str) -> None:
@@ -1156,6 +1211,7 @@ class MainWindow(QMainWindow):
             status = tr('部分文件失败')
         else:
             summary = tr('全部完成，共 {_0} 个文件。', _0=success)
+            self.step_panel.mark_done()
             state = "success"
             status = tr('全部完成')
         self._set_status(status, state)
@@ -1302,7 +1358,10 @@ class MainWindow(QMainWindow):
         if self.height() >= 760:
             # Keep the log panel visible so nothing jumps when the foldout opens.
             return min(280, max(220, self.height() - 620))
-        available = max(160, self.height() - 376)
+        # The scroll viewport must fit its card in short windows; a 160px
+        # minimum otherwise lets the card clip controls that Qt reports visible.
+        reserve = 396 + (40 if hasattr(self, 'stage_focus') and self.stage_focus.isVisible() else 0)
+        available = max(56, self.height() - reserve)
         return min(240, available)
 
     def _animate_preferences(self, expand: bool) -> None:
@@ -1315,15 +1374,16 @@ class MainWindow(QMainWindow):
         target = self._pref_target_height() if expand else 0
         duration = 220 if expand else 180
         if reduced_motion() or self.height() < 760:
-            # Short windows hide the log while the foldout is open; animating
-            # that layout swap reads as a snap, so switch instantly instead.
+            # Short windows hide the log and stage focus while the foldout is open;
+            # apply compact visibility first so _pref_target_height sees freed space.
             self._pref_animating = False
+            self._apply_compact_layout()
+            target = self._pref_target_height() if expand else 0
             container.setVisible(expand)
             container.setMinimumHeight(target)
             container.setMaximumHeight(target)
             if expand:
                 self._restore_preferences_scroll()
-            self._apply_compact_layout()
             return
         start = container.maximumHeight() if container.isVisible() else 0
         if start > 10000:
@@ -1375,6 +1435,13 @@ class MainWindow(QMainWindow):
         compact = self.height() < 680
         # Leave a useful image viewport; additional preferences scroll inside the foldout.
         expanded = self._pref_toggle.isChecked()
+        compact_pref = compact and expanded
+        active_items = self.file_list.count() > 0 or self.worker is not None
+        warming = getattr(self, 'warmup_worker', None) is not None
+        if hasattr(self, 'stage_focus'):
+            self.stage_focus.setVisible((active_items or warming) and not compact_pref)
+            self._page_progress_label.setVisible(active_items and not compact_pref)
+            self._progress_label.setVisible(active_items and not compact_pref)
         wide = self._pref_container.width() >= 680
         if not self._pref_animating:
             wanted = self._pref_target_height() if expanded else 0
@@ -1488,6 +1555,7 @@ class MainWindow(QMainWindow):
             'translation_prompt': self._prompt_input.toPlainText().strip(),
             'chinese_names': self._names_input.toPlainText().strip(),
             'resume_enabled': self._resume_enabled.isChecked(),
+            'retain_translation_context': self._retain_translation_context.isChecked(),
         }
         try:
             if self._pref_save_error or any(self.config.get(key) != value for key, value in values.items()):
@@ -1508,7 +1576,23 @@ class MainWindow(QMainWindow):
         self._pref_toggle.setText(tr('翻译偏好'))
         self._pref_toggle.setToolTip(tr('偏好已保存；展开状态会记住。'))
         self._pref_retry.setVisible(False)
+        self._sync_step_panel_config()
         return True
+
+    def _sync_context_retention(self) -> None:
+        retain = self._retain_translation_context.isChecked()
+        if retain:
+            self._resume_enabled.blockSignals(True)
+            self._resume_enabled.setChecked(True)
+            self._resume_enabled.blockSignals(False)
+        self._resume_enabled.setEnabled(not retain)
+        self._resume_enabled.setToolTip(
+            tr('保留上下文缓存时，断点续传锁定开启。') if retain else
+            tr('中断后重新添加原文件并使用同一输出目录，即可继续。取消勾选将从头翻译。'))
+
+    def _context_retention_changed(self) -> None:
+        self._sync_context_retention()
+        self._save_translation_preferences()
 
     def _save_api_config(self) -> None:
         if not self._save_translation_preferences():
@@ -1533,6 +1617,7 @@ class MainWindow(QMainWindow):
         self.api_config_page.load_config(self.config)
         self._sync_cuda_toggle()
         set_reduced_motion(self.config.get('ui_reduced_motion', False))
+        self._sync_step_panel_config()
         apply_theme(QApplication.instance(), self.config.get('ui_theme', 'auto'))
         self._font_picker.load_config(self.config)
         self._translation_color.set_color(self.config.get('text_color'))

@@ -91,6 +91,7 @@ class BatchWorker(QThread):
     image_failed = Signal(str, str)
     stage_changed = Signal(int, str, str)
     stage_event = Signal(object)
+    workflow_event = Signal(object)
     page_progress = Signal(int, int)
     finished = Signal(int, int)
 
@@ -133,6 +134,13 @@ class BatchWorker(QThread):
                            if stage == 'start' and index > 0 else tr(message))
         self.stage_changed.emit(index, stage, display_message)
         self._log_pipeline_output(message)
+
+    def _emit_workflow(self, event_type: str, **payload) -> None:
+        self.workflow_event.emit({
+            "task_id": self.task_id,
+            "type": event_type,
+            **payload,
+        })
 
     def _page_event(self, stage, state, message):
         page = getattr(self._stage_context, "page", None)
@@ -316,7 +324,7 @@ class BatchWorker(QThread):
             self._pdf_renderer = PdfPageRenderer(page.document.source_path, dpi)
             self._pdf_document = page.document
         started = perf_counter()
-        self._page_event('detect', 'running', '正在准备原分辨率 PDF 页图')
+        self._page_event('start', 'running', '正在准备原分辨率 PDF 页图')
         self._pdf_renderer.render(
             RenderedPdfPage(page.page_number - 1, page.input_path, *page.page_size_points),
             reuse_cached=True, cancel_callback=self._check_cancelled)
@@ -422,6 +430,11 @@ class BatchWorker(QThread):
         self._translation_context.record(checkpoint.context_key(page.page_number),
                                          ocr, texts, self._translation_settings)
         checkpoint.mark_context_recorded(page.page_number, generation)
+        self._emit_workflow(
+            'context',
+            page_id=f'{page.document.index}:{page.page_number}',
+            context_entries=len(self._translation_context.entries),
+        )
 
     def _repair_page(self, page, prepared):
         self._stage_context.page = page
@@ -432,6 +445,12 @@ class BatchWorker(QThread):
         with inference_cancellation(self._check_cancelled):
             repaired = self._pipeline.repair_comic_page(prepared)
         self.log.emit(f'[耗时] {self._page_label(page)}: 并行修补 {perf_counter() - started:.2f} 秒')
+        self._emit_workflow(
+            'repair_ready',
+            page_id=f'{page.document.index}:{page.page_number}',
+            page_label=self._page_label(page),
+            document_index=page.document.index,
+        )
         return repaired
 
     def _finish_page(self, page, prepared, translations):
@@ -445,7 +464,15 @@ class BatchWorker(QThread):
                 prepared['repaired'] = repair.result()
             self._check_cancelled()
             page.output_path.parent.mkdir(parents=True, exist_ok=True)
-            self._page_event('inpaint', 'running', '正在准备背景修复与排版')
+            if repair is None:
+                self._page_event('inpaint', 'running', '正在准备背景修复与排版')
+            else:
+                self._emit_workflow(
+                    'join',
+                    page_id=f'{page.document.index}:{page.page_number}',
+                    page_label=label,
+                    document_index=page.document.index,
+                )
             started = perf_counter()
             with inference_cancellation(self._check_cancelled):
                 self._pipeline.finish_comic_page(str(page.output_path), prepared, translations)
@@ -504,6 +531,24 @@ class BatchWorker(QThread):
             completed_pages = sum(page.resumed for page in page_jobs)
             self.page_progress.emit(completed_pages, len(page_jobs))
             max_workers = max(1, int(self._config.get("max_workers") or 4))
+            self._emit_workflow(
+                'plan',
+                max_workers=max_workers,
+                retain_context=bool(self._config.get('retain_translation_context', False)),
+                context_entries=len(self._translation_context.entries),
+                pages=[
+                    {
+                        'page_id': f'{page.document.index}:{page.page_number}',
+                        'page_label': self._page_label(page),
+                        'document_index': page.document.index,
+                        'document_name': page.document.source_path.name,
+                        'page_number': page.page_number,
+                        'is_pdf': page.document.is_pdf,
+                        'resumed': bool(page.resumed),
+                    }
+                    for page in page_jobs
+                ],
+            )
 
             fork = getattr(self._pipeline, 'fork_preparation', None)
             self._preparation_pipeline = fork() if callable(fork) else copy(self._pipeline)
@@ -541,12 +586,30 @@ class BatchWorker(QThread):
                     break
                 self._current_index = document.index
                 if not document.error and document.is_pdf:
+                    self._emit_workflow(
+                        'publish',
+                        document_index=document.index,
+                        document_name=document.source_path.name,
+                        state='running',
+                    )
                     try:
                         publish_pdf_project(document.output_path, document.project_dir)
+                        self._emit_workflow(
+                            'publish',
+                            document_index=document.index,
+                            document_name=document.source_path.name,
+                            state='done',
+                        )
                         self.log.emit(
                             f"[PDF] {document.source_path.name}: 已生成 {len(document.pages)} 页译文 PDF"
                         )
                     except Exception as exc:
+                        self._emit_workflow(
+                            'publish',
+                            document_index=document.index,
+                            document_name=document.source_path.name,
+                            state='failed',
+                        )
                         self._set_document_error(document, exc)
 
                 completed += 1
