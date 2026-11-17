@@ -19,7 +19,14 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 从 v2.2.1 开始，检测、OCR、修复全部切换为 **ONNX Runtime 推理**，彻底移除 PyTorch / torchvision / transformers 依赖；主程序和模型拆分发布，更新程序时不再需要重新下载模型。
 
 > [!NOTE]
-> **v2.5.0 大更新**：PDF 图片精修与无损导出、按气泡还原原图、原尺寸分块修补、连续翻译流水线、按页续传和严格 JSON 校验。已有模型可复用。[详细更新与升级说明](docs/RELEASE-v2.5.0.md) · [更新日志](CHANGELOG.md)。
+> **v2.5.2 更新**：滚动上下文记忆与可选缓存保留、OCR 后“按序翻译 ∥ 后台修补”Fork-Join 并行流水线、实时工作流拓扑可视化，以及精修画框、取色与自定义 RGB 填色、9 槽收藏字体、文字拉伸/旋转/描边和 PDF 边缘修复。已有 v2.5.1 模型可复用。[v2.5.2 发布说明](docs/RELEASE-v2.5.2.md) · [更新日志](CHANGELOG.md)。
+
+## v2.5.2 重要更新
+
+- **上下文记忆与 Fork-Join 并行流水线**：单批按阅读顺序延续跨页上下文（最多 12 页 / 24,000 字符），原子持久化在 `.cache/translation-context.json`；偏好新增「保留上下文缓存」（联动锁定断点续传）。OCR 完成后按序 API 翻译与后台 `repair_comic_page` 擦字并发执行，汇合时自动按译文结果对账掩码。[上下文与并行说明](docs/CONTEXT_TRANSLATION.md)。
+- **工作流拓扑实时可视化**：自动处理页取消旧版线性 7 步条，改为对应真实管道的有向工作流图（`读取 → 检测 → OCR → [翻译 ∥ 修补] → 排版 → 保存 / PDF`），直观呈现并发在途页角标、待汇合状态、上下文计数、续传复用与底部逐页矩阵。
+- **嵌字精修增强**：新增画布手工添加气泡框、图片取色（避开辅助线并支持长条）、自定义 RGB/Hex 填色、9 槽常用字体快捷栏（数字键 `1–9`）、文字颜色持久化、横向/纵向拉伸（`10%–400%`）、旋转（`±180°`）、描边（`0–30 px`）与「白字黑边竖排」预设，补充页面移除/清空、气泡 `1 / N` 计数及单页滚动隔离。
+- **冷启动与导出修复**：ONNX 模型预热延后至首帧绘制后触发；修复小数尺寸 PDF 页面边缘背景铺底覆盖不完整的问题。
 
 ## v2.5.0 重要更新
 
@@ -34,11 +41,15 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ## 漫画工作台
 
-黑白漫画工作台：开放式分区标题、局部网点、Skribble 字标和柔和控件，工作页直接进入操作区。翻译页可直接导入字体、选择默认译文字体并查看实际字形。七个流程节点沿直线排列，只有实际完成或跳过时才推进；精修画布保留作品原色。
+黑白漫画工作台：开放式分区标题、局部网点、Skribble 字标和柔和控件，工作页直接进入操作区。翻译页可直接导入字体、固定 9 个常用字体快捷槽并查看实际字形；底部并行工作流拓扑图按真实后台流水线实时显示并发在途页、`AI 翻译 ∥ 背景修复`分叉并行、上下文累计与逐页状态矩阵。精修画布保留作品原色。
 
 **自动处理工作台**
 
 ![ComiTrans 自动处理界面](docs/ui-review/automatic-style-review.png)
+
+**并行工作流拓扑可视化（运行中）**
+
+![ComiTrans 并行工作流进度面板](docs/ui-review/automatic-workflow-v252.png)
 
 **夜间模式（夜墨）**
 
@@ -108,15 +119,15 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ### Release 用户（推荐）
 
-1. 在[发布页](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.5.0)下载 `ComiTrans-v2.5.0-app.zip`（程序包）和 `ComiTrans-v2.5.0-models.zip`（模型包）。
+1. 在[发布页](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.5.2)下载 `ComiTrans-v2.5.2-app.zip`（程序包）；首次安装或从 v2.5.0 及更早版本升级请同时下载 `ComiTrans-v2.5.2-models.zip`（模型包，与 v2.5.1 一致，已有 v2.5.1 模型可直接复用）。
 2. 所需压缩包解压到同一个父目录，合并顶层同名 `ComiTrans` 文件夹，保留子目录结构。最终模型路径为 `ComiTrans\comic-translate-ai\models\`。
 3. 双击合并后的 `ComiTrans.exe`，在“设置”页填写翻译 API Key 和模型。
 
-从 v2.3.0 升级可复用已有模型；从 v2.2.2 升级时，日语模型可复用，韩语/英语识别需合并新版模型包。保留原有 `config.yaml`、整个 `user_fonts` 文件夹与输出文件。
+从 v2.5.1 升级可直接复用已有模型；从 v2.3.0 / v2.5.0 升级若仍使用旧模型包，建议合并 v2.5.1+ 模型包以使用更轻量的 CharSpot Small 日语 OCR 和双检测器切换。保留原有 `config.yaml`、整个 `user_fonts` 文件夹与输出文件。
 
 Release 用户不需要安装 Python、PyTorch 或 pip。GPU 加速需要兼容的 NVIDIA 驱动、CUDA 12 和 cuDNN 9；软件“设置 → 运行与输出 → GPU 安装说明与下载”提供官方链接。已有兼容环境可复用，CPU 用户无需安装这些 GPU 库。[GPU 安装指南](docs/GPU_SETUP.md)。
 
-升级到 v2.5.0：关闭程序，将 `ComiTrans-v2.5.0-app.zip` 解压到新目录，把旧目录的 `config.yaml`、`user_fonts/` 和 `comic-translate-ai/models/` 复制到对应位置。漫画输出及其 `_cleaned`、`_layout` 目录保持相对位置；确认新程序正常后再整理旧目录。GPU 用户可从软件设置打开官方运行库安装链接；本项目不打包上传 CUDA/cuDNN。本版使用完整包，详见[更新说明](docs/RELEASE-v2.5.0.md)。
+升级到 v2.5.2：关闭程序，将 `ComiTrans-v2.5.2-app.zip` 解压到新目录，把旧目录的 `config.yaml`、`user_fonts/` 和 `comic-translate-ai/models/` 复制到对应位置。漫画输出及其 `_cleaned`、`_layout` 目录保持相对位置；确认新程序正常后再整理旧目录。GPU 用户可从软件设置打开官方运行库安装链接；本项目不打包上传 CUDA/cuDNN。本版使用完整程序包，详见[v2.5.2 更新说明](docs/RELEASE-v2.5.2.md)。
 
 ### 源码运行（开发者）
 
@@ -145,10 +156,10 @@ Copy-Item comic-translate-ai/main/config.example.yaml comic-translate-ai/main/co
 ## 使用说明
 
 1. 点击“添加文件”或“添加文件夹”，也可以直接拖拽图片、PDF 或文件夹到窗口。
-2. 在“设置”页填写翻译 API，并在工作台选择“原文语言”。日语自动使用 v2.5.1 包中的 CharSpot Small，旧包可沿用 Baberu / manga-ocr，韩语、英语使用 PP-OCRv5；其它语言配置“自定义 OCR”。缺少韩英模型时运行 `.\.venv\Scripts\python scripts/download_ocr_models.py`，详见[接入文档](docs/MULTILINGUAL_OCR.md)。
+2. 在“设置”页填写翻译 API，并在工作台选择“原文语言”。日语自动使用 CharSpot Small，旧包可沿用 Baberu / manga-ocr，韩语、英语使用 PP-OCRv5；其它语言配置“自定义 OCR”。缺少韩英模型时运行 `.\.venv\Scripts\python scripts/download_ocr_models.py`，详见[接入文档](docs/MULTILINGUAL_OCR.md)。
 3. 勾选“多模态翻译”后，翻译会发送整页图片给 AI；不勾选则使用纯文本翻译。两种模式默认都由本地算法选择字体和排版。
-4. 在翻译页顶部展开“翻译偏好”，填写背景提示词和中文人名（每行一个，AI 自动对照）。
-5. 点击“开始翻译”，实时查看执行步骤、进度和日志。
+4. 在翻译页顶部展开“翻译偏好”，设置背景提示词、中文人名对照，以及可选的「保留上下文缓存」（跨任务复用并自动保持「断点续传」）。
+5. 点击“开始翻译”，在底部并行工作流拓扑图中实时查看各页所处的检测、并发翻译/修补、汇合排版与逐页状态。
 6. 翻译失败时可在“诊断”页查看诊断提示词，或点击顶部“反馈”按钮提交反馈。
 7. 需要微调时，切换到“嵌字精修”页，选择已翻译图片和文本块；直接拖动蒙版四角或边缘调整大小，框内拖动位置。右侧可输入字号、X/Y 偏移和蒙版宽高，画布自动更新。点击“保存图片”或 Ctrl+S 直接输出当前结果。[精修热预览说明](docs/EDITOR_LIVE_PREVIEW.md)。
 
@@ -237,15 +248,15 @@ Python 扩展通过 `OcrEngine.recognize(image, language) -> OcrResult` 接入�
 
 ## 翻译流程
 
-每张图片或 PDF 页面按以下流程处理。不同页面的准备、API 等待与修补可重叠，按并发设置限制在途页数，结果按输入顺序保存：
+每张图片或 PDF 页面按以下 Fork-Join 流水线处理：不同页面的准备与检测按并发上限重叠推进，OCR 完成后分叉并发执行“按阅读顺序带上下文翻译”与“后台线程背景修复”，汇合对账后按输入顺序排版并保存结果：
 
 1. **气泡与文本检测**：ONNX 文本检测器输出气泡、文字掩膜和文本行。
-2. **源语言 OCR**：日语使用 v2.5.1 包中的 CharSpot Small，韩语和英语按文本行使用 PP-OCRv5，也可使用自定义 OCR。仅日语本地模式保留原有英文跳过规则；其它模式可正常识别、翻译英文。无原文或无译文的区域保留原图。
-3. **大模型翻译**：纯文本模式发送 OCR 结果；多模态模式发送整页图片。字体默认由本地按角色、字形和文本框选择；单独启用实验性字体比对时，AI 才参与三候选字体族判断，结果通过本地门控后生效。字号与排版方向始终由本地决定。
-4. **背景修复**：按检测文字掩膜擦除，纯色使用实际底色，验证通过的规则网点与渐变局部重建，复杂背景调用原尺寸分块 LaMa 修复。
+2. **源语言 OCR**：日语使用 CharSpot Small（兼容旧包 Baberu / manga-ocr），韩语和英语按文本行使用 PP-OCRv5，也可使用自定义 OCR。仅日语本地模式保留原有英文跳过规则；其它模式可正常识别、翻译英文。无原文或无译文的区域保留原图。
+3. **分叉分支 A · 顺序上下文翻译**：纯文本模式发送 OCR 结果，多模态模式发送整页图片，并自动拼接近期上下文（最多 12 页 / 24,000 字符）；字体默认由本地按角色、字形和文本框选择，字号与排版方向由本地决定。
+4. **分叉分支 B · 并行背景修复**：与翻译 API 等待并发在独立后台线程执行整页擦字（纯色回填、规则网点/渐变重建或原尺寸分块 LaMa 修复）；译文返回后汇合对账，自动移除空译文气泡的掩膜。
 5. **中文排版**：按掩膜有效面积估算字号、按掩膜质心定位，横竖方向自适应，长文本自动收紧字号。
-6. **保存与编辑**：输出翻译图，清理底图单独保存到 `<输出目录>_cleaned/`，布局 JSON 保存到 `<输出目录>_layout/`，可在嵌字编辑页继续人工微调。
-7. **PDF 重组**：PDF 的全部页面成功后，按原页面尺寸重组并重新打开校验；任一页失败时不生成半成品 PDF。
+6. **保存与编辑**：输出翻译图，清理底图单独保存到 `<输出目录>_cleaned/`，布局 JSON 保存到 `<输出目录>_layout/`，可在嵌字精修页继续人工微调（含手动添加气泡、取色填色、收藏字体与拉伸旋转描边）。
+7. **PDF 重组**：PDF 的全部页面成功后，按原页面尺寸重组并重新打开校验（覆盖小数尺寸边界）；任一页失败时不生成半成品 PDF。
 
 翻译服务返回 401/403（鉴权）、402（余额不足）或 404（接口/模型不存在）时，客户端会显示实际原因并停止请求剩余页面。HTTP 402 需要为对应 API 账户充值，或更换有额度的 API Key，代码本身无法绕过服务商额度限制。
 
@@ -282,21 +293,22 @@ v2.5.1 本地预览只随包提供 CharSpot Small 日语 OCR，默认使用 Smal
 ### 生成发布包
 
 ```powershell
-python package_release.py --output release/v2.5.1
+python package_release.py --output release/v2.5.2
 ```
 
-本地构建生成两个 v2.5.1 压缩包。
+本地构建生成两个 v2.5.2 压缩包。
 
-- `ComiTrans-v2.5.1-app.zip`：主程序，不含模型
-- `ComiTrans-v2.5.1-models.zip`：含日语、韩语、英语 OCR 的 ONNX 模型包；已有模型可复用
+- `ComiTrans-v2.5.2-app.zip`：主程序，不含模型
+- `ComiTrans-v2.5.2-models.zip`：与 v2.5.1 一致的 ONNX 模型包（含日语 CharSpot Small、双检测器、韩语、英语 OCR 与 LaMa）；v2.5.1 已有模型可直接复用
 
-不发布 CUDA/cuDNN 运行库包；v2.5.0 修补版与 v2.5.1 用户可在设置中点击「下载安装便携 GPU 运行库」，重启后从程序目录加载。发布页同时提供 `SHA256SUMS.txt` 和 `baseline.json`。
+不发布 CUDA/cuDNN 运行库包；v2.5.0 修补版与 v2.5.1+ 用户可在设置中点击「下载安装便携 GPU 运行库」，重启后从程序目录加载。发布页同时提供 `SHA256SUMS.txt` 和 `baseline.json`。
 
 版本元数据保存在源码仓库，随发布提交：
 
-- [docs/releases/v2.5.1/baseline.json](docs/releases/v2.5.1/baseline.json)：2.5.1 目标构建基线
-- [docs/releases/v2.5.1/SHA256SUMS.txt](docs/releases/v2.5.1/SHA256SUMS.txt)：2.5.1 程序包、模型包及目标基线的 SHA256
-
+- [docs/releases/v2.5.2/baseline.json](docs/releases/v2.5.2/baseline.json)：2.5.2 目标构建基线
+- [docs/releases/v2.5.2/SHA256SUMS.txt](docs/releases/v2.5.2/SHA256SUMS.txt)：2.5.2 程序包、模型包及目标基线的 SHA256
+- [docs/releases/v2.5.1/baseline.json](docs/releases/v2.5.1/baseline.json)：2.5.1 构建基线
+- [docs/releases/v2.5.1/SHA256SUMS.txt](docs/releases/v2.5.1/SHA256SUMS.txt)：2.5.1 校验清单
 - [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json)：程序文件 SHA256 清单与构建指纹，供后续生成补丁
 - [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt)：程序包、模型包和基线清单的 SHA256
 
@@ -331,6 +343,19 @@ ComiTrans
 └── package_release.py             # Release 拆包脚本
 ```
 ## 更新日志
+
+### v2.5.2（2026-11-17）
+
+- 新增滚动上下文记忆与 `.cache/translation-context.json` 原子缓存；偏好新增「保留上下文缓存」（联动锁定断点续传）。
+- OCR 后分叉并发执行按序翻译与后台 `repair_comic_page` 擦字修补，汇合对账空译文掩码；重绘翻译页工作流拓扑可视化面板与逐页状态矩阵。
+- 精修编辑器支持手工添加气泡框、图片取色与自定义 RGB 填色、9 槽收藏字体快捷切换（`1–9`）、拉伸（`10%–400%`）、旋转（`±180°`）、描边（`0–30 px`）与白字黑边竖排预设、列表清理控制及单页滚动隔离。
+- 推迟模型预热至首帧绘制后执行，修复小数尺寸 PDF 页面边缘覆盖问题。
+- [v2.5.2 发布说明](docs/RELEASE-v2.5.2.md) · [完整开发日志](CHANGELOG.md)。
+
+### v2.5.1（2026-11-10）
+
+- 新增「夜墨」深色主题、画布点击选区、右栏可拖拽分隔线、`F2` 全屏编辑、缩放 HUD 与 `Z` 缩放工具、详细配置页、一键精修与框选填白/填黑。
+- 新增 CUDA 加速开关及检测器说明，日语自动切换为 CharSpot Small，v2.5.1 模型包可由 v2.5.2 直接复用。[v2.5.1 说明](docs/RELEASE-v2.5.1.md)。
 
 ### v2.5.0（2026-11-02）
 
