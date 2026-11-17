@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from comic_translate_core.pipeline_settings import apply_runtime_settings
+from comic_translate_core.pipeline_settings import apply_runtime_settings, TranslationSettings
+from comic_translate_core.translation_context import TranslationContext
 from comic_translate_core.errors import TaskCancelledError, TranslationError
 from .i18n import tr
 
@@ -90,6 +91,7 @@ class BatchWorker(QThread):
     image_failed = Signal(str, str)
     stage_changed = Signal(int, str, str)
     stage_event = Signal(object)
+    workflow_event = Signal(object)
     page_progress = Signal(int, int)
     finished = Signal(int, int)
 
@@ -98,6 +100,8 @@ class BatchWorker(QThread):
         self._files = [Path(f) for f in files]
         self._output_dir = Path(output_dir)
         self._config = dict(config)
+        if self._config.get('retain_translation_context', False):
+            self._config['resume_enabled'] = True
         self._pipeline = pipeline
         self._stop = False
         self._fatal_error = ""
@@ -130,6 +134,13 @@ class BatchWorker(QThread):
                            if stage == 'start' and index > 0 else tr(message))
         self.stage_changed.emit(index, stage, display_message)
         self._log_pipeline_output(message)
+
+    def _emit_workflow(self, event_type: str, **payload) -> None:
+        self.workflow_event.emit({
+            "task_id": self.task_id,
+            "type": event_type,
+            **payload,
+        })
 
     def _page_event(self, stage, state, message):
         page = getattr(self._stage_context, "page", None)
@@ -313,7 +324,7 @@ class BatchWorker(QThread):
             self._pdf_renderer = PdfPageRenderer(page.document.source_path, dpi)
             self._pdf_document = page.document
         started = perf_counter()
-        self._page_event('detect', 'running', '正在准备原分辨率 PDF 页图')
+        self._page_event('start', 'running', '正在准备原分辨率 PDF 页图')
         self._pdf_renderer.render(
             RenderedPdfPage(page.page_number - 1, page.input_path, *page.page_size_points),
             reuse_cached=True, cancel_callback=self._check_cancelled)
@@ -347,6 +358,8 @@ class BatchWorker(QThread):
                                 tr('{_0}: 已取消', _0=self._page_label(page)))
 
     def _prepare_page(self, page):
+        if page.resumed:
+            return {'ocr_texts': [], 'context_replay': True}
         if self._is_stopped() or page.document.error:
             return None
         self._stage_context.page = page
@@ -374,8 +387,16 @@ class BatchWorker(QThread):
         self._stage_context.blank = not any(text.strip() for text in prepared['ocr_texts'])
         try:
             self._check_cancelled()
+            if page.resumed:
+                entry = page.document.checkpoint.context_entry(page.page_number)
+                if entry is not None:
+                    self._remember_translation(page, *entry)
+                return None
+            if page.document.error:
+                return None
             cached = page.document.checkpoint.translation(page.page_number, prepared['ocr_texts'])
             if cached is not None:
+                self._remember_translation(page, prepared['ocr_texts'], cached)
                 self.log.emit(f'[续传] {self._page_label(page)}: 复用已保存译文')
                 self._page_event('translate', 'done', '复用已保存译文')
                 return cached
@@ -383,6 +404,7 @@ class BatchWorker(QThread):
             result = self._translate_page(page, prepared)
             # Persist a valid paid response even if stop arrived during HTTP.
             page.document.checkpoint.save_translation(page.page_number, prepared['ocr_texts'], result)
+            self._remember_translation(page, prepared['ocr_texts'], result)
             self.log.emit(f'[耗时] {self._page_label(page)}: API 翻译 {perf_counter() - started:.2f} 秒')
             return result
         except TaskCancelledError:
@@ -400,14 +422,57 @@ class BatchWorker(QThread):
                         self.log.emit('[失败] 翻译服务返回全局配置/账户错误，已停止预取和后续请求。')
         return None
 
+    def _remember_translation(self, page, ocr, texts):
+        checkpoint = page.document.checkpoint
+        generation = self._translation_context.generation
+        if checkpoint.context_recorded(page.page_number, generation):
+            return
+        self._translation_context.record(checkpoint.context_key(page.page_number),
+                                         ocr, texts, self._translation_settings)
+        checkpoint.mark_context_recorded(page.page_number, generation)
+        self._emit_workflow(
+            'context',
+            page_id=f'{page.document.index}:{page.page_number}',
+            context_entries=len(self._translation_context.entries),
+        )
+
+    def _repair_page(self, page, prepared):
+        self._stage_context.page = page
+        self._stage_context.blank = not any(text.strip() for text in prepared['ocr_texts'])
+        self._check_cancelled()
+        self._page_event('inpaint', 'running', '正在准备背景修复与排版')
+        started = perf_counter()
+        with inference_cancellation(self._check_cancelled):
+            repaired = self._pipeline.repair_comic_page(prepared)
+        self.log.emit(f'[耗时] {self._page_label(page)}: 并行修补 {perf_counter() - started:.2f} 秒')
+        self._emit_workflow(
+            'repair_ready',
+            page_id=f'{page.document.index}:{page.page_number}',
+            page_label=self._page_label(page),
+            document_index=page.document.index,
+        )
+        return repaired
+
     def _finish_page(self, page, prepared, translations):
         self._stage_context.page = page
         self._stage_context.blank = not any(text.strip() for text in prepared['ocr_texts'])
         label = self._page_label(page)
         try:
             self._check_cancelled()
+            repair = prepared.pop('repair_future', None)
+            if repair is not None:
+                prepared['repaired'] = repair.result()
+            self._check_cancelled()
             page.output_path.parent.mkdir(parents=True, exist_ok=True)
-            self._page_event('inpaint', 'running', '正在准备背景修复与排版')
+            if repair is None:
+                self._page_event('inpaint', 'running', '正在准备背景修复与排版')
+            else:
+                self._emit_workflow(
+                    'join',
+                    page_id=f'{page.document.index}:{page.page_number}',
+                    page_label=label,
+                    document_index=page.document.index,
+                )
             started = perf_counter()
             with inference_cancellation(self._check_cancelled):
                 self._pipeline.finish_comic_page(str(page.output_path), prepared, translations)
@@ -450,6 +515,12 @@ class BatchWorker(QThread):
             if not self._files:
                 self.finished.emit(0, 0)
                 return
+            self._translation_context = TranslationContext.start(
+                app_config.PROJECT_ROOT / '.cache' / 'translation-context.json',
+                retain=bool(self._config.get('retain_translation_context', False)))
+            self._pipeline.translation_context = self._translation_context
+            self._pipeline.translation_context_managed = True
+            self._translation_settings = TranslationSettings.from_pipeline(self._pipeline)
             _mask = app_config.mask_api_key(str(self._config.get("api_key") or "")) or "空"
             self.log.emit(
                 f"[INFO] 翻译模型: {self._config.get('translation_model', '')}，API Key: {_mask}"
@@ -459,26 +530,44 @@ class BatchWorker(QThread):
             page_jobs = [page for document in documents for page in document.pages]
             completed_pages = sum(page.resumed for page in page_jobs)
             self.page_progress.emit(completed_pages, len(page_jobs))
-            pending_pages = [page for page in page_jobs if not page.resumed]
             max_workers = max(1, int(self._config.get("max_workers") or 4))
+            self._emit_workflow(
+                'plan',
+                max_workers=max_workers,
+                retain_context=bool(self._config.get('retain_translation_context', False)),
+                context_entries=len(self._translation_context.entries),
+                pages=[
+                    {
+                        'page_id': f'{page.document.index}:{page.page_number}',
+                        'page_label': self._page_label(page),
+                        'document_index': page.document.index,
+                        'document_name': page.document.source_path.name,
+                        'page_number': page.page_number,
+                        'is_pdf': page.document.is_pdf,
+                        'resumed': bool(page.resumed),
+                    }
+                    for page in page_jobs
+                ],
+            )
 
             fork = getattr(self._pipeline, 'fork_preparation', None)
             self._preparation_pipeline = fork() if callable(fork) else copy(self._pipeline)
-            self.log.emit(f'[流水线] 在途最多 {max_workers} 页；' +
-                          ('准备/翻译与修补重叠，GPU 推理分块交错。' if max_workers > 1 else '单页顺序处理。'))
+            self.log.emit(f'[流水线] 在途最多 {max_workers} 页；OCR 后翻译与修补分叉并行，翻译按阅读顺序更新上下文，汇合后嵌字保存。')
             # One output capture owns all cooperating threads. Nesting global
             # stdout redirects across producer/API/consumer threads is unsafe.
             with self._capture_pipeline_output(), PagePrefetch(
-                pending_pages, self._prepare_page, self._translate_and_cache,
+                page_jobs, self._prepare_page, self._translate_and_cache,
                 capacity=max_workers, cancelled=self._is_stopped,
                 close_preparation=self._close_pdf_renderer,
+                translation_workers=1,
+                repair=self._repair_page if callable(getattr(self._pipeline, 'repair_comic_page', None)) else None,
             ) as pages:
                 for page, prepared, future in pages:
                     try:
                         if self._is_stopped():
                             break
                         translations = future.result()
-                        if translations is not None and not self._is_stopped():
+                        if not page.resumed and translations is not None and not self._is_stopped():
                             if self._finish_page(page, prepared, translations):
                                 completed_pages += 1
                                 self.page_progress.emit(completed_pages, len(page_jobs))
@@ -497,12 +586,30 @@ class BatchWorker(QThread):
                     break
                 self._current_index = document.index
                 if not document.error and document.is_pdf:
+                    self._emit_workflow(
+                        'publish',
+                        document_index=document.index,
+                        document_name=document.source_path.name,
+                        state='running',
+                    )
                     try:
                         publish_pdf_project(document.output_path, document.project_dir)
+                        self._emit_workflow(
+                            'publish',
+                            document_index=document.index,
+                            document_name=document.source_path.name,
+                            state='done',
+                        )
                         self.log.emit(
                             f"[PDF] {document.source_path.name}: 已生成 {len(document.pages)} 页译文 PDF"
                         )
                     except Exception as exc:
+                        self._emit_workflow(
+                            'publish',
+                            document_index=document.index,
+                            document_name=document.source_path.name,
+                            state='failed',
+                        )
                         self._set_document_error(document, exc)
 
                 completed += 1

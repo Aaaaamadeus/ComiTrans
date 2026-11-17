@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt, QSize, QEvent, QTimer, Signal
 from PySide6.QtGui import QImageReader, QPixmap
 from PySide6.QtWidgets import QAbstractScrollArea
 
+from ..i18n import tr
 from .preview import ImagePreview, PageCanvas
 from .thumbnail_loader import ThumbnailLoader
 
@@ -66,6 +67,29 @@ class StripPreview(ImagePreview):
         if self._continuous:
             self._visible_timer.start(0)
 
+    def remove_page(self, path):
+        """Remove a page from the strip without touching its image file."""
+        key = str(Path(path).resolve())
+        if key not in self._pages:
+            return False
+        self.cancel_region_drag()
+        label = self._pages[key][0]
+        if label is not None:
+            self._unmount(label)
+        self._pages.pop(key, None)
+        self._keys.remove(key)
+        self._indices = {page: index for index, page in enumerate(self._keys)}
+        self._layout_signature = None
+        self._thumbnail_loader.request([])
+        if self._active_path == key:
+            self._active_path = None
+            self._label = self._single_label
+            super().clear(tr('选择一页，开始精修'))
+        if self._continuous:
+            self._visible_timer.start(0)
+        self._trim_spares()
+        return True
+
     def _mount(self, key):
         existing = self._pages[key][0]
         if existing is not None:
@@ -80,6 +104,7 @@ class StripPreview(ImagePreview):
             label.region_edited.connect(self.region_edited)
             label.region_edit_finished.connect(self.region_edit_finished)
             label.region_clicked.connect(self.region_clicked)
+            label.bubble_created.connect(self.bubble_created)
         label.setToolTip(Path(key).name)
         self._pages[key][0] = label
         self._canvas_keys[label] = key
@@ -90,7 +115,7 @@ class StripPreview(ImagePreview):
         self._pages[key][0] = None
         label.cancel_region_drag()
         label.region = None
-        label.region_editable = label.region_creation = False
+        label.region_editable = label.region_creation = label.bubble_creation = False
         label.clear()
         label.hide()
         self._spares.append(label)
@@ -113,16 +138,19 @@ class StripPreview(ImagePreview):
         self._visible_timer.start(0)
 
     def set_continuous(self, enabled):
+        self.cancel_color_picking()
         self.cancel_region_drag()
         previous = self._label
         region, editable, creation = previous.region, previous.region_editable, previous.region_creation
+        bubble_creation = previous.bubble_creation
         previous.region = None
-        previous.region_editable = previous.region_creation = False
+        previous.region_editable = previous.region_creation = previous.bubble_creation = False
         previous.update()
         self._continuous = enabled
         self._label = self._mount(self._active_path) if enabled and self._active_path else self._single_label
         self._label.image_size = self._original.size()
         self._label.region_creation = creation
+        self._label.bubble_creation = bubble_creation
         self.set_region(region, editable=editable)
         self._apply_regions()
         if not self._original.isNull():
@@ -139,9 +167,10 @@ class StripPreview(ImagePreview):
         key = str(Path(path).resolve())
         self.add_page(key)
         if self._active_path != key:
+            self.cancel_color_picking()
             self.cancel_region_drag()
             self._label.region = None
-            self._label.region_editable = self._label.region_creation = False
+            self._label.region_editable = self._label.region_creation = self._label.bubble_creation = False
             self._label.clear()
         self._active_path = key
         self._label = self._mount(key) if self._continuous else self._single_label
@@ -288,6 +317,12 @@ class StripPreview(ImagePreview):
             entry[0].setPixmap(pixmap)
 
     def eventFilter(self, watched, event):
+        # In single-page mode the hidden strip must never navigate or consume a pan.
+        if not self._continuous and hasattr(self, '_strip_scroll') and (
+                watched is self._strip_scroll.viewport() or watched in self._canvas_keys):
+            if event.type() in (QEvent.Wheel, QEvent.MouseButtonPress, QEvent.MouseButtonDblClick):
+                event.accept()
+                return True
         if hasattr(self, '_strip_scroll') and watched is self._strip_scroll.viewport():
             if event.type() == QEvent.Resize and self._continuous:
                 self.cancel_region_drag()

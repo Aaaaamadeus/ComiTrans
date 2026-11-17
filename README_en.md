@@ -21,7 +21,14 @@ ComiTrans is a manga translation desktop client. Detection, built-in Japanese/Ko
 Since v2.2.1, detection, OCR, and inpainting are powered entirely by **ONNX Runtime**, removing PyTorch / torchvision / transformers dependencies. The app and models are released as separate packages: app updates no longer require re-downloading unchanged models.
 
 > [!NOTE]
-> **v2.5.0 major update:** image-based PDF editing and lossless export, per-bubble original restoration, native-resolution tiled repair, bounded streaming translation, per-page resume and strict JSON validation. Existing models remain reusable. [Detailed update and upgrade guide](docs/RELEASE-v2.5.0.md) · [Changelog](CHANGELOG.md).
+> **v2.5.2 update:** rolling cross-page translation context with optional cache retention, an OCR-forked sequential-translation ∥ background-repair Fork-Join pipeline, a redesigned live workflow graph on the translation page, plus manual bubble boxes, eyedropper & custom RGB fills, 9-slot favorite fonts (`1–9`), lettering stretch/rotation/outline, and fractional-edge PDF export fixes. v2.5.1 models remain reusable. [v2.5.2 release notes](docs/RELEASE-v2.5.2.md) · [Changelog](CHANGELOG.md).
+
+## What's new in v2.5.2
+
+- **Contextual translation & Fork-Join pipeline:** Rolling cross-page memory (up to 12 pages / 24,000 serialized chars) atomically saved to `.cache/translation-context.json`, with a "Keep context cache" preference that keeps per-page resume enabled. Right after OCR, sequential reading-order translation and background-thread page inpainting (`repair_comic_page`) run concurrently and reconcile empty translations at join. [Context & parallel pipeline guide](docs/CONTEXT_TRANSLATION.md).
+- **Live Fork-Join workflow visualizer:** Replaces the 7-step straight bar on the translation page with a real-time directed graph (`Start → Detect → OCR → [Translate ∥ Inpaint] → Typeset → Save / PDF`) displaying concurrent in-flight page badges, repair-ready join state, context count, resumed pages, and a bottom per-page matrix strip.
+- **Typesetting editor upgrades:** Manual bubble frame creation, canvas/strip color picking (avoiding guides), custom RGB/Hex selection fills (undoable), 9 pinned favorite fonts with `1–9` shortcuts, persisted text colors, stretch (`10–400%`), rotation (`±180°`), manual outline stroke (`0–30 px`) with a vertical white-text black-outline preset, page removal/clear controls, `1 / N` block counter, and single-page scroll isolation.
+- **Startup & PDF fixes:** Defers ONNX model warmup until after first paint and covers fractional page edges during PDF export.
 
 ## What's new in v2.5.0
 
@@ -36,11 +43,15 @@ A three-page offline scheduling comparison measured **42.43 → 37.85 seconds**,
 
 ## Manga workbench
 
-A black-and-white manga workbench with open section headings, local halftones, the Skribble wordmark, and soft controls. Workspaces open directly into their tools. Import fonts and choose a default translation font on the translation page, with a real glyph preview. Seven nodes share one horizontal track and advance on real completion or skip events. The editor canvas preserves the artwork's colors.
+A black-and-white manga workbench with open section headings, local halftones, the Skribble wordmark, and soft controls. Workspaces open directly into their tools. Import fonts and pin up to 9 favorite translation fonts (`1–9` shortcuts) with a real glyph preview; the bottom Fork-Join workflow graph tracks live in-flight pages, `AI Translate ∥ Inpaint` branches, rolling context count, and a per-page status strip. The editor canvas preserves the artwork's colors.
 
 **Automatic processing**
 
 ![ComiTrans automatic processing](docs/ui-review/automatic-style-review.png)
+
+**Fork-Join live workflow visualizer**
+
+![ComiTrans live Fork-Join workflow visualizer](docs/ui-review/automatic-workflow-v252.png)
 
 **Night mode (Night ink)**
 
@@ -76,8 +87,8 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 
 | Before | After |
 | --- | --- |
-| ![Page 6 Japanese original](docs/images/before1.png) | ![Page 6 Chinese translation](docs/images/after1.png) |
-| ![Page 7 Japanese original](docs/images/before2.png) | ![Page 7 Chinese translation](docs/images/after2.png) |
+| ![Page 6 Japanese original](docs/images/20.1.png) | ![Page 6 Chinese translation](docs/images/20.11.png) |
+| ![Page 7 Japanese original](docs/images/20.2.png) | ![Page 7 Chinese translation](docs/images/20.21.png) |
 
 ## Table of Contents
 
@@ -123,15 +134,15 @@ A fully successful translation batch has a 15% chance of showing a small reposit
 
 ### Release users (recommended)
 
-1. Download `ComiTrans-v2.5.0-app.zip` and `ComiTrans-v2.5.0-models.zip` from the [v2.5.0 release](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.5.0).
+1. Download `ComiTrans-v2.5.2-app.zip` from the [v2.5.2 release](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.5.2); for fresh installs or upgrades from v2.5.0 and earlier, also download `ComiTrans-v2.5.2-models.zip` (identical to v2.5.1 models; existing v2.5.1 users can reuse their models folder).
 2. Extract the required archives into the same parent directory and merge their top-level `ComiTrans` folders, preserving the subfolder structure. The final model path is `ComiTrans\comic-translate-ai\models\`.
 3. Double-click the merged `ComiTrans.exe` and enter your translation API key and model on the "Settings" page.
 
-Upgrading from v2.3.0: reuse your existing models. From v2.2.2, existing Japanese models can be reused; merge the new model archive to add Korean/English recognition. Keep your existing `config.yaml`, entire `user_fonts` folder, and output files.
+Upgrading from v2.5.1: reuse your existing models directly. Upgrading from v2.3.0 / v2.5.0: merge the v2.5.1+ model archive to switch to the lighter CharSpot Small Japanese OCR and CUDA-aware dual detector. Keep your existing `config.yaml`, entire `user_fonts` folder, and output files.
 
-Release users do not need Python, PyTorch, or pip. GPU acceleration requires a compatible NVIDIA driver, CUDA 12 and cuDNN 9. Open Settings → Runtime & Output → GPU setup and downloads to install the portable runtime in the patched v2.5.0 or v2.5.1 app, or to open official installer links. Reuse a compatible environment; CPU users do not need GPU libraries. [Setup guide](docs/GPU_SETUP.md). New installations prefer GPU; if CUDA cannot start, the app reports its CPU fallback. Existing CPU preferences are preserved.
+Release users do not need Python, PyTorch, or pip. GPU acceleration requires a compatible NVIDIA driver, CUDA 12 and cuDNN 9. Open Settings → Runtime & Output → GPU setup and downloads to install the portable runtime or to open official installer links. Reuse a compatible environment; CPU users do not need GPU libraries. [Setup guide](docs/GPU_SETUP.md). New installations prefer GPU; if CUDA cannot start, the app reports its CPU fallback. Existing CPU preferences are preserved.
 
-To upgrade to v2.5.0, close the app and extract `ComiTrans-v2.5.0-app.zip` into a new folder. Copy `config.yaml`, `user_fonts/` and `comic-translate-ai/models/` from the old installation to the same relative locations. Keep output images and their companion `_cleaned` and `_layout` folders together. Keep the old installation until the new one works. This version uses the full app archive; see the [update guide](docs/RELEASE-v2.5.0.md).
+To upgrade to v2.5.2, close the app and extract `ComiTrans-v2.5.2-app.zip` into a new folder. Copy `config.yaml`, `user_fonts/` and `comic-translate-ai/models/` from the old installation to the same relative locations. Keep output images and their companion `_cleaned` and `_layout` folders together. Keep the old installation until the new one works. This version uses the full app archive; see the [v2.5.2 update guide](docs/RELEASE-v2.5.2.md).
 
 ### Run from source (developers)
 
@@ -160,10 +171,10 @@ You can also double-click `start.bat`. The AI pipeline warms up automatically af
 ## Usage
 
 1. Click "Add Files" or "Add Folder", or drag images, PDFs, or folders into the window.
-2. Configure the translation API in Settings, then choose Source Language on the workbench. Japanese Auto uses CharSpot Small in the v2.5.1 preview and supports Baberu/manga-ocr in older model packs; Korean/English use PP-OCRv5. Choose Custom OCR for another language or provider.
+2. Configure the translation API in Settings, then choose Source Language on the workbench. Japanese Auto uses CharSpot Small (with legacy Baberu/manga-ocr packs still supported); Korean/English use PP-OCRv5. Choose Custom OCR for another language or provider.
 3. Enable "Multimodal Translation" to send the full page image to the AI; disable it for pure-text translation. Both modes use local font selection and typesetting by default.
-4. Expand "Preferences" on the translation page to fill in background prompts and Chinese character names (one per line; the AI maps them automatically).
-5. Click "Start Translation" and watch the live step/status logs.
+4. Expand "Preferences" on the translation page to configure background prompts, Chinese character names (one per line), and optional "Keep context cache" (keeps page resume locked on across runs).
+5. Click "Start Translation" and follow live in-flight stages, Fork-Join parallel progress, and per-page states in the workflow graph below.
 6. On failure, open the "Diagnostics" page for diagnosis prompts, or click the Issue button.
 7. Select a text block in "Typesetting Refinement". Drag its mask corners or edges to resize, or drag inside to move; press Esc during a drag to restore its starting geometry. Font size, X/Y offsets, and exact dimensions are also available under “排版与位置”. The canvas updates automatically. Click Save Image or press Ctrl+S to export the current result. See the [live preview guide](docs/EDITOR_LIVE_PREVIEW.md).
 
@@ -252,12 +263,12 @@ Typesetting renders text on a local 3x supersampled surface and downsamples it w
 ## Translation Pipeline
 
 1. **Bubble & text detection**: an ONNX detector outputs bubbles, text masks, and text lines.
-2. **Source-language OCR**: Japanese uses CharSpot Small with the v2.5.1 pack, Korean and English use PP-OCRv5 text-line recognition, or a custom OCR service can be selected. The English-skip rule applies only to Japanese local mode. Empty source/translation regions retain the original artwork.
-3. **LLM translation**: pure-text mode sends OCR results; multimodal mode sends the page image. Local role, glyph, and box heuristics select fonts by default. With experimental font comparison explicitly enabled, the AI identifies a font family among three local candidates, subject to local gates. Size and orientation always stay local.
-4. **Background inpainting**: erases only the detector text mask; solid regions retain their actual background color; verified screentones/gradients use local reconstruction, and complex backgrounds use native-resolution tiled LaMa.
+2. **Source-language OCR**: Japanese uses CharSpot Small (legacy Baberu/manga-ocr packs remain supported), Korean and English use PP-OCRv5 text-line recognition, or a custom OCR service can be selected. The English-skip rule applies only to Japanese local mode. Empty source/translation regions retain the original artwork.
+3. **Fork branch A · sequential contextual translation**: pure-text mode sends OCR results; multimodal mode sends the page image, carrying rolling context across up to 12 recent pages (24,000 serialized chars). Local heuristics select fonts by default while size and orientation stay local.
+4. **Fork branch B · parallel background inpainting**: runs concurrently in a dedicated worker thread while waiting on the translation API, erasing detected masks via solid fill, screentone/gradient reconstruction, or tiled LaMa; join-stage reconciliation restores masks for empty translations.
 5. **Chinese typesetting**: font size is estimated from the mask area, text is centered on the mask centroid, orientation adapts automatically, and long text gets tighter sizing.
-6. **Save & edit**: output images are saved, cleaned canvases go to `<output_dir>_cleaned/`, layout JSON goes to `<output_dir>_layout/`, and the editor lets you refine everything manually.
-7. **PDF assembly**: once every page succeeds, pages are rebuilt at their original sizes and the PDF is reopened for validation; no partial PDF is emitted if a page fails.
+6. **Save & edit**: output images are saved, cleaned canvases go to `<output_dir>_cleaned/`, layout JSON goes to `<output_dir>_layout/`, and the editor lets you refine everything manually (including manual bubble boxes, eyedropper & custom fills, `1–9` favorite fonts, stretch, rotation, and outlines).
+7. **PDF assembly**: once every page succeeds, pages are rebuilt at their original sizes (covering fractional page edges) and the PDF is reopened for validation; no partial PDF is emitted if a page fails.
 
 When the translation provider returns 401/403 (authentication), 402 (insufficient balance), or 404 (endpoint/model not found), the client reports the real cause and stops scheduling remaining pages. HTTP 402 requires funding the API account or switching to a key with available credit.
 
@@ -294,21 +305,22 @@ By default the app is built without models. For local testing with models:
 ### Generate release packages
 
 ```powershell
-python package_release.py --output release/v2.5.1
+python package_release.py --output release/v2.5.2
 ```
 
-The local build produces two v2.5.1 archives.
+The local build produces two v2.5.2 archives.
 
-- `ComiTrans-v2.5.1-app.zip`: program only, no models
-- `ComiTrans-v2.5.1-models.zip`: ONNX models including Japanese, Korean, and English OCR; existing models can be reused
+- `ComiTrans-v2.5.2-app.zip`: program only, no models
+- `ComiTrans-v2.5.2-models.zip`: ONNX models matching v2.5.1 (Japanese CharSpot Small, dual detectors, Korean & English OCR, LaMa); existing v2.5.1 models can be reused
 
 CUDA/cuDNN libraries are not distributed in this release. GPU users can open official installation links from Settings. The release includes `SHA256SUMS.txt` and `baseline.json`.
 
 Version metadata is stored and committed in the source repository:
 
-- [docs/releases/v2.5.1/baseline.json](docs/releases/v2.5.1/baseline.json): v2.5.1 target build fingerprint
-- [docs/releases/v2.5.1/SHA256SUMS.txt](docs/releases/v2.5.1/SHA256SUMS.txt): v2.5.1 app, models and target baseline checksums
-
+- [docs/releases/v2.5.2/baseline.json](docs/releases/v2.5.2/baseline.json): v2.5.2 target build fingerprint
+- [docs/releases/v2.5.2/SHA256SUMS.txt](docs/releases/v2.5.2/SHA256SUMS.txt): v2.5.2 app, models and target baseline checksums
+- [docs/releases/v2.5.1/baseline.json](docs/releases/v2.5.1/baseline.json): v2.5.1 build fingerprint
+- [docs/releases/v2.5.1/SHA256SUMS.txt](docs/releases/v2.5.1/SHA256SUMS.txt): v2.5.1 checksums
 - [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json): file hashes and build fingerprint for generating future patches
 - [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt): checksums for the app, models and baseline
 
@@ -344,6 +356,19 @@ ComiTrans
 ```
 
 ## Changelog
+
+### v2.5.2 (2026-11-17)
+
+- Rolling cross-page translation context with atomic `.cache/translation-context.json` persistence and a "Keep context cache" toggle locking per-page resume.
+- Fork-Join pipeline after OCR running sequential API translation in parallel with dedicated-thread background repair (`repair_comic_page`), reconciling empty translations at join; redesigned translation page workflow visualizer with in-flight page badges, context/resume counters, and per-page matrix strip.
+- Editor upgrades: manual bubble frames, canvas/strip eyedropper & custom RGB/Hex fills, 9-slot favorite fonts (`1–9` shortcuts), persisted text colors, stretch (`10–400%`), rotation (`±180°`), manual outline stroke (`0–30 px`), vertical white-text black-outline preset, page-list cleanup controls, `1 / N` block counter, and single-page scroll isolation.
+- Deferred model warmup until after first paint and fixed fractional-edge coverage during PDF export.
+- [v2.5.2 release notes](docs/RELEASE-v2.5.2.md) · [Full changelog](CHANGELOG.md).
+
+### v2.5.1 (2026-11-10)
+
+- Night ink dark theme, direct canvas bubble hit-testing & selection, resizable right inspector splitter, `F2` full-screen editor, zoom HUD & `Z` zoom tool, Advanced settings tab, one-click retouch, and undoable white/black selection fills.
+- CUDA toggle with detector tradeoff hint and CharSpot Small default Japanese OCR (models unchanged for v2.5.2). [v2.5.1 notes](docs/RELEASE-v2.5.1.md).
 
 ### v2.5.0 (2026-11-02)
 

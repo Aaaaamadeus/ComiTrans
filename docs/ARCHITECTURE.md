@@ -14,7 +14,7 @@ PNG 为 3600 × 3220 像素。SVG 保留文字、方框和连线，可继续编�
 | --- | --- | --- |
 | 桌面入口 | 创建 QApplication、初始化主题与语言、显示主窗口 | `run.py`、`comic_translate_desktop/main.py` |
 | 工作台与精修界面 | 文件导入、批次操作、页图浏览、逐块改字、背景修补和导出 | `comic_translate_desktop/ui/main_window.py`、`ui/editor_page.py`、`ui/preview.py`、`ui/strip_preview.py` |
-| 后台调度 | 启动预热、有上限的页面流水线、前处理/API 与修补重叠、进度与取消 | `comic_translate_desktop/worker.py`、`comic_translate_core/page_prefetch.py` |
+| 后台调度 | 延迟后台预热、有上限的页面流水线、前处理/API 与修补重叠、进度与取消 | `comic_translate_desktop/worker.py`、`comic_translate_core/page_prefetch.py` |
 | 推理调度 | CUDA 运行库初始化、实际设备提示、公平排队与取消；CPU 推理可独立运行 | `comic_translate_core/onnx_session.py`、`inference_control.py` |
 | 精修后台作业 | 后台索引、页面解码、旧布局迁移、有限载入队列和保存快照 | `comic_translate_desktop/editor_jobs.py` |
 | 精修局部合成 | 原像素区域复合、文字图层、水印与原图还原；界面只更新受影响区域 | `comic_translate_core/page_compositor.py` |

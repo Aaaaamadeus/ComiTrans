@@ -211,7 +211,10 @@ def _write_pdf(paths, sizes, output_path, temporary_path, progress_callback, can
             image = reader.read()
             if image.isNull():
                 raise PdfProcessingError(f"无法读取译图: {image_path.name}")
-            target = QRectF(writer.pageLayout().paintRectPixels(writer.resolution()))
+            # QPdfWriter paints in page points. Using the integer pixel paint
+            # rectangle leaves a thin unpainted strip when the physical page
+            # size contains fractional points, which renders as a black gap.
+            target = QRectF(writer.pageLayout().paintRect(QPageLayout.Unit.Point))
             painter.drawImage(target, image)
             if progress_callback:
                 progress_callback(index + 1, len(paths))

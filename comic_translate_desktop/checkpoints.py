@@ -9,6 +9,7 @@ from functools import wraps
 from threading import RLock
 
 from PIL import Image
+from comic_translate_core.translation_context import CONTEXT_VERSION
 
 
 def _digest(value):
@@ -20,6 +21,7 @@ def _identity(source, config):
     with source.open('rb') as stream:
         source_hash = hashlib.file_digest(stream, 'sha256').hexdigest()
     ignored = {'raw', 'api_key', 'max_workers', 'resume_enabled', 'use_gpu',
+               'retain_translation_context',
                'ui_language', 'ui_language_selected', 'issue_url',
                'page_input_dir', 'page_output_dir', 'page_test_output_dir'}
     settings = {key: value for key, value in config.items()
@@ -34,7 +36,7 @@ def _identity(source, config):
                 path = Path(item)
                 stat = path.stat()
                 resources.append((str(path.resolve()), stat.st_size, stat.st_mtime_ns))
-    return _digest([str(source.resolve()), source_hash, settings, resources])
+    return _digest([CONTEXT_VERSION, str(source.resolve()), source_hash, settings, resources])
 
 
 def editable_files_exist(output: Path) -> bool:
@@ -68,7 +70,7 @@ class DocumentCheckpoint:
         self.path = directory / f'{_digest(str(self.output))}.json'
         identity = _identity(source, config)
         self.data = {'version': 1, 'identity': identity, 'completed': [], 'translations': {}}
-        if config.get('resume_enabled', True):
+        if config.get('resume_enabled', True) or config.get('retain_translation_context', False):
             try:
                 old = json.loads(self.path.read_text(encoding='utf-8'))
                 if (isinstance(old, dict) and old.get('version') == 1 and old.get('identity') == identity
@@ -131,4 +133,27 @@ class DocumentCheckpoint:
         from comic_translate_core.translation_format import validate_translations
         validate_translations(texts, len(ocr))
         self.data['translations'][str(number)] = {'ocr': list(ocr), 'texts': list(texts)}
+        self.save()
+
+    @_synchronized
+    def context_entry(self, number):
+        entry = self.data['translations'].get(str(number))
+        if isinstance(entry, dict):
+            ocr = entry.get('ocr')
+            if (isinstance(ocr, list) and all(isinstance(text, str) for text in ocr)
+                    and self.translation(number, ocr) is not None):
+                return list(ocr), list(entry['texts'])
+        return None
+
+    def context_key(self, number):
+        return f"{self.data['identity']}:{number}"
+
+    @_synchronized
+    def context_recorded(self, number, generation):
+        entry = self.data['translations'].get(str(number))
+        return isinstance(entry, dict) and entry.get('context_generation') == generation
+
+    @_synchronized
+    def mark_context_recorded(self, number, generation):
+        self.data['translations'][str(number)]['context_generation'] = generation
         self.save()

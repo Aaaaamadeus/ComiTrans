@@ -16,7 +16,8 @@ from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import QApplication, QMessageBox
 from comic_translate_desktop.ui.log_panel import LogPanel
-from comic_translate_desktop.ui.step_panel import StepPanel, DONE, RUNNING, PENDING, SKIPPED, FAILED, CANCELLED
+from comic_translate_desktop.ui.step_panel import StepPanel, DONE, RUNNING, PENDING, SKIPPED, FAILED, CANCELLED, READY
+from comic_translate_desktop.ui.theme import apply_theme
 from comic_translate_desktop.ui.editor_page import EditorPage
 from comic_translate_desktop.ui.main_window import MainWindow
 from comic_translate_desktop.worker import BatchWorker, QtTextStream, _DocumentJob, _PageJob
@@ -199,7 +200,7 @@ class DesktopUiTests(unittest.TestCase):
 
     def test_node_track_advances_only_after_completion_and_keeps_skipped_nodes(self):
         panel = StepPanel()
-        panel.resize(700, 76)
+        panel.resize(760, 112)
         panel.show()
         self.addCleanup(destroy_widget, panel)
 
@@ -210,26 +211,148 @@ class DesktopUiTests(unittest.TestCase):
         self.assertEqual(panel.progress_fraction, 0)
         event('detect', 'done')
         self.assertEqual(panel.progress_fraction, 2 / 7)
-        self.app.processEvents()
-        # This point lies on the connector, away from the circles and labels.
-        before = panel.grab().toImage().pixelColor(275, 12).lightness()
         event('ocr', 'done')
-        self.app.processEvents()
-        after = panel.grab().toImage().pixelColor(275, 12).lightness()
-        self.assertGreater(before, 150)
-        self.assertLess(after, 40)
-        event('translate', 'running')
         self.assertEqual(panel.progress_fraction, 3 / 7)
-        event('translate', 'skipped')
+        self.app.processEvents()
+        # Both fork nodes are rendered on parallel rows in the same column.
+        tr_rect = panel._node_rects['translate']
+        in_rect = panel._node_rects['inpaint']
+        self.assertLess(tr_rect.bottom(), in_rect.top())
+        self.assertAlmostEqual(tr_rect.left(), in_rect.left(), delta=1.0)
+        before_tr = panel.grab().toImage().pixelColor(int(tr_rect.center().x()), int(tr_rect.top() + 2)).lightness()
+        event('translate', 'running')
+        event('inpaint', 'running')
+        self.assertEqual(panel.progress_fraction, 3 / 7)
+        self.app.processEvents()
+        active_tr = panel.grab().toImage().pixelColor(int(tr_rect.center().x()), int(tr_rect.top() + 2)).lightness()
+        active_in = panel.grab().toImage().pixelColor(int(in_rect.center().x()), int(in_rect.top() + 2)).lightness()
+        self.assertGreater(before_tr, 200)
+        self.assertLess(active_tr, 50)
+        self.assertLess(active_in, 50)
+        # Parallel inpaint completing before translate cannot advance past join.
+        event('inpaint', 'done')
+        event('typeset', 'done')
         self.assertEqual(panel.progress_fraction, 4 / 7)
-        for stage in ('inpaint', 'typeset', 'save'):
-            event(stage, 'done')
+        event('translate', 'skipped')
+        self.assertEqual(panel.progress_fraction, 6 / 7)
+        event('save', 'done')
         self.assertEqual(panel.progress_fraction, 1)
         event('inpaint', 'running')
         event('translate', 'done')
         self.assertEqual(panel.progress_fraction, 1)
         self.assertEqual(panel._states['translate'], SKIPPED)
         self.assertEqual(panel._states['inpaint'], DONE)
+
+    def test_workflow_visualizer_tracks_parallel_lanes_repair_ready_resumed_and_dark_theme(self):
+        panel = StepPanel()
+        panel.resize(960, 112)
+        panel.show()
+        self.addCleanup(destroy_widget, panel)
+        self.addCleanup(lambda: apply_theme(self.app, 'light'))
+
+        panel.consume_workflow_event({
+            'type': 'plan',
+            'max_workers': 4,
+            'retain_context': True,
+            'context_entries': 2,
+            'pages': [
+                {'page_id': '1:1', 'page_label': 'book.pdf 第 1/4 页', 'resumed': True},
+                {'page_id': '1:2', 'page_label': 'book.pdf 第 2/4 页', 'resumed': False},
+                {'page_id': '1:3', 'page_label': 'book.pdf 第 3/4 页', 'resumed': False},
+                {'page_id': '1:4', 'page_label': 'book.pdf 第 4/4 页', 'resumed': False},
+            ],
+        })
+        self.assertEqual(panel._resumed_count(), 1)
+        # Page 2 enters fork, repair finishes first -> READY at join while translate still runs.
+        for stage, state in (('start', 'running'), ('detect', 'done'), ('ocr', 'done'),
+                             ('translate', 'running'), ('inpaint', 'running')):
+            panel.consume_event(dict(page_id='1:2', page_label='book.pdf 第 2/4 页',
+                                     stage=stage, state=state, message=stage))
+        panel.consume_workflow_event({'type': 'repair_ready', 'page_id': '1:2', 'page_label': 'book.pdf 第 2/4 页'})
+        # Page 3 simultaneously enters detection on the preparation lane.
+        panel.consume_event(dict(page_id='1:3', page_label='book.pdf 第 3/4 页',
+                                 stage='start', state='running', message='start'))
+        panel.consume_event(dict(page_id='1:3', page_label='book.pdf 第 3/4 页',
+                                 stage='detect', state='running', message='detect'))
+        views = panel._compute_stage_views()
+        self.assertEqual(views['detect'].state, RUNNING)
+        self.assertEqual(views['detect'].badge, 'P3')
+        self.assertEqual(views['ocr'].state, DONE)
+        self.assertEqual(views['translate'].state, RUNNING)
+        self.assertEqual(views['translate'].badge, 'P2')
+        self.assertEqual(views['inpaint'].state, READY)
+        self.assertEqual(views['inpaint'].badge, 'P2')
+        self.assertEqual(views['typeset'].state, PENDING)
+
+        # Page 2 finishes translation, joins branches, and updates context count.
+        panel.consume_event(dict(page_id='1:2', page_label='book.pdf 第 2/4 页',
+                                 stage='translate', state='done', message='翻译完成'))
+        panel.consume_workflow_event({'type': 'context', 'page_id': '1:2', 'context_entries': 3})
+        panel.consume_workflow_event({'type': 'join', 'page_id': '1:2', 'page_label': 'book.pdf 第 2/4 页'})
+        views = panel._compute_stage_views()
+        self.assertEqual(views['typeset'].state, RUNNING)
+        self.assertEqual(views['typeset'].badge, 'P2')
+        self.assertEqual(panel._context_entries, 3)
+
+        # Failed stage keeps sibling ready/done state intact when mark_failed() is also called.
+        panel.consume_event(dict(page_id='1:3', page_label='book.pdf 第 3/4 页',
+                                 stage='inpaint', state='running', message='repair'))
+        panel.consume_workflow_event({'type': 'repair_ready', 'page_id': '1:3', 'page_label': 'book.pdf 第 3/4 页'})
+        panel.consume_event(dict(page_id='1:3', page_label='book.pdf 第 3/4 页',
+                                 stage='translate', state='failed', message='402'))
+        panel.mark_failed()
+        views = panel._compute_stage_views()
+        self.assertEqual(views['translate'].state, FAILED)
+        self.assertEqual(views['inpaint'].state, READY)
+
+        # PDF publishing stage and dark theme rendering check.
+        panel.consume_workflow_event({'type': 'publish', 'document_name': 'book.pdf', 'state': 'running'})
+        self.assertEqual(panel._compute_stage_views()['save'].badge, 'PDF')
+        apply_theme(self.app, 'dark')
+        self.app.processEvents()
+        dark_img = panel.grab().toImage()
+        self.assertLess(dark_img.pixelColor(20, 10).lightness(), 40)
+        panel.set_compact(True)
+        self.assertEqual(panel.height(), 66)
+        self.app.processEvents()
+
+        # Queued fallback tiles reflect terminal phase when no explicit plan arrived.
+        fallback_panel = StepPanel()
+        fallback_panel.set_queued_files(2, ['a.png', 'b.png'])
+        self.assertEqual(fallback_panel._classify_page_tile('q:1', 0, False)[0], 'queued')
+        fallback_panel.mark_done()
+        self.assertEqual(fallback_panel._classify_page_tile('q:1', 0, False)[0], 'done')
+        destroy_widget(fallback_panel)
+
+    def test_worker_emits_workflow_plan_repair_ready_join_and_context_events(self):
+        from tests.test_resume_translation import RecordingPipeline
+
+        sources = []
+        for idx in range(2):
+            path = self.root / f'p{idx}.png'
+            Image.new('RGB', (48, 64), 'white').save(path)
+            sources.append(path)
+
+        class ForkPipeline(RecordingPipeline):
+            def repair_comic_page(self, prepared):
+                return {'repaired': True}
+
+            def finish_comic_page(self, output_path, prepared, translations):
+                prepared.pop('repaired', None)
+                super().finish_comic_page(output_path, prepared, translations)
+
+        worker = BatchWorker(sources, self.root / 'output', {'max_workers': 2}, pipeline=ForkPipeline())
+        events = []
+        worker.workflow_event.connect(events.append, Qt.DirectConnection)
+        worker.run()
+        types = [event['type'] for event in events]
+        self.assertIn('plan', types)
+        self.assertIn('repair_ready', types)
+        self.assertIn('join', types)
+        self.assertIn('context', types)
+        plan = next(event for event in events if event['type'] == 'plan')
+        self.assertEqual(len(plan['pages']), 2)
+        self.assertEqual(plan['max_workers'], 2)
 
     def test_node_track_stops_at_failure_and_does_not_combine_parallel_pages(self):
         panel = StepPanel()
@@ -290,6 +413,20 @@ class DesktopUiTests(unittest.TestCase):
             self.assertIn('未保存', page._save_status.text())
             self.assertTrue(window._settings_btn.isChecked())
             self.assertFalse(window._nav_auto.isChecked())
+
+    def test_startup_keeps_model_loading_out_of_window_creation(self):
+        from comic_translate_desktop import config
+        with patch.object(config, 'CONFIG_PATH', self.root / 'defaults.yaml'), \
+             patch.object(config, 'PROJECT_ROOT', self.root), \
+             patch.object(MainWindow, '_start_warmup') as warmup:
+            window = MainWindow()
+            self.addCleanup(destroy_widget, window)
+            self.assertFalse(window._warmup_timer.isActive())
+            window.show()
+            self.app.processEvents()
+            self.assertTrue(window._warmup_timer.isActive())
+        warmup.assert_not_called()
+        self.assertIsNone(window.warmup_worker)
 
     def test_compact_settings_and_diagnosis_keep_primary_actions_visible(self):
         from comic_translate_desktop import config

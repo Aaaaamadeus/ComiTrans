@@ -100,6 +100,19 @@ class PdfTranslationTests(unittest.TestCase):
             # zlib stops at the end of this stream, ignoring subsequent PDF objects.
             self.assertEqual(zlib.decompress(pdf[embedded.end():]), page.tobytes())
 
+    def test_fractional_page_size_paints_every_edge_without_black_gaps(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            expected = (238, 221, 204)
+            source = root / "fractional.png"
+            Image.new("RGB", (439, 634), expected).save(source)
+            output = build_pdf_from_images(
+                [source], [(439.2, 634.32)], root / "fractional.pdf")
+            pages = render_pdf_pages(output, root / "rendered", dpi=200)
+            with Image.open(pages[0].image_path) as rendered:
+                image = rendered.convert("RGB")
+                self.assertEqual(set(image.getdata()), {expected})
+
     def test_round_trip_preserves_page_count_sizes_and_preview(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)

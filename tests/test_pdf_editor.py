@@ -330,6 +330,27 @@ class PdfEditorTests(unittest.TestCase):
         self.wait_export(editor)
         self.assertTrue((self.root / 'independent.pdf').exists())
 
+    def test_page_actions_remove_selected_and_clear_without_deleting_files(self):
+        editor = self.editor()
+        project = load_pdf_project(self.pdf)
+        first, second = project.images
+        self.assertEqual(editor.page_list.count(), 2)
+        editor.page_list.item(0).setSelected(True)
+        editor._remove_pages_btn.click()
+        for _ in range(300):
+            if not editor._page_jobs.busy:
+                break
+            QTest.qWait(10)
+        self.assertEqual(editor.page_list.count(), 1)
+        self.assertEqual(editor.output_path, second)
+        self.assertTrue(first.is_file())
+        self.assertTrue(second.is_file())
+        editor._clear_pages_btn.click()
+        self.assertEqual(editor.page_list.count(), 0)
+        self.assertIsNone(editor.output_path)
+        self.assertTrue(first.is_file())
+        self.assertTrue(second.is_file())
+
     def test_plain_images_can_export_without_editing_metadata(self):
         editor = EditorPage()
         self.addCleanup(self.close_editor, editor)

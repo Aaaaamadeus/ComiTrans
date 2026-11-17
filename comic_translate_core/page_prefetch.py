@@ -1,4 +1,4 @@
-"""Bounded, ordered page preparation with independent translation requests."""
+"""Bounded page preparation with configurable, ordered translation execution."""
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 from threading import BoundedSemaphore, Event, Thread
@@ -11,13 +11,16 @@ class PagePrefetch:
     starts as soon as a page is prepared. Consumers finish pages in input order.
     Releasing an item admits the next page, without a batch-wide barrier.
     """
-    def __init__(self, pages, prepare, translate, *, capacity, cancelled, close_preparation):
+    def __init__(self, pages, prepare, translate, *, capacity, cancelled, close_preparation,
+                 translation_workers=None, repair=None):
         self.pages = pages
         self.prepare = prepare
         self.translate = translate
+        self.repair = repair
         self.cancelled = cancelled
         self.close_preparation = close_preparation
         self.capacity = max(1, capacity)
+        self.translation_workers = max(1, translation_workers or self.capacity)
         self._slots = BoundedSemaphore(self.capacity)
         self._queue = Queue()
         self._closing = Event()
@@ -27,7 +30,9 @@ class PagePrefetch:
         return self._closing.is_set() or self.cancelled()
 
     def __enter__(self):
-        self._pool = ThreadPoolExecutor(max_workers=self.capacity, thread_name_prefix='page-api')
+        self._pool = ThreadPoolExecutor(max_workers=self.translation_workers, thread_name_prefix='page-api')
+        self._repair_pool = (ThreadPoolExecutor(max_workers=1, thread_name_prefix='page-repair')
+                             if self.repair is not None else None)
         self._producer = Thread(target=self._produce, name='page-prepare')
         self._iterator = self._consume()
         self._producer.start()
@@ -53,6 +58,8 @@ class PagePrefetch:
                         prepared = None
                         self._slots.release()
                         break
+                    if self._repair_pool is not None and not prepared.get('context_replay'):
+                        prepared['repair_future'] = self._repair_pool.submit(self.repair, page, prepared)
                     future = self._pool.submit(self.translate, page, prepared)
                     self._queue.put((page, prepared, future))
                     # Neither producer locals nor completed Future objects may
@@ -90,5 +97,7 @@ class PagePrefetch:
         # Responses already in flight are validated/cached by the callback,
         # including when the user cancels while an HTTP request is running.
         self._pool.shutdown(wait=True, cancel_futures=True)
+        if self._repair_pool is not None:
+            self._repair_pool.shutdown(wait=True, cancel_futures=True)
         while not self._queue.empty():
             self._queue.get_nowait()

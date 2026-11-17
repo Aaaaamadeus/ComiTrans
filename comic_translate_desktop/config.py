@@ -184,6 +184,7 @@ def load_ai_config() -> dict[str, Any]:
         "max_workers": _clamped_int(raw.get("max_workers"), "max_workers"),
         "pdf_dpi": _clamped_int(raw.get("pdf_dpi"), "pdf_dpi"),
         "resume_enabled": bool(raw.get("resume_enabled", True)),
+        "retain_translation_context": bool(raw.get("retain_translation_context", False)),
         "issue_url": str(raw.get("issue_url") or ""),
         "use_gpu": use_gpu,
         "font_map": font_map,
