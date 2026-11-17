@@ -35,6 +35,52 @@ class BubbleRestoreTests(unittest.TestCase):
         save_original(output, original)
         return output, layout, original
 
+    def test_toolbar_undo_restores_automatic_bubble_then_survives_save_reload(self):
+        output, layout, original = self.page_with_original()
+        editor = self.editor(output)
+        self.assertTrue(editor.apply_changes())
+        processed = editor._rendered.copy()
+        self.assertFalse(editor._repair_history)
+        self.assertTrue(editor._repair_undo.isEnabled())
+        editor._repair_undo.click()
+        self.assertTrue(editor.items[0]['restore_original'])
+        self.assertFalse(editor.items[1].get('restore_original'))
+        region = (100, 90, 290, 340)
+        self.assertEqual(editor._rendered.crop(region).tobytes(), original.crop(region).tobytes())
+        neighbour = (330, 390, 560, 620)
+        self.assertEqual(editor._rendered.crop(neighbour).tobytes(), processed.crop(neighbour).tobytes())
+        self.assertFalse(editor._repair_undo.isEnabled())
+        self.assertTrue(editor.save_image())
+        self.assertTrue(json.loads(layout.read_text(encoding='utf-8'))[0]['restore_original'])
+        reopened = self.editor(output)
+        self.assertTrue(reopened.apply_changes())
+        self.assertEqual(reopened._rendered.tobytes(), editor._rendered.tobytes())
+        reopened.block_list.setCurrentRow(1)
+        self.assertTrue(reopened._repair_undo.isEnabled())
+        self.assertTrue(reopened.undo_background_repair())
+        self.assertTrue(all(item['restore_original'] for item in reopened.items))
+
+    def test_toolbar_undo_prioritizes_manual_repair_then_automatic_bubble(self):
+        output, _, _ = self.page_with_original()
+        editor = self.editor(output)
+        before = editor._cleaned_image.copy()
+        editor._accept_background_repair((5, 5, 50, 50), Image.new('RGB', (45, 45), '#778899'))
+        self.assertTrue(editor.undo_background_repair())
+        self.assertEqual(editor._cleaned_image.tobytes(), before.tobytes())
+        self.assertFalse(editor.items[0].get('restore_original'))
+        self.assertTrue(editor.undo_background_repair())
+        self.assertTrue(editor.items[0]['restore_original'])
+
+    def test_toolbar_undo_without_original_keeps_pixels_and_explains_link_action(self):
+        output, _ = self.page()
+        editor = self.editor(output)
+        self.assertTrue(editor.apply_changes())
+        before = editor._rendered.tobytes()
+        self.assertFalse(editor.undo_background_repair())
+        self.assertEqual(editor._rendered.tobytes(), before)
+        self.assertFalse(editor._dirty)
+        self.assertIn('关联原图', editor._status.text())
+
     def test_restore_one_bubble_preserves_neighbour_and_original_text_settings(self):
         output, _, original = self.page_with_original()
         editor = self.editor(output)

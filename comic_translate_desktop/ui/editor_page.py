@@ -5,9 +5,9 @@ import sys
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
-from PySide6.QtCore import Qt, QSize, QSettings, QTimer, QEvent, QPoint
-from PySide6.QtGui import QPixmap, QIcon, QImageReader, QShortcut, QKeySequence
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QGroupBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView)
+from PySide6.QtCore import Qt, QRect, QSize, QSettings, QTimer, QEvent, QPoint
+from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QIcon, QImageReader, QShortcut, QKeySequence
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView, QStyledItemDelegate, QStyle)
 from ..config import load_ai_config, MAIN_DIR
 from ..font_library import available_fonts, font_description, font_display_name, font_reference, inspect_font, resolve_font_reference
 from comic_translate_core.page_compositor import compose_page, layer_bounds
@@ -24,9 +24,12 @@ from ..lettering_transform import text_transform, transform_layer, outline_width
 from .color_picker import TextColorPicker
 from .strip_preview import StripPreview
 from .thumbnail_loader import ThumbnailLoader
-from .theme import set_themed_icon, ui_font
+from .theme import color, set_themed_icon, ui_font
 from .manga_components import PanelHeading
 from .searchable_combo import SearchableFontCombo
+from .favorite_fonts import FavoriteFontBar
+from .tool_flow import ToolFlowLayout
+from PySide6.QtWidgets import QColorDialog
 
 STYLE_LABELS = {
     "dialogue": "普通对话",
@@ -45,6 +48,64 @@ STYLE_LABELS = {
     "next_preview": "下回预告",
     "title": "标题",
 }
+
+
+class _BlockItemDelegate(QStyledItemDelegate):
+    """Crisp single-row block item with tabular index, elided summary, and right badge."""
+
+    def sizeHint(self, option, index):
+        return QSize(max(120, option.rect.width()), 34)
+
+    def paint(self, painter, option, index):
+        payload = index.data(Qt.UserRole + 2)
+        if not payload:
+            super().paint(painter, option, index)
+            return
+        number, summary, badge, restored = payload
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing)
+        rect = option.rect.adjusted(2, 1, -2, -1)
+        selected = bool(option.state & QStyle.State_Selected)
+        hovered = bool(option.state & QStyle.State_MouseOver)
+        if selected:
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(color('muted')))
+            painter.drawRoundedRect(rect, 6, 6)
+            painter.setBrush(QColor(color('ink')))
+            painter.drawRoundedRect(QRect(rect.left(), rect.top() + 5, 3, rect.height() - 10), 1, 1)
+        elif hovered:
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(color('workspace')))
+            painter.drawRoundedRect(rect, 6, 6)
+
+        num_font = ui_font(12, QFont.Bold if selected else QFont.Normal, mono=True)
+        painter.setFont(num_font)
+        painter.setPen(QColor(color('ink' if selected else 'secondary')))
+        num_rect = QRect(rect.left() + 10, rect.top(), 24, rect.height())
+        painter.drawText(num_rect, Qt.AlignVCenter | Qt.AlignLeft, number)
+
+        right_edge = rect.right() - 8
+        if badge:
+            badge_font = ui_font(11)
+            painter.setFont(badge_font)
+            fm = painter.fontMetrics()
+            badge_w = fm.horizontalAdvance(badge) + (12 if restored else 4)
+            badge_rect = QRect(right_edge - badge_w, rect.top() + (rect.height() - 20) // 2, badge_w, 20)
+            if restored:
+                painter.setPen(QColor(color('rule')))
+                painter.setBrush(QColor(color('workspace')))
+                painter.drawRoundedRect(badge_rect, 4, 4)
+            painter.setPen(QColor(color('secondary')))
+            painter.drawText(badge_rect, Qt.AlignCenter, badge)
+            right_edge = badge_rect.left() - 6
+
+        text_rect = QRect(num_rect.right() + 6, rect.top(), max(20, right_edge - (num_rect.right() + 6)), rect.height())
+        body_font = ui_font(13, QFont.Medium if selected else QFont.Normal)
+        painter.setFont(body_font)
+        painter.setPen(QColor(color('ink' if not restored or selected else 'secondary')))
+        elided = painter.fontMetrics().elidedText(summary, Qt.ElideRight, text_rect.width())
+        painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignLeft, elided)
+        painter.restore()
 
 
 class EditorPage(QWidget):
@@ -87,6 +148,7 @@ class EditorPage(QWidget):
         self._original_image = None
         self._repair_history = []
         self._repair_box = None
+        self._fill_color = QColor('#ffffff')
         self._repair_worker = None
         self._repair_engine = BackgroundRepair(
             self.config['lama_model'], device='cuda' if self.config.get('use_gpu') else 'cpu')
@@ -206,6 +268,18 @@ class EditorPage(QWidget):
         self._style_combo.setToolTip(tr('仅修改当前文本块；手动选择优先于翻译默认字体，缺字自动回退。'))
         self._schedule_preview()
 
+    @staticmethod
+    def _field_cell(caption, widget):
+        cell = QWidget()
+        layout = QVBoxLayout(cell)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+        label = QLabel(tr(caption))
+        label.setProperty('muted', True)
+        layout.addWidget(label)
+        layout.addWidget(widget)
+        return cell
+
     def _build_ui(self):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -213,14 +287,17 @@ class EditorPage(QWidget):
         body = QFrame()
         body.setObjectName('pageBody')
         root = QVBoxLayout(body)
-        root.setContentsMargins(16, 12, 16, 12)
-        root.setSpacing(10)
+        root.setContentsMargins(14, 10, 14, 8)
+        root.setSpacing(8)
+        self._root_layout = root
         outer.addWidget(body, 1)
+
         toolbar_frame = QFrame()
         toolbar_frame.setObjectName('editorToolbar')
         toolbar = QHBoxLayout(toolbar_frame)
-        toolbar.setContentsMargins(0, 0, 0, 10)
-        toolbar.setSpacing(8)
+        toolbar.setContentsMargins(0, 0, 0, 8)
+        toolbar.setSpacing(6)
+        self._toolbar_layout = toolbar
         self._pages_toggle = QPushButton(tr('页面'))
         self._properties_toggle = QPushButton(tr('编辑面板'))
         for button in (self._pages_toggle, self._properties_toggle):
@@ -235,12 +312,21 @@ class EditorPage(QWidget):
         self._focus_btn.setProperty('compact', True)
         self._focus_btn.setToolTip(tr('收起侧栏与辅助信息，专注查看作品 · Ctrl+Shift+F'))
         toolbar.addWidget(self._focus_btn)
-        self._zoom_tool_btn = QPushButton(tr('缩放工具'))
-        self._zoom_tool_btn.setCheckable(True)
-        self._zoom_tool_btn.setProperty('role', 'utility')
-        self._zoom_tool_btn.setProperty('compact', True)
-        self._zoom_tool_btn.setToolTip(tr('点击放大，Alt+点击缩小 · Z'))
-        toolbar.addWidget(self._zoom_tool_btn)
+        toolbar_div = QFrame()
+        toolbar_div.setObjectName('toolbarDivider')
+        toolbar_div.setFrameShape(QFrame.VLine)
+        toolbar_div.setFixedSize(1, 18)
+        toolbar.addWidget(toolbar_div)
+        self._zoom_out_btn = QPushButton()
+        self._zoom_out_btn.setObjectName('zoomStepBtn')
+        set_themed_icon(self._zoom_out_btn, 'minus', size=13)
+        self._zoom_out_btn.setProperty('compact', True)
+        self._zoom_out_btn.setProperty('role', 'chip')
+        self._zoom_out_btn.setFixedWidth(26)
+        self._zoom_out_btn.setAccessibleName(tr('缩小'))
+        self._zoom_out_btn.setToolTip(tr('缩小 · Ctrl+-'))
+        self._zoom_out_btn.clicked.connect(lambda: self.preview.zoom_by(1 / 1.25))
+        toolbar.addWidget(self._zoom_out_btn)
         self._zoom = QComboBox()
         for name, value in [(tr('适应页面'), None), ('50%', .5), ('100%', 1.), ('150%', 1.5),
                             ('200%', 2.), (tr('适应宽度'), 'width')]:
@@ -249,16 +335,35 @@ class EditorPage(QWidget):
         self._zoom.setInsertPolicy(QComboBox.NoInsert)
         self._zoom.lineEdit().setReadOnly(True)
         self._zoom.lineEdit().setAlignment(Qt.AlignCenter)
-        self._zoom.setMinimumWidth(92)
+        self._zoom.setMinimumWidth(88)
         self._zoom.setToolTip(tr('缩放：Alt+滚轮以光标为中心，空格+拖动平移；Ctrl+0/1/2 适应页面/100%/适应宽度'))
         toolbar.addWidget(self._zoom)
+        self._zoom_in_btn = QPushButton()
+        self._zoom_in_btn.setObjectName('zoomStepBtn')
+        set_themed_icon(self._zoom_in_btn, 'plus', size=13)
+        self._zoom_in_btn.setProperty('compact', True)
+        self._zoom_in_btn.setProperty('role', 'chip')
+        self._zoom_in_btn.setFixedWidth(26)
+        self._zoom_in_btn.setAccessibleName(tr('放大'))
+        self._zoom_in_btn.setToolTip(tr('放大 · Ctrl+='))
+        self._zoom_in_btn.clicked.connect(lambda: self.preview.zoom_by(1.25))
+        toolbar.addWidget(self._zoom_in_btn)
+        self._zoom_tool_btn = QPushButton(tr('缩放工具'))
+        self._zoom_tool_btn.setCheckable(True)
+        self._zoom_tool_btn.setProperty('role', 'utility')
+        self._zoom_tool_btn.setProperty('compact', True)
+        self._zoom_tool_btn.setToolTip(tr('点击放大，Alt+点击缩小 · Z'))
+        toolbar.addWidget(self._zoom_tool_btn)
         self._strip_toggle = QPushButton(tr('连续长条'))
         self._strip_toggle.setCheckable(True)
+        self._strip_toggle.setProperty('role', 'utility')
         self._strip_toggle.setProperty('compact', True)
         self._strip_toggle.setToolTip(tr('纵向滚动浏览所有页面，点击页面后原位精修。'))
         toolbar.addWidget(self._strip_toggle)
         toolbar.addStretch()
         self._export_pdf_btn = QPushButton(tr('导出 PDF'))
+        self._export_pdf_btn.setProperty('role', 'chip')
+        self._export_pdf_btn.setProperty('compact', True)
         self._export_pdf_btn.setToolTip(tr('将已保存的图片按页面顺序导出为 PDF；编辑时不会合成 PDF。'))
         self._export_pdf_btn.setEnabled(False)
         self._export_pdf_btn.clicked.connect(self._export_action)
@@ -267,28 +372,46 @@ class EditorPage(QWidget):
         self._save_btn.setProperty('role', 'primary')
         toolbar.addWidget(self._save_btn)
         root.addWidget(toolbar_frame)
+
+        self._favorite_fonts = FavoriteFontBar(self.config)
+        self._favorite_fonts.font_selected.connect(self._apply_favorite_font)
+        self._favorite_fonts.add_current_requested.connect(self._add_favorite_font)
+        root.addWidget(self._favorite_fonts)
+
         self._status = QLabel(tr('导入带布局数据的已翻译图片或 PDF，或从自动处理结果进入精修。'))
         self._status.setWordWrap(True)
         self._status.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._status.setObjectName('editorStatus')
-        self._status.setMaximumHeight(56)
+        self._status.setMaximumHeight(44)
+
         self.splitter = QSplitter(Qt.Horizontal)
         self.splitter.setHandleWidth(8)
         self.splitter.setChildrenCollapsible(False)
+
         self._pages_panel = QFrame()
-        self._pages_panel.setObjectName('editorPanel')
-        self._pages_panel.setMinimumWidth(180)
-        self._pages_panel.setMaximumWidth(320)
+        self._pages_panel.setObjectName('editorSidebar')
+        self._pages_panel.setMinimumWidth(196)
+        self._pages_panel.setMaximumWidth(300)
         left = QVBoxLayout(self._pages_panel)
-        left.setContentsMargins(8, 0, 12, 0)
-        left.setSpacing(12)
+        left.setContentsMargins(10, 8, 10, 8)
+        left.setSpacing(8)
+        page_head = QHBoxLayout()
+        page_head.setContentsMargins(0, 0, 0, 0)
+        page_head.setSpacing(6)
         heading = PanelHeading('01', tr('页面'), sidebar=True)
-        left.addWidget(heading)
+        page_head.addWidget(heading, 1)
+        self._page_count_label = QLabel(tr('{_0} 页', _0=0))
+        self._page_count_label.setProperty('muted', True)
+        self._page_count_label.setFont(ui_font(12, mono=True))
+        page_head.addWidget(self._page_count_label)
+        left.addLayout(page_head)
         add = QPushButton(tr('导入译图 / PDF'))
         set_themed_icon(add, 'plus')
+        add.setProperty('role', 'chip')
         add.clicked.connect(self._import_pages)
         left.addWidget(add)
         self.page_list = QListWidget()
+        self.page_list.setObjectName('pageList')
         self.page_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.page_list.viewport().installEventFilter(self)
         self.page_list.verticalScrollBar().valueChanged.connect(lambda: self._thumbnail_timer.start(25))
@@ -299,28 +422,34 @@ class EditorPage(QWidget):
         self.page_list.currentItemChanged.connect(self._select_page)
         self.page_list.itemSelectionChanged.connect(self._update_repair_controls)
         left.addWidget(self.page_list, 1)
-        page_actions = QHBoxLayout()
+        sidebar_footer = QFrame()
+        sidebar_footer.setObjectName('sidebarFooter')
+        page_actions = QHBoxLayout(sidebar_footer)
+        page_actions.setContentsMargins(0, 8, 0, 0)
+        page_actions.setSpacing(6)
         self._remove_pages_btn = QPushButton(tr('移除选中'))
         self._clear_pages_btn = QPushButton(tr('清空'))
         for button in (self._remove_pages_btn, self._clear_pages_btn):
             button.setProperty('compact', True)
-            page_actions.addWidget(button)
+            button.setProperty('role', 'chip')
+            page_actions.addWidget(button, 1)
         self._remove_pages_btn.clicked.connect(self._remove_selected_pages)
         self._clear_pages_btn.clicked.connect(self._clear_pages)
-        left.addLayout(page_actions)
+        left.addWidget(sidebar_footer)
         self.splitter.addWidget(self._pages_panel)
+
         canvas = QFrame()
         canvas.setObjectName('canvasPanel')
         # Let the responsive sidebars collapse before long translated actions widen the window.
         canvas.setMinimumWidth(280)
         canvas_layout = QVBoxLayout(canvas)
-        canvas_layout.setContentsMargins(0, 0, 0, 0)
-        canvas_layout.setSpacing(8)
+        canvas_layout.setContentsMargins(4, 0, 4, 0)
+        canvas_layout.setSpacing(6)
         self._canvas_heading = PanelHeading('02', tr('页面预览'))
         canvas_layout.addWidget(self._canvas_heading)
         self.preview = StripPreview(import_action=True, illustration='studio-editor-v1.png')
         self._strip_toggle.toggled.connect(self.preview.set_continuous)
-        self.preview.page_requested.connect(self.request_page)
+        self.preview.page_requested.connect(self._request_canvas_page)
         self.preview.clear(tr('选择一页，开始精修'))
         self.preview._hint.setText(tr('导入带布局数据的已翻译图片或 PDF，或从自动处理结果进入精修。'))
         self.preview.import_button.setText(tr('导入已翻译图片或 PDF'))
@@ -329,6 +458,8 @@ class EditorPage(QWidget):
         self.preview.region_edit_finished.connect(self.apply_changes)
         self.preview.region_clicked.connect(self._select_block)
         self.preview.bubble_created.connect(self._add_bubble_from_canvas)
+        self.preview.color_picked.connect(self._accept_fill_color)
+        self.preview.color_pick_canceled.connect(lambda: self._pick_fill_btn.setChecked(False))
         self.preview.installEventFilter(self)
         self._zoom_tool_btn.toggled.connect(self.preview.set_zoom_tool)
         self._canvas_frame = canvas
@@ -340,7 +471,12 @@ class EditorPage(QWidget):
         self._zoom_hud_timer.setSingleShot(True)
         self._zoom_hud_timer.setInterval(900)
         self._zoom_hud_timer.timeout.connect(self._zoom_hud.hide)
-        repair_toolbar = QHBoxLayout()
+
+        canvas_tools_frame = QFrame()
+        canvas_tools_frame.setObjectName('canvasToolBar')
+        canvas_tools = ToolFlowLayout(canvas_tools_frame)
+        canvas_tools.setContentsMargins(8, 5, 8, 5)
+        canvas_tools.setSpacing(5)
         self._repair_mode = QPushButton(tr('框选背景'))
         self._repair_mode.setCheckable(True)
         self._repair_mode.setToolTip(tr('拖动框选修补范围，拖动边角调整；Esc 取消本次拖动。'))
@@ -348,62 +484,122 @@ class EditorPage(QWidget):
         self._add_bubble_btn.setCheckable(True)
         self._add_bubble_btn.setToolTip(tr('在画布上拖动一个矩形，添加可自由编辑的文字气泡框。'))
         self._repair_btn = QPushButton(tr('修补选区'))
+        self._repair_undo = QPushButton(tr('撤回修补'))
+        self._repair_undo.setToolTip(tr('优先撤回手动修补；没有手动记录时，还原选中气泡的自动修补与嵌字。旧结果请先关联原图。'))
+        for button in (self._repair_mode, self._add_bubble_btn, self._repair_btn, self._repair_undo):
+            button.setProperty('compact', True)
+            button.setProperty('role', 'chip')
+            canvas_tools.addWidget(button)
+        self._repair_mode.toggled.connect(self._toggle_repair_mode)
+        self._add_bubble_btn.toggled.connect(self._toggle_bubble_creation)
+        self._repair_btn.clicked.connect(self._start_background_repair)
+        self._repair_undo.clicked.connect(self.undo_background_repair)
+
+        tools_div = QFrame()
+        tools_div.setObjectName('toolbarDivider')
+        tools_div.setProperty('toolDivider', True)
+        tools_div.setFrameShape(QFrame.VLine)
+        tools_div.setFixedSize(1, 18)
+        canvas_tools.addWidget(tools_div)
+
         self._fill_white_btn = QPushButton(tr('填白'))
         self._fill_white_btn.setToolTip(tr('把框选区域整块填成白色（可撤回）。'))
         self._fill_black_btn = QPushButton(tr('填黑'))
         self._fill_black_btn.setToolTip(tr('把框选区域整块填成黑色（可撤回）。'))
-        self._repair_undo = QPushButton(tr('撤回修补'))
-        self._repair_undo.setToolTip(tr('优先撤回手动修补；没有手动记录时，还原选中气泡的自动修补与嵌字。旧结果请先关联原图。'))
-        for button in (self._repair_mode, self._add_bubble_btn, self._repair_btn, self._fill_white_btn,
-                       self._fill_black_btn, self._repair_undo):
+        self._fill_color_btn = QPushButton()
+        self._fill_color_btn.setAccessibleName(tr('选择填充颜色'))
+        self._fill_color_btn.setToolTip(tr('点击选择颜色，支持 RGB 与十六进制色值。'))
+        self._fill_color_btn.clicked.connect(self._choose_fill_color)
+        self._pick_fill_btn = QPushButton(tr('图片取色'))
+        self._pick_fill_btn.setCheckable(True)
+        self._pick_fill_btn.setToolTip(tr('点击图片取色；Esc 或右键取消，不会修改图片。'))
+        self._pick_fill_btn.toggled.connect(self._toggle_fill_color_pick)
+        self._fill_custom_btn = QPushButton(tr('填色'))
+        self._fill_white_btn.clicked.connect(lambda: self._fill_repair_region((255, 255, 255)))
+        self._fill_black_btn.clicked.connect(lambda: self._fill_repair_region((0, 0, 0)))
+        self._fill_custom_btn.clicked.connect(lambda: self._fill_repair_region(self._fill_color.getRgb()[:3]))
+        for button in (self._fill_white_btn, self._fill_black_btn, self._fill_color_btn,
+                       self._pick_fill_btn, self._fill_custom_btn):
             button.setProperty('compact', True)
-            button.setProperty('role', 'utility')
-            repair_toolbar.addWidget(button)
-        repair_toolbar.addStretch()
-        self._repair_mode.toggled.connect(self._toggle_repair_mode)
-        self._add_bubble_btn.toggled.connect(self._toggle_bubble_creation)
-        self._repair_btn.clicked.connect(self._start_background_repair)
-        self._fill_white_btn.clicked.connect(
-            lambda: self._fill_repair_region((255, 255, 255)))
-        self._fill_black_btn.clicked.connect(
-            lambda: self._fill_repair_region((0, 0, 0)))
-        self._repair_undo.clicked.connect(self.undo_background_repair)
-        canvas_layout.addLayout(repair_toolbar)
+            button.setProperty('role', 'chip')
+            canvas_tools.addWidget(button)
+        self._refresh_fill_color()
+        canvas_layout.addWidget(canvas_tools_frame)
         canvas_layout.addWidget(self.preview, 1)
         self.splitter.addWidget(canvas)
+
         self._properties_panel = QFrame()
         self._properties_panel.setObjectName('editorInspector')
-        self._properties_panel.setMinimumWidth(300)
+        self._properties_panel.setMinimumWidth(310)
         self._properties_panel.setMaximumWidth(560)
         inspector_layout = QVBoxLayout(self._properties_panel)
         inspector_layout.setContentsMargins(0, 0, 0, 0)
         inspector_layout.setSpacing(0)
-        self._properties_scroll = QScrollArea()
-        self._properties_scroll.setWidgetResizable(True)
-        self._properties_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        content = QFrame()
-        content.setObjectName('editorPanel')
-        self._properties_scroll.setWidget(content)
-        inspector_layout.addWidget(self._properties_scroll, 1)
-        props = QVBoxLayout(content)
-        props.setContentsMargins(12, 12, 12, 12)
-        heading = PanelHeading('03', tr('文本与排版'), sidebar=True)
-        props.addWidget(heading)
-        self.block_list = QListWidget()
-        self.block_list.setMinimumHeight(160)
-        self.block_list.currentRowChanged.connect(self._load_properties)
+
+        inspector_header = QFrame()
+        inspector_header.setObjectName('inspectorHeader')
+        header_layout = QVBoxLayout(inspector_header)
+        header_layout.setContentsMargins(12, 6, 12, 6)
+        header_layout.setSpacing(4)
+        self._header_layout = header_layout
+        self._inspector_heading = PanelHeading('03', tr('文本与排版'), sidebar=True)
+        header_layout.addWidget(self._inspector_heading)
+        bubble_bar = QHBoxLayout()
+        bubble_bar.setContentsMargins(0, 0, 0, 0)
+        bubble_bar.setSpacing(5)
+        self._block_counter = QLabel(tr('0 块'))
+        self._block_counter.setProperty('muted', True)
+        self._block_counter.setFont(ui_font(12, mono=True))
+        bubble_bar.addWidget(self._block_counter)
+        self._prev_block_btn = QToolButton()
+        self._prev_block_btn.setObjectName('blockNavBtn')
+        set_themed_icon(self._prev_block_btn, 'chevron-left', size=14)
+        self._prev_block_btn.setProperty('compact', True)
+        self._prev_block_btn.setProperty('role', 'chip')
+        self._prev_block_btn.setFixedSize(26, 26)
+        self._prev_block_btn.setAccessibleName(tr('上一个文本块 · Alt+↑'))
+        self._prev_block_btn.setToolTip(tr('上一个文本块 · Alt+↑'))
+        self._prev_block_btn.clicked.connect(lambda: self._step_block(-1))
+        bubble_bar.addWidget(self._prev_block_btn)
+        self._next_block_btn = QToolButton()
+        self._next_block_btn.setObjectName('blockNavBtn')
+        set_themed_icon(self._next_block_btn, 'chevron-right', size=14)
+        self._next_block_btn.setProperty('compact', True)
+        self._next_block_btn.setProperty('role', 'chip')
+        self._next_block_btn.setFixedSize(26, 26)
+        self._next_block_btn.setAccessibleName(tr('下一个文本块 · Alt+↓'))
+        self._next_block_btn.setToolTip(tr('下一个文本块 · Alt+↓'))
+        self._next_block_btn.clicked.connect(lambda: self._step_block(1))
+        bubble_bar.addWidget(self._next_block_btn)
+        bubble_bar.addStretch(1)
         self._restore_bubble_btn = QPushButton(tr('还原此气泡'))
+        self._restore_bubble_btn.setProperty('compact', True)
+        self._restore_bubble_btn.setProperty('role', 'chip')
         self._restore_bubble_btn.setToolTip(tr('撤销所选气泡的修补与嵌字，恢复处理前的原始像素；可再次恢复处理结果。'))
         self._restore_bubble_btn.clicked.connect(self.toggle_bubble_original)
-        original_actions = QHBoxLayout()
-        self._restore_bubble_btn.setProperty('compact', True)
-        original_actions.addWidget(self._restore_bubble_btn)
+        bubble_bar.addWidget(self._restore_bubble_btn)
         self._link_original_btn = QPushButton(tr('关联原图'))
+        self._link_original_btn.setProperty('compact', True)
+        self._link_original_btn.setProperty('role', 'chip')
         self._link_original_btn.setToolTip(tr('旧结果缺少原图时，选择该页处理前的同尺寸原图。'))
         self._link_original_btn.clicked.connect(self.link_original)
-        self._link_original_btn.setProperty('compact', True)
-        original_actions.addWidget(self._link_original_btn)
-        props.addLayout(original_actions)
+        bubble_bar.addWidget(self._link_original_btn)
+        header_layout.addLayout(bubble_bar)
+        inspector_layout.addWidget(inspector_header)
+
+        inspector_body = QWidget()
+        body_layout = QVBoxLayout(inspector_body)
+        body_layout.setContentsMargins(10, 6, 10, 6)
+        body_layout.setSpacing(0)
+        self._inspector_body_layout = body_layout
+        self.block_list = QListWidget()
+        self.block_list.setObjectName('blockList')
+        self.block_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.block_list.setMinimumHeight(40)
+        self.block_list.setUniformItemSizes(True)
+        self.block_list.setMouseTracking(True)
+        self.block_list.setItemDelegate(_BlockItemDelegate(self.block_list))
+        self.block_list.currentRowChanged.connect(self._load_properties)
         self._inspector_tabs = QTabWidget()
         self._inspector_tabs.setDocumentMode(True)
         self._inspector_splitter = QSplitter(Qt.Vertical)
@@ -412,19 +608,19 @@ class EditorPage(QWidget):
         self._inspector_splitter.setHandleWidth(6)
         self._inspector_splitter.addWidget(self.block_list)
         self._inspector_splitter.addWidget(self._inspector_tabs)
-        self._inspector_splitter.setSizes([200, 420])
-        props.addWidget(self._inspector_splitter, 1)
+        self._inspector_splitter.setStretchFactor(0, 0)
+        self._inspector_splitter.setStretchFactor(1, 1)
+        self._inspector_splitter.setSizes([150, 440])
+        body_layout.addWidget(self._inspector_splitter, 1)
+        inspector_layout.addWidget(inspector_body, 1)
+
         text_panel = QWidget()
         text_props = QVBoxLayout(text_panel)
         text_props.setContentsMargins(0, 8, 0, 0)
-        text_props.setSpacing(8)
+        text_props.setSpacing(6)
+        self._text_props_layout = text_props
         self._inspector_tabs.addTab(text_panel, tr('译文编辑'))
-        layout_panel = QWidget()
-        layout_props = QVBoxLayout(layout_panel)
-        layout_props.setContentsMargins(0, 8, 0, 0)
-        layout_props.setSpacing(12)
-        self._inspector_tabs.addTab(layout_panel, tr('排版与位置'))
-        props = text_props
+
         self._source_toggle = QToolButton()
         self._source_toggle.setText(tr('原文'))
         self._source_toggle.setCheckable(True)
@@ -432,12 +628,13 @@ class EditorPage(QWidget):
         self._source_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self._source_toggle.setProperty('role', 'quiet')
         self._source_toggle.setProperty('compact', True)
-        props.addWidget(self._source_toggle)
+        text_props.addWidget(self._source_toggle)
         self._source_text = QPlainTextEdit()
+        self._source_text.setObjectName('textSource')
         self._source_text.setReadOnly(True)
-        self._source_text.setFixedHeight(110)
+        self._source_text.setFixedHeight(92)
         self._source_text.setFont(ui_font(japanese=True))
-        props.addWidget(self._source_text)
+        text_props.addWidget(self._source_text)
         self._source_toggle.toggled.connect(self._toggle_source_text)
         target_label = QLabel(tr('译文'))
         target_label.setObjectName('fieldCaption')
@@ -445,33 +642,52 @@ class EditorPage(QWidget):
         break_row.addWidget(target_label, 1)
         self._line_break_btn = QPushButton(tr('插入换行'))
         self._line_break_btn.setProperty('compact', True)
+        self._line_break_btn.setProperty('role', 'chip')
         self._line_break_btn.setToolTip(tr('在光标处插入换行，与 Enter 相同'))
         self._line_break_btn.clicked.connect(self._insert_line_break)
         break_row.addWidget(self._line_break_btn)
         self._expand_btn = QPushButton(tr('全屏编辑'))
         self._expand_btn.setProperty('compact', True)
+        self._expand_btn.setProperty('role', 'chip')
         self._expand_btn.setToolTip(tr('在独立窗口中编辑当前气泡的译文 · F2'))
         self._expand_btn.clicked.connect(self.open_text_editor)
         break_row.addWidget(self._expand_btn)
-        props.addLayout(break_row)
+        text_props.addLayout(break_row)
         break_hint = QLabel(tr('Enter 换行 · 竖排时换到左列'))
         break_hint.setWordWrap(True)
         break_hint.setProperty('muted', True)
-        props.addWidget(break_hint)
+        self._break_hint = break_hint
+        text_props.addWidget(break_hint)
         self._text_input = QPlainTextEdit()
         self._text_input.setObjectName('textInput')
-        self._text_input.setMinimumHeight(140)
+        self._text_input.setMinimumHeight(80)
         self._text_input.setMaximumHeight(16777215)
         self._text_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._text_input.setAccessibleName(tr('译文与手动换行'))
         self._text_input.setPlaceholderText(tr('输入译文，按 Enter 手动换行'))
         self._text_input.setToolTip(tr('Enter 插入硬换行：横排换到下一行，竖排换到左侧下一列；连续回车保留空行或空列。'))
-        props.addWidget(self._text_input, 1)
-        props = layout_props
-        group = QGroupBox(tr('字体与排版'))
-        form = QFormLayout(group)
-        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-        form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        text_props.addWidget(self._text_input, 1)
+
+        layout_panel = QWidget()
+        layout_tab_root = QVBoxLayout(layout_panel)
+        layout_tab_root.setContentsMargins(0, 6, 0, 0)
+        layout_tab_root.setSpacing(0)
+        self._layout_tab_root = layout_tab_root
+        self._inspector_tabs.addTab(layout_panel, tr('排版与位置'))
+
+        self._properties_scroll = QScrollArea()
+        self._properties_scroll.setObjectName('inspectorScroll')
+        self._properties_scroll.setWidgetResizable(True)
+        self._properties_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_content = QFrame()
+        scroll_content.setObjectName('inspectorScrollContent')
+        self._properties_scroll.setWidget(scroll_content)
+        layout_tab_root.addWidget(self._properties_scroll, 1)
+
+        props = QVBoxLayout(scroll_content)
+        props.setContentsMargins(0, 2, 4, 6)
+        props.setSpacing(10)
+
         self._style_combo = SearchableFontCombo()
         self._style_combo.setAccessibleName(tr('当前文本块字体'))
         self._style_combo.setFont(ui_font(13))
@@ -510,34 +726,61 @@ class EditorPage(QWidget):
         self._outline_width.setToolTip(tr('描边宽度按原图像素计算；自动保留原效果，0 为无描边。白边和黑边均可调整。'))
         self._hollow_preset_btn = QPushButton(tr('白字黑边竖排'))
         self._hollow_preset_btn.setProperty('compact', True)
-        self._hollow_preset_btn.setProperty('role', 'quiet')
+        self._hollow_preset_btn.setProperty('role', 'chip')
         self._hollow_preset_btn.setToolTip(tr('应用示例效果：竖排、白色字心、黑色描边；保留当前字体。'))
         self._hollow_preset_btn.clicked.connect(self._apply_hollow_preset)
         self._text_color = TextColorPicker()
         self._text_color.setAccessibleName(tr('当前文本块文字颜色'))
         self._text_color.setToolTip(tr('只修改当前文本块；默认黑字，空心效果默认白字。自选颜色保留描边效果。'))
+
+        type_card = QFrame()
+        type_card.setObjectName('inspectorCard')
+        type_layout = QVBoxLayout(type_card)
+        type_layout.setContentsMargins(10, 8, 10, 8)
+        type_layout.setSpacing(6)
+        type_title = QLabel(tr('字体与排版'))
+        type_title.setObjectName('cardTitle')
+        type_layout.addWidget(type_title)
         font_row = QHBoxLayout()
         font_row.setSpacing(6)
-        font_row.addWidget(QLabel(tr('字体')))
+        font_label = QLabel(tr('字体'))
+        font_label.setProperty('muted', True)
+        font_row.addWidget(font_label)
         font_row.addStretch(1)
         self._font_library_btn = QPushButton(tr('字体库'))
         self._font_library_btn.setProperty('compact', True)
-        self._font_library_btn.setProperty('role', 'quiet')
+        self._font_library_btn.setProperty('role', 'chip')
         self._font_library_btn.clicked.connect(self._open_font_library)
         font_row.addWidget(self._font_library_btn)
-        form.addRow(tr(font_row))
-        form.addRow(tr(self._style_combo))
-        form.addRow(tr(self._font_name_label))
-        form.addRow(tr('文字颜色'), self._text_color)
-        form.addRow(tr('字号'), self._size_spin)
-        form.addRow(tr('排版方向'), self._direction_combo)
-        form.addRow(tr('竖排列对齐'), self._vertical_alignment_combo)
-        form.addRow(tr('文字效果'), self._effect_combo)
-        form.addRow(tr('描边大小'), self._outline_width)
-        form.addRow(self._hollow_preset_btn)
-        props.addWidget(group)
-        group = QGroupBox(tr('位置与蒙版'))
-        form = QFormLayout(group)
+        type_layout.addLayout(font_row)
+        type_layout.addWidget(self._style_combo)
+        type_layout.addWidget(self._font_name_label)
+        type_grid = QGridLayout()
+        type_grid.setContentsMargins(0, 1, 0, 1)
+        type_grid.setHorizontalSpacing(10)
+        type_grid.setVerticalSpacing(5)
+        type_grid.setColumnStretch(0, 1)
+        type_grid.setColumnStretch(1, 1)
+        type_grid.addWidget(self._field_cell('字号', self._size_spin), 0, 0)
+        type_grid.addWidget(self._field_cell('排版方向', self._direction_combo), 0, 1)
+        type_layout.addLayout(type_grid)
+        type_layout.addWidget(self._field_cell('文字效果', self._effect_combo))
+        type_layout.addWidget(self._field_cell('文字颜色', self._text_color))
+        outline_grid = QGridLayout()
+        outline_grid.setContentsMargins(0, 1, 0, 1)
+        outline_grid.setHorizontalSpacing(10)
+        outline_grid.setVerticalSpacing(5)
+        outline_grid.setColumnStretch(0, 1)
+        outline_grid.setColumnStretch(1, 1)
+        outline_grid.addWidget(self._field_cell('竖排列对齐', self._vertical_alignment_combo), 0, 0)
+        outline_grid.addWidget(self._field_cell('描边大小', self._outline_width), 0, 1)
+        type_layout.addLayout(outline_grid)
+        preset_row = QHBoxLayout()
+        preset_row.addWidget(self._hollow_preset_btn)
+        preset_row.addStretch(1)
+        type_layout.addLayout(preset_row)
+        props.addWidget(type_card)
+
         self._offset_x, self._offset_y = QSpinBox(), QSpinBox()
         for spin in (self._offset_x, self._offset_y):
             spin.setRange(-100000, 100000)
@@ -547,16 +790,6 @@ class EditorPage(QWidget):
             spin.setRange(1, 100000)
             spin.setSuffix(' px')
             spin.setToolTip(tr('调整译文排版蒙版，以当前中心向两侧改变大小'))
-        self._show_mask = QCheckBox(tr('显示蒙版范围'))
-        self._show_mask.setChecked(True)
-        self._show_mask.setToolTip(tr('画布辅助线仅用于精修，不写入导出图片'))
-        self._box_label = QLabel(tr('选择文本块后显示坐标'))
-        self._box_label.setWordWrap(True)
-        self._box_label.setProperty('muted', True)
-        form.addRow(tr('X 偏移'), self._offset_x)
-        form.addRow(tr('Y 偏移'), self._offset_y)
-        form.addRow(tr('蒙版宽度'), self._mask_width)
-        form.addRow(tr('蒙版高度'), self._mask_height)
         self._text_scale_x, self._text_scale_y = QSpinBox(), QSpinBox()
         for spin in (self._text_scale_x, self._text_scale_y):
             spin.setRange(10, 400)
@@ -570,37 +803,77 @@ class EditorPage(QWidget):
         self._text_rotation.setToolTip(tr('以文字中心旋转；正数顺时针，负数逆时针。'))
         self._reset_transform_btn = QPushButton(tr('重置文字变形'))
         self._reset_transform_btn.setProperty('compact', True)
-        self._reset_transform_btn.setProperty('role', 'quiet')
+        self._reset_transform_btn.setProperty('role', 'chip')
         self._reset_transform_btn.clicked.connect(self._reset_text_transform)
-        form.addRow(tr('横向拉伸'), self._text_scale_x)
-        form.addRow(tr('纵向拉伸'), self._text_scale_y)
-        form.addRow(tr('文字旋转'), self._text_rotation)
-        form.addRow(self._reset_transform_btn)
-        form.addRow(tr(self._show_mask))
-        form.addRow(tr(self._box_label))
+        self._show_mask = QCheckBox(tr('显示蒙版范围'))
+        self._show_mask.setChecked(True)
+        self._show_mask.setToolTip(tr('画布辅助线仅用于精修，不写入导出图片'))
+        self._box_label = QLabel(tr('选择文本块后显示坐标'))
+        self._box_label.setWordWrap(True)
+        self._box_label.setProperty('muted', True)
+
+        geo_card = QFrame()
+        geo_card.setObjectName('inspectorCard')
+        geo_layout = QVBoxLayout(geo_card)
+        geo_layout.setContentsMargins(10, 8, 10, 8)
+        geo_layout.setSpacing(5)
+        geo_title = QLabel(tr('位置与蒙版'))
+        geo_title.setObjectName('cardTitle')
+        geo_layout.addWidget(geo_title)
+        geo_grid = QGridLayout()
+        geo_grid.setContentsMargins(0, 1, 0, 1)
+        geo_grid.setHorizontalSpacing(10)
+        geo_grid.setVerticalSpacing(4)
+        geo_grid.setColumnStretch(0, 1)
+        geo_grid.setColumnStretch(1, 1)
+        geo_grid.addWidget(self._field_cell('X 偏移', self._offset_x), 0, 0)
+        geo_grid.addWidget(self._field_cell('Y 偏移', self._offset_y), 0, 1)
+        geo_grid.addWidget(self._field_cell('蒙版宽度', self._mask_width), 1, 0)
+        geo_grid.addWidget(self._field_cell('蒙版高度', self._mask_height), 1, 1)
+        geo_grid.addWidget(self._field_cell('横向拉伸', self._text_scale_x), 2, 0)
+        geo_grid.addWidget(self._field_cell('纵向拉伸', self._text_scale_y), 2, 1)
+        geo_grid.addWidget(self._field_cell('文字旋转', self._text_rotation), 3, 0)
+        reset_cell = QWidget()
+        reset_cell_layout = QVBoxLayout(reset_cell)
+        reset_cell_layout.setContentsMargins(0, 0, 0, 0)
+        reset_cell_layout.setSpacing(3)
+        reset_cell_layout.addStretch(1)
+        reset_cell_layout.addWidget(self._reset_transform_btn)
+        geo_grid.addWidget(reset_cell, 3, 1)
+        geo_layout.addLayout(geo_grid)
+        geo_layout.addWidget(self._show_mask)
+        geo_layout.addWidget(self._box_label)
         drag_hint = QLabel(tr('拖动蒙版边角调整大小，框内拖动位置'))
         drag_hint.setWordWrap(True)
         drag_hint.setProperty('muted', True)
-        form.addRow(tr(drag_hint))
-        props.addWidget(group)
+        geo_layout.addWidget(drag_hint)
+        props.addWidget(geo_card)
+        props.addStretch(1)
+
         self._apply_btn = QPushButton(tr('刷新预览'))
         self._apply_btn.setProperty('compact', True)
-        self._apply_btn.setProperty('role', 'quiet')
-        props.addStretch()
+        self._apply_btn.setProperty('role', 'chip')
         inspector_actions = QFrame()
         inspector_actions.setObjectName('inspectorActions')
         actions_layout = QHBoxLayout(inspector_actions)
-        actions_layout.setContentsMargins(12, 10, 12, 10)
+        actions_layout.setContentsMargins(12, 8, 12, 8)
+        self._inspector_actions_layout = actions_layout
         hint = QLabel(tr('修改实时预览 · Ctrl+S 保存图片'))
         hint.setProperty('muted', True)
+        hint.setWordWrap(True)
+        self._inspector_hint = hint
         actions_layout.addWidget(hint, 1)
+        self._inspector_spacer = QWidget()
+        self._inspector_spacer.setVisible(False)
+        actions_layout.addWidget(self._inspector_spacer, 1)
         actions_layout.addWidget(self._apply_btn)
         inspector_layout.addWidget(inspector_actions)
+
         self.splitter.addWidget(self._properties_panel)
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 1)
         self.splitter.setStretchFactor(2, 0)
-        self.splitter.setSizes([220, 720, 440])
+        self.splitter.setSizes([216, 740, 420])
         root.addWidget(self.splitter, 1)
         root.addWidget(self._status)
         self._pages_toggle.toggled.connect(lambda checked: self._choose_panel(0, checked))
@@ -639,6 +912,12 @@ class EditorPage(QWidget):
             shortcut.setContext(Qt.WidgetWithChildrenShortcut)
             shortcut.activated.connect(action)
             self._zoom_shortcuts.append(shortcut)
+        self._block_nav_shortcuts = []
+        for keys, delta in (('Alt+Up', -1), ('Alt+Down', 1)):
+            shortcut = QShortcut(QKeySequence(keys), self)
+            shortcut.setContext(Qt.WidgetWithChildrenShortcut)
+            shortcut.activated.connect(lambda d=delta: self._step_block(d))
+            self._block_nav_shortcuts.append(shortcut)
         self._text_editor_shortcut = QShortcut(QKeySequence('F2'), self)
         self._text_editor_shortcut.setContext(Qt.WidgetWithChildrenShortcut)
         self._text_editor_shortcut.activated.connect(self.open_text_editor)
@@ -653,6 +932,9 @@ class EditorPage(QWidget):
         state = settings.value('ui/editorSplitter')
         if state is not None:
             self.splitter.restoreState(state)
+        inspector_state = settings.value('ui/editorInspectorSplitter')
+        if inspector_state is not None:
+            self._inspector_splitter.restoreState(inspector_state)
         self._desired_panels = [settings.value('ui/editorPages', True, type=bool),
                                 settings.value('ui/editorProperties', True, type=bool)]
         self._apply_panel_layout()
@@ -701,6 +983,7 @@ class EditorPage(QWidget):
     def save_ui_state(self):
         settings = QSettings()
         settings.setValue('ui/editorSplitter', self._wide_splitter_state or (self._focus_splitter_state if self._focus_btn.isChecked() else self.splitter.saveState()))
+        settings.setValue('ui/editorInspectorSplitter', self._inspector_splitter.saveState())
         panels = self._desired_panels
         settings.setValue('ui/editorPages', panels[0])
         settings.setValue('ui/editorProperties', panels[1])
@@ -747,7 +1030,22 @@ class EditorPage(QWidget):
             self._apply_panel_layout()
         for widget in (self._canvas_heading, self._status, self._pages_toggle, self._properties_toggle):
             widget.setVisible(not focused)
-        self._focus_btn.setText(tr('退出专注') if focused else tr('专注画布'))
+        self._update_toolbar_labels()
+
+    def _update_toolbar_labels(self):
+        compact = self.width() < 1120
+        for button, full, short in (
+            (self._properties_toggle, tr('编辑面板'), tr('面板')),
+            (self._zoom_tool_btn, tr('缩放工具'), tr('缩放')),
+            (self._strip_toggle, tr('连续长条'), tr('长条')),
+            (self._export_pdf_btn, tr('导出 PDF'), 'PDF'),
+            (self._save_btn, tr('保存图片'), tr('保存')),
+        ):
+            button.setText(short if compact else full)
+            button.setAccessibleName(full)
+        self._focus_btn.setText(tr('退出专注') if self._focus_btn.isChecked()
+                                else tr('专注') if compact else tr('专注画布'))
+        self._focus_btn.setAccessibleName(tr('专注画布'))
 
     def _toggle_source_text(self, expanded):
         self._source_expanded = expanded
@@ -756,16 +1054,71 @@ class EditorPage(QWidget):
         self._apply_source_layout()
 
     def _reveal_text_editor(self):
-        if not self.isVisible() or self._loaded_row < 0 or self._inspector_tabs.currentIndex() != 0:
+        # The block list sits in the upper splitter pane while the editor tabs
+        # stay anchored below it; keep the inspector split balanced on short windows.
+        if not self.isVisible() or self._loaded_row < 0:
             return
-        if self.height() >= 760:
+        self._sync_inspector_split()
+
+    def _sync_inspector_split(self):
+        short = self.height() < 560
+        if hasattr(self, '_canvas_heading'):
+            self._canvas_heading.setVisible(not short)
+        if hasattr(self, '_inspector_heading'):
+            self._inspector_heading.setVisible(not short)
+        if hasattr(self, '_root_layout'):
+            self._root_layout.setContentsMargins(10 if short else 14, 4 if short else 10, 10 if short else 14, 4 if short else 8)
+            self._root_layout.setSpacing(4 if short else 8)
+            self._toolbar_layout.setContentsMargins(0, 0, 0, 4 if short else 8)
+            self._header_layout.setContentsMargins(10 if short else 12, 3 if short else 6, 10 if short else 12, 3 if short else 6)
+            self._inspector_body_layout.setContentsMargins(8 if short else 10, 2 if short else 6, 8 if short else 10, 2 if short else 6)
+            self._text_props_layout.setContentsMargins(0, 4 if short else 8, 0, 0)
+            self._text_props_layout.setSpacing(4 if short else 6)
+            self._layout_tab_root.setContentsMargins(0, 2 if short else 6, 0, 0)
+            self._inspector_actions_layout.setContentsMargins(10 if short else 12, 3 if short else 8, 10 if short else 12, 3 if short else 8)
+            self._break_hint.setVisible(not short)
+            self._inspector_hint.setVisible(not short)
+            self._inspector_spacer.setVisible(short)
+            self._text_input.setMinimumHeight(42 if short else 80)
+        self._inspector_splitter.setHandleWidth(4 if short else 6)
+        self.block_list.setMinimumHeight(38 if short else 108)
+        total = sum(self._inspector_splitter.sizes())
+        if total <= 0:
             return
-        panel = self._properties_scroll
-        point = self._text_input.mapTo(panel.widget(), QPoint(0, 0))
-        if panel.viewport().height() - point.y() < 120:
-            # Only ~a line of the editor is visible: align the tab header instead of a blank field.
-            tabs_top = self._inspector_tabs.mapTo(panel.widget(), QPoint(0, 0)).y()
-            panel.verticalScrollBar().setValue(max(0, tabs_top - 8))
+        if short:
+            list_h = 38 if self.height() < 520 else 42
+            self._inspector_splitter.setSizes([list_h, max(120, total - list_h)])
+        elif self._inspector_splitter.sizes()[0] < 108:
+            list_h = min(150, max(108, total // 4))
+            self._inspector_splitter.setSizes([list_h, max(200, total - list_h)])
+
+    def _step_block(self, delta):
+        if not self.items:
+            return
+        row = self._loaded_row if 0 <= self._loaded_row < len(self.items) else 0
+        target = max(0, min(len(self.items) - 1, row + delta))
+        if target != self.block_list.currentRow():
+            self.block_list.setCurrentRow(target)
+            item = self.block_list.item(target)
+            if item is not None:
+                self.block_list.scrollToItem(item, QAbstractItemView.PositionAtCenter)
+
+    def _refresh_page_counter(self):
+        if hasattr(self, '_page_count_label'):
+            self._page_count_label.setText(tr('{_0} 页', _0=self.page_list.count()))
+
+    def _refresh_block_counter(self):
+        if not hasattr(self, '_block_counter'):
+            return
+        total = len(self.items)
+        if total and 0 <= self._loaded_row < total:
+            self._block_counter.setText(tr('{_0} / {_1}', _0=self._loaded_row + 1, _1=total))
+        elif total:
+            self._block_counter.setText(tr('{_0} 块', _0=total))
+        else:
+            self._block_counter.setText(tr('0 块'))
+        self._prev_block_btn.setEnabled(total > 1 and self._loaded_row > 0)
+        self._next_block_btn.setEnabled(total > 1 and 0 <= self._loaded_row < total - 1)
 
     def _apply_source_layout(self):
         expanded = self._source_expanded and (not self.isVisible() or self.height() >= 700 or self._source_compact_override)
@@ -923,10 +1276,16 @@ class EditorPage(QWidget):
         item.setSizeHint(QSize(170, 100))
         self._page_items[key] = item
         self.page_list.addItem(item)
+        self._refresh_page_counter()
         self._thumbnail_timer.start(0)
         return item
 
     def eventFilter(self, watched, event):
+        if (event.type() == QEvent.KeyPress and Qt.Key_1 <= event.key() <= Qt.Key_9
+                and event.modifiers() in (Qt.NoModifier, Qt.KeypadModifier)
+                and self._font_hotkeys_available()):
+            if not event.isAutoRepeat() and self._favorite_fonts.activate(event.key() - Qt.Key_1):
+                return True
         if watched is self.page_list.viewport() and event.type() in (QEvent.Resize, QEvent.Show):
             self._thumbnail_timer.start(0)
         elif watched is getattr(self, 'preview', None) and event.type() == QEvent.Resize:
@@ -940,6 +1299,50 @@ class EditorPage(QWidget):
         elif event.type() == QEvent.WindowDeactivate:
             self.preview.set_space_pan(False)
         return super().eventFilter(watched, event)
+
+    def _font_hotkeys_available(self):
+        focus = QApplication.focusWidget()
+        return (self.isVisible() and QApplication.activeModalWidget() is None
+                and QApplication.activeWindow() is self.window()
+                and focus is not None and (focus is self or self.isAncestorOf(focus))
+                and self._style_combo.isEnabled() and not self.page_io_busy
+                and self._repair_worker is None and self._export_worker is None
+                and not self._save_jobs.busy
+                and not isinstance(focus, (QLineEdit, QPlainTextEdit, QTextEdit,
+                                           QAbstractSpinBox, QComboBox)))
+
+    def _add_favorite_font(self):
+        choice = self._style_combo.currentData()
+        try:
+            if choice in STYLE_LABELS:
+                path = self.config.get('style_font_map', self.config['font_map'])[choice]
+            elif choice:
+                path = resolve_font_reference(choice)
+            else:
+                style = self.items[self._loaded_row].get('style', 'dialogue')
+                path = self.config['font_map'][style]
+            reference = font_reference(inspect_font(path).path)
+        except (OSError, ValueError, KeyError, IndexError):
+            return
+        if not self._favorite_fonts.add_font(reference):
+            self._status.setText(tr('常用字体已满（9 个），请在“设置快捷字体”中替换。'))
+
+    def _apply_favorite_font(self, reference):
+        if (not self._style_combo.isEnabled() or self.page_io_busy or self._save_jobs.busy
+                or self._repair_worker is not None or self._export_worker is not None
+                or not self._font_reference_available(reference)):
+            return
+        index = self._style_combo.findData(reference)
+        if index < 0:
+            font = inspect_font(resolve_font_reference(reference))
+            self._style_combo.addItem(font_display_name(font), reference)
+            index = self._style_combo.count() - 1
+        self._style_combo.setCurrentIndex(index)
+        self.apply_changes()
+
+    def _request_canvas_page(self, path):
+        if self._strip_toggle.isChecked() and self.preview._continuous:
+            self.request_page(path)
 
     def _space_pans_canvas(self):
         """Space is the Hand tool, but never inside a text field or on a focused button."""
@@ -1016,6 +1419,7 @@ class EditorPage(QWidget):
             if str(Path(item.data(Qt.UserRole)).resolve()) in keys:
                 self.page_list.takeItem(index)
         self.page_list.blockSignals(False)
+        self._refresh_page_counter()
         if not current_removed:
             self._restore_page_selection()
             self._update_repair_controls()
@@ -1065,6 +1469,7 @@ class EditorPage(QWidget):
         self._preview_dirty = False
         self._layer_cache.clear()
         self.block_list.clear()
+        self._refresh_block_counter()
         self._export_pdf_btn.setEnabled(False)
         self.preview.clear(tr('选择一页，开始精修'))
         self._set_editable(False)
@@ -1217,6 +1622,7 @@ class EditorPage(QWidget):
             self._prepare_regions()
             for index, item in enumerate(self.items):
                 block = QListWidgetItem(self._block_label(index))
+                block.setData(Qt.UserRole + 2, self._block_payload(index))
                 block.setToolTip(str(item.get('text', '')))
                 self.block_list.addItem(tr(block))
             self._status.setText(tr('{_0} · {_1} 个文本块', _0=path.name, _1=len(self.items)))
@@ -1224,6 +1630,7 @@ class EditorPage(QWidget):
                 self.block_list.setCurrentRow(0)
             else:
                 self._status.setText(tr('{_0} · 没有可编辑文本块', _0=path.name))
+            self._refresh_block_counter()
         except (OSError, ValueError, TypeError) as exc:
             self._status.setText(tr('无法精修：{_0}', _0=exc))
             page_item.setText(tr('⊠ 无布局数据\n{_0}', _0=path.name))
@@ -1239,6 +1646,25 @@ class EditorPage(QWidget):
             return tr('{_0} · 已还原原图', _0=f'{index + 1:02d}')
         summary = str(item.get('text', '')).replace('\n', ' ↵ ')[:28]
         return f'{index + 1:02d}  {summary}'
+
+    def _block_payload(self, index):
+        item = self.items[index]
+        number = f'{index + 1:02d}'
+        if item.get('restore_original'):
+            return (number, tr('已还原原图'), tr('已还原'), True)
+        summary = ' '.join(str(item.get('text', '')).split()) or tr('（空）')
+        direction = tr('横') if int(item.get('direction', 1)) == 0 else tr('竖')
+        size = item.get('font_size') if item.get('manual_layout') else item.get('rendered_font_size') or item.get('font_size')
+        badge = f'{direction} {int(size)}px' if size else direction
+        return (number, summary, badge, False)
+
+    def _refresh_block_item(self, index):
+        row = self.block_list.item(index)
+        if row is None or not 0 <= index < len(self.items):
+            return
+        row.setText(self._block_label(index))
+        row.setData(Qt.UserRole + 2, self._block_payload(index))
+        row.setToolTip(str(self.items[index].get('text', '')))
 
     def _get_original_image(self):
         if self._original_image is None:
@@ -1308,7 +1734,7 @@ class EditorPage(QWidget):
         self._layer_cache.pop(self._loaded_row, None)
         self._dirty = self._preview_dirty = True
         self._edit_revision += 1
-        self.block_list.item(self._loaded_row).setText(self._block_label(self._loaded_row))
+        self._refresh_block_item(self._loaded_row)
         self._refresh_page_dirty_label()
         self._set_editable(True)
         self._update_region_guide()
@@ -1456,6 +1882,7 @@ class EditorPage(QWidget):
         self._schedule_preview()
 
     def _toggle_bubble_creation(self, enabled):
+        self._pick_fill_btn.setChecked(False)
         enabled = bool(enabled)
         if enabled and self._repair_mode.isChecked():
             self._repair_mode.blockSignals(True)
@@ -1506,6 +1933,7 @@ class EditorPage(QWidget):
         self.items.append(item)
         index = len(self.items) - 1
         block = QListWidgetItem(self._block_label(index))
+        block.setData(Qt.UserRole + 2, self._block_payload(index))
         block.setToolTip(tr('手动添加的气泡框，输入译文后即可嵌字。'))
         self.block_list.addItem(block)
         self._edit_revision += 1
@@ -1541,7 +1969,7 @@ class EditorPage(QWidget):
                     text_scale_y=self._text_scale_y.value() / 100,
                     text_rotation=self._text_rotation.value(),
                     outline_width=None if self._outline_width.value() < 0 else self._outline_width.value())
-        self.block_list.item(self._loaded_row).setText(self._block_label(self._loaded_row))
+        self._refresh_block_item(self._loaded_row)
         self._row_dirty = False
 
     def _load_properties(self, row):
@@ -1550,6 +1978,7 @@ class EditorPage(QWidget):
             self._loaded_row = -1
             self._font_choice_dirty = False
             self._set_editable(False)
+            self._refresh_block_counter()
             self.preview.set_region(None)
             self.preview.set_regions([])
             if self._text_dialog is not None:
@@ -1591,7 +2020,8 @@ class EditorPage(QWidget):
                                         self._text_input.toPlainText())
         self._loading = False
         self._row_dirty = False
-        if self.height() >= 700:
+        self._refresh_block_counter()
+        if self.height() >= 700 and self._inspector_tabs.currentIndex() == 1:
             self._properties_scroll.verticalScrollBar().setValue(0)
         self._reveal_timer.start(0)
 
@@ -1647,6 +2077,7 @@ class EditorPage(QWidget):
                  and not self._save_jobs.busy and not self._requesting_page
                  and not self._indexing and not self._import_jobs.busy)
         self._repair_mode.setEnabled(ready)
+        self._favorite_fonts.set_apply_enabled(ready and self._style_combo.isEnabled())
         self._add_bubble_btn.setEnabled(ready)
         if not ready and self._add_bubble_btn.isChecked():
             self._add_bubble_btn.blockSignals(True)
@@ -1664,9 +2095,15 @@ class EditorPage(QWidget):
         fills_enabled = ready and self._repair_box is not None and not protected
         self._fill_white_btn.setEnabled(fills_enabled)
         self._fill_black_btn.setEnabled(fills_enabled)
+        self._fill_custom_btn.setEnabled(fills_enabled)
+        self._fill_color_btn.setEnabled(ready)
+        self._pick_fill_btn.setEnabled(ready)
+        if not ready:
+            self._pick_fill_btn.setChecked(False)
         fill_tip = tr('选区包含已还原气泡，请先恢复该气泡的处理结果再填色。') if protected else ''
         self._fill_white_btn.setToolTip(fill_tip or tr('把框选区域整块填成白色（可撤回）。'))
         self._fill_black_btn.setToolTip(fill_tip or tr('把框选区域整块填成黑色（可撤回）。'))
+        self._fill_custom_btn.setToolTip(fill_tip or tr('用当前颜色填充框选区域（可撤回）。'))
         selected = 0 <= self._loaded_row < len(self.items)
         self._restore_bubble_btn.setEnabled(ready and selected)
         self._restore_bubble_btn.setText(tr('恢复处理结果') if selected and self.items[self._loaded_row].get('restore_original') else tr('还原此气泡'))
@@ -1682,6 +2119,7 @@ class EditorPage(QWidget):
         self.preview.setEnabled(not busy)
 
     def _toggle_repair_mode(self, enabled):
+        self._pick_fill_btn.setChecked(False)
         if enabled and self._add_bubble_btn.isChecked():
             self._add_bubble_btn.blockSignals(True)
             self._add_bubble_btn.setChecked(False)
@@ -1692,9 +2130,43 @@ class EditorPage(QWidget):
         self._update_region_guide()
         self._update_repair_controls()
         if enabled:
-            self._status.setText(tr('在画布拖动框选背景，再点击“修补选区”或“填白 / 填黑”；译文保持独立。'))
+            self._status.setText(tr('在画布拖动框选背景，再修补或填色；可自选颜色或从图片取色。'))
+
+    def _refresh_fill_color(self):
+        swatch = QPixmap(18, 18)
+        swatch.fill(Qt.transparent)
+        painter = QPainter(swatch)
+        painter.setPen(QColor(color('ruleStrong')))
+        painter.setBrush(self._fill_color)
+        painter.drawRoundedRect(1, 1, 16, 16, 3, 3)
+        painter.end()
+        self._fill_color_btn.setIcon(QIcon(swatch))
+        self._fill_color_btn.setText(self._fill_color.name().upper())
+
+    def _choose_fill_color(self):
+        self._pick_fill_btn.setChecked(False)
+        picked = QColorDialog.getColor(self._fill_color, self, tr('选择填充颜色'),
+                                       QColorDialog.DontUseNativeDialog)
+        if picked.isValid():
+            self._accept_fill_color(picked)
+
+    def _toggle_fill_color_pick(self, enabled):
+        if enabled and not self.apply_changes():
+            self._pick_fill_btn.setChecked(False)
+            return
+        self.preview.set_color_picking(enabled)
+        self._status.setText(tr('点击图片选择填充颜色；Esc 或右键取消。') if enabled
+                             else tr('已退出图片取色。'))
+
+    def _accept_fill_color(self, picked):
+        self._fill_color = QColor(picked.name())
+        self._refresh_fill_color()
+        self._pick_fill_btn.setChecked(False)
+        self._status.setText(tr('填充颜色：{color} · 框选区域后点击“填色”。',
+                                color=self._fill_color.name().upper()))
 
     def _start_background_repair(self):
+        self._pick_fill_btn.setChecked(False)
         if self._requesting_page or self._indexing or self._save_jobs.busy or self._repair_worker is not None or self._cleaned_image is None or self._repair_box is None:
             return
         if self._export_worker is not None:
@@ -1720,6 +2192,7 @@ class EditorPage(QWidget):
 
     def _fill_repair_region(self, color) -> None:
         """Paint the selected rectangle with a flat colour on the cleaned base."""
+        self._pick_fill_btn.setChecked(False)
         if (self._requesting_page or self._indexing or self._save_jobs.busy
                 or self._repair_worker is not None or self._cleaned_image is None
                 or self._repair_box is None or self._export_worker is not None):
@@ -1751,9 +2224,8 @@ class EditorPage(QWidget):
         self._dirty = self._preview_dirty = True
         self._refresh_page_dirty_label()
         if self.apply_changes():
-            self._status.setText(
-                tr('已把选区填为白色 · 未保存，可撤回修补。') if color == (255, 255, 255)
-                else tr('已把选区填为黑色 · 未保存，可撤回修补。'))
+            self._status.setText(tr('已把选区填为 {color} · 未保存，可撤回修补。',
+                                    color=QColor(*color).name().upper()))
 
     def _accept_background_repair(self, box, patch):
         before = self._cleaned_image.crop(box)
@@ -1884,6 +2356,8 @@ class EditorPage(QWidget):
             self.preview.set_pixmap(QPixmap.fromImage(ImageQt(image)))
         else:
             self.preview.update_regions(image, regions)
+        if 0 <= self._loaded_row < len(self.items):
+            self._refresh_block_item(self._loaded_row)
 
     def _export_action(self):
         if self._export_worker is not None:
@@ -2121,7 +2595,10 @@ class EditorPage(QWidget):
 
     def _adapt_width(self):
         if self.isVisible():
-            self._source_text.setFixedHeight(64 if self.height() < 700 else 110)
+            self._update_toolbar_labels()
+            compact_h = self.height() < 700
+            self._source_text.setFixedHeight(56 if compact_h else 92)
             self._apply_source_layout()
             self._apply_panel_layout()
+            self._sync_inspector_split()
             self._reveal_timer.start(0)

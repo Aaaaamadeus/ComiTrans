@@ -138,6 +138,7 @@ class StripPreview(ImagePreview):
         self._visible_timer.start(0)
 
     def set_continuous(self, enabled):
+        self.cancel_color_picking()
         self.cancel_region_drag()
         previous = self._label
         region, editable, creation = previous.region, previous.region_editable, previous.region_creation
@@ -166,6 +167,7 @@ class StripPreview(ImagePreview):
         key = str(Path(path).resolve())
         self.add_page(key)
         if self._active_path != key:
+            self.cancel_color_picking()
             self.cancel_region_drag()
             self._label.region = None
             self._label.region_editable = self._label.region_creation = self._label.bubble_creation = False
@@ -315,6 +317,12 @@ class StripPreview(ImagePreview):
             entry[0].setPixmap(pixmap)
 
     def eventFilter(self, watched, event):
+        # In single-page mode the hidden strip must never navigate or consume a pan.
+        if not self._continuous and hasattr(self, '_strip_scroll') and (
+                watched is self._strip_scroll.viewport() or watched in self._canvas_keys):
+            if event.type() in (QEvent.Wheel, QEvent.MouseButtonPress, QEvent.MouseButtonDblClick):
+                event.accept()
+                return True
         if hasattr(self, '_strip_scroll') and watched is self._strip_scroll.viewport():
             if event.type() == QEvent.Resize and self._continuous:
                 self.cancel_region_drag()

@@ -23,32 +23,32 @@ class PanelHeading(QWidget):
         self.sidebar = sidebar
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setFixedHeight(44 if sidebar else 36)
+        self.setFixedHeight(36 if sidebar else 32)
         self._number = label(self, number, 12, weight=QFont.Normal)
         self._number.setVisible(bool(number))
         self._number.setFont(ui_font(12, mono=True))
         self._number.setProperty('muted', True)
         self._number.setAlignment(Qt.AlignCenter)
-        self._title = label(self, title, 20 if sidebar else 18, weight=QFont.Bold)
-        self._title.setFont(ui_font(20 if sidebar else 18, QFont.Bold))
+        self._title = label(self, title, 18 if sidebar else 17, weight=QFont.Bold)
+        self._title.setFont(ui_font(18 if sidebar else 17, QFont.Bold))
         self.setAccessibleName(f'{number} {title}'.strip())
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self._number.setGeometry(0, 6 if self.sidebar else 0, 24, 30)
-        self._title.setGeometry(34 if self._number.text() else 0, 4 if self.sidebar else 0,
-                                self._title.sizeHint().width() + 5, 32)
+        top = 2 if self.sidebar else 0
+        self._number.setGeometry(0, top + 3, 24, 26)
+        self._title.setGeometry(32 if self._number.text() else 0, top,
+                                self._title.sizeHint().width() + 5, 30)
 
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         w, h = self.width(), self.height()
-        p.fillRect(self.rect(), QColor(color('workspace' if self.sidebar else 'paper')))
         end = min(w, self._title.x() + self._title.width() + 10)
         tone_width = min(72 if self.sidebar else 120, max(0, w - end - 12))
         if tone_width > 24:
-            p.setOpacity(.30)
-            draw_tone(p, QRectF(w - tone_width, 0, tone_width, h - 4),
+            p.setOpacity(.28)
+            draw_tone(p, QRectF(w - tone_width, 0, tone_width, h - 2),
                       compact=self.window().width() < COMPACT_BREAKPOINT,
                       profile='section', direction='right')
         p.end()

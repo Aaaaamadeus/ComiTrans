@@ -8,7 +8,8 @@ from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from PIL import Image
-from PySide6.QtCore import QSettings, QSize, QTimer
+from PySide6.QtCore import QSettings, QSize, QTimer, QPoint, QPointF, Qt
+from PySide6.QtGui import QPixmap, QWheelEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMessageBox
 from comic_translate_desktop import config
@@ -184,6 +185,61 @@ class LargeEditorTests(unittest.TestCase):
                 QTest.qWait(5)
                 self.assertLessEqual(len(preview._canvas_keys) + len(preview._spares), 6)
             self.assertIsNotNone(preview._pages[str(self.root / '999.png')][0])
+
+    def test_single_page_scroll_zoom_and_pan_never_request_a_neighbor(self):
+        preview = StripPreview()
+        self.addCleanup(destroy_widget, preview)
+        preview.resize(600, 500)
+        preview.show()
+        pages = [self.root / f'{index}.png' for index in range(3)]
+        for path in pages:
+            Image.new('RGB', (800, 1200), '#decba0').save(path)
+            preview.add_page(path, QSize(800, 1200))
+        preview.set_page_pixmap(pages[1], QPixmap(str(pages[1])))
+        preview.set_continuous(True)
+        self.app.processEvents()
+        preview.set_continuous(False)
+        preview.set_zoom(2)
+        self.app.processEvents()
+        requested = []
+        preview.page_requested.connect(requested.append)
+        active = preview._active_path
+        bar = preview._scroll.verticalScrollBar()
+        def wheel(widget, dy, modifiers=Qt.NoModifier):
+            point = widget.rect().center()
+            event = QWheelEvent(QPointF(point), QPointF(widget.mapToGlobal(point)),
+                                QPoint(), QPoint(0, dy), Qt.NoButton, modifiers,
+                                Qt.NoScrollPhase, False)
+            self.app.sendEvent(widget, event)
+        for edge, delta in ((0, 120), (bar.maximum(), -120)):
+            bar.setValue(edge)
+            for _ in range(4):
+                wheel(preview._label, delta)
+            self.assertEqual(bar.value(), edge)
+        wheel(preview._label, 120, Qt.AltModifier)
+        self.assertGreater(preview._zoom, 2)
+        canvas = preview._label
+        point = QPoint(200, 200)
+        QTest.mousePress(canvas, Qt.MiddleButton, pos=point)
+        QTest.mouseMove(canvas, point + QPoint(0, -40))
+        QTest.mouseRelease(canvas, Qt.MiddleButton, pos=point + QPoint(0, -40))
+        wheel(preview._strip_scroll.viewport(), -120)
+        self.assertEqual(requested, [])
+        self.assertEqual(preview._active_path, active)
+        self.assertIs(preview._stack.currentWidget(), preview._scroll)
+
+    def test_canvas_navigation_signal_is_ignored_outside_continuous_mode(self):
+        first, _ = self.page('first')
+        second, _ = self.page('second')
+        editor = self.editor()
+        self.assertTrue(editor.load_page(first))
+        editor._strip_toggle.setChecked(False)
+        with patch.object(editor, 'request_page') as request:
+            editor.preview.page_requested.emit(str(second))
+            request.assert_not_called()
+            editor._strip_toggle.setChecked(True)
+            editor.preview.page_requested.emit(str(second))
+            request.assert_called_once_with(str(second))
 
     def test_large_project_registration_yields_between_batches(self):
         from comic_translate_desktop.pdf_project import PdfProject

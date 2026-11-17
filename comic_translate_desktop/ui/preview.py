@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScroll
 from ..pdf_utils import render_pdf_preview
 from ..config import ICON_PATH
 from .halftone import COMPACT_BREAKPOINT, draw_corner_tones, draw_tone
-from .theme import color, display_font, theme_name
+from .theme import color, display_font, theme_name, ui_font
 from .motion import fade_in
 
 
@@ -404,28 +404,47 @@ class PageCanvas(QLabel):
         draw_corner_tones(painter, QRectF(bounds),
                           compact=self.window().width() < COMPACT_BREAKPOINT)
         painter.setClipping(False)
+        shadow = QColor(color('black'))
+        for spread, alpha in ((3, 18), (6, 10), (10, 5)):
+            shadow.setAlpha(alpha)
+            pen = QPen(shadow, 1)
+            pen.setCosmetic(True)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRect(page.adjusted(-spread, -spread, spread, spread))
         edge = QPen(QColor(color('pageEdge')), 1)
         edge.setCosmetic(True)
         painter.setPen(edge)
         painter.setBrush(Qt.NoBrush)
         painter.drawRect(page.adjusted(.5, .5, -.5, -.5))
+        selected_index = None
         if self.regions_visible and self.regions:
             painter.setClipping(False)
             painter.setClipRect(page)
             painter.setRenderHint(QPainter.Antialiasing)
             for index, box in self.regions:
                 rect = self._box_rect(box)
-                if rect.isEmpty() or (self.region is not None and tuple(box) == tuple(self.region)):
+                if rect.isEmpty():
+                    continue
+                if self.region is not None and tuple(box) == tuple(self.region):
+                    selected_index = index
                     continue
                 guide = QColor(color('guide'))
                 if index == self._hover_index:
-                    guide.setAlpha(220)
+                    halo = QColor(color('guideHalo'))
+                    halo.setAlpha(180)
+                    halo_pen = QPen(halo, 2.5, Qt.SolidLine)
+                    halo_pen.setCosmetic(True)
+                    painter.setPen(halo_pen)
+                    painter.setBrush(Qt.NoBrush)
+                    painter.drawRect(rect)
+                    guide.setAlpha(235)
                     pen = QPen(guide, 1.5, Qt.SolidLine)
                     pen.setCosmetic(True)
                     painter.setPen(pen)
-                    painter.setBrush(QColor(guide.red(), guide.green(), guide.blue(), 28))
+                    painter.setBrush(QColor(guide.red(), guide.green(), guide.blue(), 24))
                 else:
-                    guide.setAlpha(90)
+                    guide.setAlpha(85)
                     pen = QPen(guide, 1, Qt.DashLine)
                     pen.setCosmetic(True)
                     painter.setPen(pen)
@@ -437,18 +456,38 @@ class PageCanvas(QLabel):
             painter.setClipRect(page)
             rect = self.region_rect()
             painter.setRenderHint(QPainter.Antialiasing)
-            painter.setRenderHint(QPainter.Antialiasing)
+            halo = QColor(color('guideHalo'))
+            halo.setAlpha(200)
+            halo_pen = QPen(halo, 2.5, Qt.SolidLine)
+            halo_pen.setCosmetic(True)
+            painter.setPen(halo_pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRect(rect)
             pen = QPen(QColor(color('guide')), 1.5, Qt.DashLine)
             pen.setCosmetic(True)
             painter.setPen(pen)
-            painter.setBrush(Qt.NoBrush)
             painter.drawRect(rect)
+            if selected_index is not None and rect.width() >= 24 and rect.height() >= 20:
+                badge_text = f'{selected_index + 1:02d}'
+                badge_font = ui_font(11, mono=True)
+                badge_font.setBold(True)
+                painter.setFont(badge_font)
+                badge_w = max(22, painter.fontMetrics().horizontalAdvance(badge_text) + 10)
+                badge_h = 18
+                bx = max(page.left() + 2, min(page.right() - badge_w - 2, rect.left()))
+                by = rect.top() - badge_h - 3 if rect.top() - badge_h - 3 >= page.top() + 2 else rect.top() + 3
+                badge_rect = QRectF(bx, by, badge_w, badge_h)
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(QColor(color('ink')))
+                painter.drawRoundedRect(badge_rect, 4, 4)
+                painter.setPen(QColor(color('paper')))
+                painter.drawText(badge_rect, Qt.AlignCenter, badge_text)
             if self.region_editable and self.isEnabled():
                 painter.setClipRect(page.adjusted(-5, -5, 5, 5))
-                painter.setPen(QPen(QColor(color('guide')), 1))
+                painter.setPen(QPen(QColor(color('guide')), 1.25))
                 painter.setBrush(QColor(color('paper')))
                 for handle in self._region_handles().values():
-                    painter.drawRect(QRectF(handle.x() - 3.5, handle.y() - 3.5, 7, 7))
+                    painter.drawRect(QRectF(handle.x() - 4, handle.y() - 4, 8, 8))
         painter.end()
 
 
@@ -459,6 +498,8 @@ class ImagePreview(QWidget):
     region_clicked = Signal(int)
     bubble_created = Signal(object)
     zoom_changed = Signal(object)
+    color_picked = Signal(object)
+    color_pick_canceled = Signal()
 
     MIN_ZOOM, MAX_ZOOM = 0.05, 8.0
 
@@ -471,6 +512,7 @@ class ImagePreview(QWidget):
         self._pan = None
         self._space_pan = False
         self._zoom_tool = False
+        self._color_picking = False
         self.setMinimumSize(120, 100)
         self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self._stack = QStackedLayout(self)
@@ -566,6 +608,30 @@ class ImagePreview(QWidget):
                 return super().eventFilter(watched, event)
         elif watched is not self._label:
             return super().eventFilter(watched, event)
+        if self._color_picking:
+            if (event.type() == QEvent.KeyPress and event.key() == Qt.Key_Escape
+                    or event.type() == QEvent.MouseButtonPress and event.button() == Qt.RightButton):
+                self.cancel_color_picking()
+                return True
+            if (event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton
+                    and not self._space_pan):
+                if watched is self._label:
+                    page = self._label.page_rect()
+                    point = event.position()
+                    if not page.isEmpty() and page.contains(point):
+                        x = int((point.x() - page.left()) * self._original.width() / page.width())
+                        y = int((point.y() - page.top()) * self._original.height() / page.height())
+                        if 0 <= x < self._original.width() and 0 <= y < self._original.height():
+                            # Sample native page pixels, excluding guides and display interpolation.
+                            picked = self._original.toImage().pixelColor(x, y)
+                            self.set_color_picking(False)
+                            self.color_picked.emit(picked)
+                return True
+            if event.type() == QEvent.MouseButtonDblClick:
+                return True
+            if event.type() == QEvent.MouseMove and not self._space_pan and self._pan is None:
+                self._label.setCursor(Qt.CrossCursor)
+                return True
         if event.type() == QEvent.Wheel:
             if event.modifiers() & (Qt.ControlModifier | Qt.AltModifier):
                 step = 1.12 if event.angleDelta().y() > 0 else 1 / 1.12
@@ -665,6 +731,7 @@ class ImagePreview(QWidget):
         self._update_scaled()
 
     def clear(self, text=tr('等待预览')):
+        self.cancel_color_picking()
         self._original = QPixmap()
         self.set_region(None)
         self._label.set_regions([])
@@ -675,6 +742,7 @@ class ImagePreview(QWidget):
 
     def set_loading(self, message=''):
         """Decoding a page: keep the previous panel out of the way."""
+        self.cancel_color_picking()
         self._state_title.setText(tr('正在加载页面…'))
         self._state_message.setText(message or tr('正在解码原图与排版数据'))
         self._state_bar.setVisible(True)
@@ -685,6 +753,7 @@ class ImagePreview(QWidget):
             fade_in(self._state_panel)
 
     def set_error(self, message, retry=None):
+        self.cancel_color_picking()
         self._state_title.setText(tr('这一页没有打开'))
         self._state_message.setText(str(message))
         self._state_bar.setVisible(False)
@@ -719,7 +788,7 @@ class ImagePreview(QWidget):
     def _update_canvas_cursor(self):
         if self._pan is not None:
             return
-        if self._zoom_tool:
+        if (self._color_picking or self._zoom_tool) and not self._space_pan:
             self._scroll.viewport().setCursor(Qt.CrossCursor)
             self._label.setCursor(Qt.CrossCursor)
         elif self._space_pan:
@@ -728,6 +797,23 @@ class ImagePreview(QWidget):
         else:
             self._scroll.viewport().unsetCursor()
             self._label.unsetCursor()
+
+    def set_color_picking(self, active):
+        self.cancel_region_drag()
+        self._color_picking = bool(active) and not self._original.isNull()
+        self.set_region(self._label.region, editable=self._label.region_editable)
+        if self._color_picking:
+            self._label.setFocus(Qt.OtherFocusReason)
+        self._update_canvas_cursor()
+
+    def cancel_color_picking(self):
+        if self._color_picking:
+            self.set_color_picking(False)
+            self.color_pick_canceled.emit()
+
+    def hideEvent(self, event):
+        self.cancel_color_picking()
+        super().hideEvent(event)
 
     def set_fit_width(self):
         self.cancel_region_drag()
@@ -780,7 +866,8 @@ class ImagePreview(QWidget):
         self._label.region = tuple(box) if box is not None else None
         self._label.region_editable = editable and box is not None
         self._label.setFocusPolicy(Qt.StrongFocus if (self._label.region_editable
-                               or self._label.region_creation or self._label.bubble_creation)
+                               or self._label.region_creation or self._label.bubble_creation
+                               or self._color_picking)
                                else Qt.NoFocus)
         self._label.setToolTip(tr(tr('拖动边角调整蒙版大小，框内拖动位置；Esc 恢复本次拖动前的范围')
                                if self._label.region_editable else ''))
