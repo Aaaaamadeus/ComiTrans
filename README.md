@@ -43,27 +43,44 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 黑白漫画工作台：开放式分区标题、局部网点、Skribble 字标和柔和控件，工作页直接进入操作区。翻译页可直接导入字体、固定 9 个常用字体快捷槽并查看实际字形；底部并行工作流拓扑图按真实后台流水线实时显示并发在途页、`AI 翻译 ∥ 背景修复`分叉并行、上下文累计与逐页状态矩阵。精修画布保留作品原色。
 
-**自动处理工作台**
+**自动处理工作台 · Fork-Join 并行工作流**
 
-![ComiTrans 自动处理界面](docs/ui-review/automatic-style-review.png)
+![ComiTrans 自动处理并行工作流](docs/ui-review/automatic-workflow-v252.png)
 
-**并行工作流拓扑可视化（运行中）**
+**嵌字精修工作区 · 常用字体 / 填色与排版**
 
-![ComiTrans 并行工作流进度面板](docs/ui-review/automatic-workflow-v252.png)
+![ComiTrans 嵌字精修界面](docs/ui-review/editor-fill-fonts-1440-style-review.png)
 
 **夜间模式（夜墨）**
 
 设置 → 运行与输出 → 外观 可切换「跟随系统 / 纸白 / 夜墨」，切换即时生效，Windows 标题栏同步换色；夜墨只改变界面与画布周围，漫画像素与导出结果保持不变。
 
-| 自动处理 | 嵌字精修 |
+| 自动处理与并行工作流 | 嵌字精修 |
 | --- | --- |
-| ![夜墨下的自动处理](docs/ui-review/dark-automatic.png) | ![夜墨下的嵌字精修](docs/ui-review/dark-editor.png) |
+| ![夜墨下的并行工作流](docs/ui-review/dark-workflow-v252.png) | ![夜墨下的嵌字精修](docs/ui-review/dark-editor.png) |
 
-**快速逐字日志（实际 Qt 录屏，界面测试文本）**
+<details>
+<summary>展开更多 v2.5.2 界面截图（上下文缓存偏好、画布取色、拉伸描边、字体库与设置）</summary>
+
+| 翻译偏好与上下文缓存保留 | 批处理完成与工作流状态 |
+| --- | --- |
+| ![翻译偏好与上下文缓存](docs/ui-review/context-1440-retained-style-review.png) | ![批处理完成工作流](docs/ui-review/automatic-complete-style-review.png) |
+
+| 画布图片取色 | 文字拉伸 / 旋转 / 描边预设 |
+| --- | --- |
+| ![画布图片取色与自定义填色](docs/ui-review/editor-color-pick-1440-style-review.png) | ![文字拉伸、旋转与白字黑边竖排预设](docs/ui-review/editor-outline-1440-style-review.png) |
+
+| 离线字体库检索 | 设置与翻译服务配置 |
+| --- | --- |
+| ![字体库检索](docs/ui-review/font-library-search-style-review.png) | ![设置页](docs/ui-review/settings-style-review.png) |
+
+</details>
+
+**快速逐字日志（实际 Qt 录屏，v2.5.2 界面测试文本）**
 
 日志正文使用 Aa今日花晴 春懒猫困，以约每秒 250 字快速展开，积压时自动加速；复制、导出与任务结束时补齐全文。支持级别筛选、搜索、字号调整、暂停跟随和选区保留，显示最近 5,000 条记录，完整日志保存在磁盘。
 
-![快速逐字日志输出](docs/ui-review/log-reveal.gif)
+![快速逐字日志输出](docs/ui-review/log-reveal-v252.gif)
 
 ## 翻译前后对比
 
