@@ -19,6 +19,20 @@
       "actions_visible": true
     },
     {
+      "file": "context-1440-fresh-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "context-1440-retained-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
       "file": "font-library-style-review.png",
       "width": 820,
       "height": 660,
@@ -103,6 +117,20 @@
       "actions_visible": true
     },
     {
+      "file": "editor-fill-fonts-1440-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-color-pick-1440-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
       "file": "editor-focus-style-review.png",
       "width": 1440,
       "height": 900,
@@ -145,6 +173,27 @@
       "actions_visible": true
     },
     {
+      "file": "editor-outline-1440-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-stretch-1440-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-rotation-1440-style-review.png",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
       "file": "automatic-preview-style-review.png",
       "width": 1440,
       "height": 900,
@@ -155,6 +204,20 @@
       "file": "automatic-complete-style-review.png",
       "width": 1440,
       "height": 900,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "context-1024-fresh-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "context-1024-retained-style-review.png",
+      "width": 1024,
+      "height": 720,
       "dpr": 1.0,
       "actions_visible": true
     },
@@ -173,6 +236,13 @@
       "actions_visible": true
     },
     {
+      "file": "settings-advanced-1024-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
       "file": "diagnosis-1024-style-review.png",
       "width": 1024,
       "height": 720,
@@ -181,6 +251,41 @@
     },
     {
       "file": "editor-1024-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-outline-1024-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-stretch-1024-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-rotation-1024-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-fill-fonts-1024-style-review.png",
+      "width": 1024,
+      "height": 720,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-color-pick-1024-style-review.png",
       "width": 1024,
       "height": 720,
       "dpr": 1.0,
@@ -208,6 +313,13 @@
       "actions_visible": true
     },
     {
+      "file": "settings-advanced-960-style-review.png",
+      "width": 960,
+      "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
       "file": "diagnosis-960-style-review.png",
       "width": 960,
       "height": 540,
@@ -222,9 +334,58 @@
       "actions_visible": true
     },
     {
+      "file": "editor-outline-960-style-review.png",
+      "width": 960,
+      "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-stretch-960-style-review.png",
+      "width": 960,
+      "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-rotation-960-style-review.png",
+      "width": 960,
+      "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-fill-fonts-960-style-review.png",
+      "width": 960,
+      "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-color-pick-960-style-review.png",
+      "width": 960,
+      "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
       "file": "editor-focus-960-style-review.png",
       "width": 960,
       "height": 540,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "context-820-fresh-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "context-820-retained-style-review.png",
+      "width": 820,
+      "height": 480,
       "dpr": 1.0,
       "actions_visible": true
     },
@@ -243,6 +404,13 @@
       "actions_visible": true
     },
     {
+      "file": "settings-advanced-820-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
       "file": "diagnosis-820-style-review.png",
       "width": 820,
       "height": 480,
@@ -251,6 +419,41 @@
     },
     {
       "file": "editor-820-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-outline-820-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-stretch-820-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-rotation-820-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-fill-fonts-820-style-review.png",
+      "width": 820,
+      "height": 480,
+      "dpr": 1.0,
+      "actions_visible": true
+    },
+    {
+      "file": "editor-color-pick-820-style-review.png",
       "width": 820,
       "height": 480,
       "dpr": 1.0,
@@ -298,33 +501,33 @@
       44
     ],
     "statusPill": [
-      1080,
+      1072,
       30,
       96,
       24
     ],
     "设置": [
-      1184,
+      1176,
       27,
-      46,
+      48,
       30
     ],
     "诊断": [
-      1238,
+      1232,
       27,
-      46,
+      48,
       30
     ],
     "输出目录": [
-      1292,
+      1288,
       27,
-      74,
+      76,
       30
     ],
     "反馈": [
-      1374,
+      1372,
       27,
-      46,
+      48,
       30
     ]
   },
@@ -342,14 +545,14 @@
     "edits_preserve_file_until_save": true,
     "saved_pixels_match_preview": true,
     "guide_excluded_from_export": true,
-    "cached_edit_ms": 9.0
+    "cached_edit_ms": 7.2
   },
   "editor_mask_drag": {
     "handles": 8,
     "geometry": [
       93,
       133,
-      336,
+      334,
       337
     ],
     "live_during_drag": true,
@@ -361,6 +564,13 @@
     "only_selected_block": true,
     "save_reload_pixels_match": true,
     "subsequent_default_keeps_manual_font": true
+  },
+  "editor_lettering": {
+    "outline_width": 2,
+    "scale_x": 1.3,
+    "scale_y": 0.9,
+    "rotation": -12,
+    "save_reload_pixels_match": true
   },
   "brand_font": "Skribble",
   "log_font": "Aa今日花晴 春懒猫困",
