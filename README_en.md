@@ -45,40 +45,46 @@ A three-page offline scheduling comparison measured **42.43 → 37.85 seconds**,
 
 A black-and-white manga workbench with open section headings, local halftones, the Skribble wordmark, and soft controls. Workspaces open directly into their tools. Import fonts and pin up to 9 favorite translation fonts (`1–9` shortcuts) with a real glyph preview; the bottom Fork-Join workflow graph tracks live in-flight pages, `AI Translate ∥ Inpaint` branches, rolling context count, and a per-page status strip. The editor canvas preserves the artwork's colors.
 
-**Automatic processing**
-
-![ComiTrans automatic processing](docs/ui-review/automatic-style-review.png)
-
-**Fork-Join live workflow visualizer**
+**Automatic processing · Fork-Join live workflow**
 
 ![ComiTrans live Fork-Join workflow visualizer](docs/ui-review/automatic-workflow-v252.png)
+
+**Typesetting editor · Favorite fonts, fills & layout**
+
+![ComiTrans typesetting editor](docs/ui-review/editor-fill-fonts-1440-style-review.png)
 
 **Night mode (Night ink)**
 
 Settings → Runtime & output → Appearance switches between Follow system / Paper / Night ink. It applies instantly and recolors the Windows title bar too; Night ink changes the UI and the area around the canvas only, never the manga pixels or exports.
 
-| Automatic processing | Typesetting |
+| Automatic processing & workflow | Typesetting |
 | --- | --- |
-| ![Automatic processing in night ink](docs/ui-review/dark-automatic.png) | ![Typesetting in night ink](docs/ui-review/dark-editor.png) |
+| ![Live workflow in night ink](docs/ui-review/dark-workflow-v252.png) | ![Typesetting in night ink](docs/ui-review/dark-editor.png) |
 
 <details>
-<summary>Processing, mask editing, and font library screenshots</summary>
+<summary>More v2.5.2 screenshots (context preferences, color picker, lettering transforms, font library & settings)</summary>
 
-The processing capture uses real local models on text-free test pages, without an external translation request.
+| Context cache preferences | Completed batch workflow |
+| --- | --- |
+| ![Translation preferences and retained context cache](docs/ui-review/context-1440-retained-style-review.png) | ![Completed Fork-Join workflow](docs/ui-review/automatic-complete-style-review.png) |
 
-![Processing and stage track](docs/ui-review/automatic-processing.png)
+| Canvas eyedropper color pick | Stretch, rotation & outline preset |
+| --- | --- |
+| ![Canvas eyedropper and custom fill](docs/ui-review/editor-color-pick-1440-style-review.png) | ![Stretch, rotation, and white-on-black vertical preset](docs/ui-review/editor-outline-1440-style-review.png) |
 
-![Mask resizing and live editor preview](docs/ui-review/editor-mask-drag-style-review.png)
+| Mask resizing & live editor preview | Font library & settings |
+| --- | --- |
+| ![Mask resizing and live editor preview](docs/ui-review/editor-mask-drag-style-review.png) | ![Font library and name search](docs/ui-review/font-library-search-style-review.png) |
 
-![Font library and name search](docs/ui-review/font-library-search-style-review.png)
+![Settings page](docs/ui-review/settings-style-review.png)
 
 </details>
 
-**Fast character reveal — recorded from Qt with UI test messages**
+**Fast character reveal — recorded from v2.5.2 Qt with UI test messages**
 
 Logs use the Aa handwriting font and reveal at about 250 characters per second, accelerating when messages accumulate. Copy, export, errors, and task completion flush the full text. Filtering, search, font size, pause-follow, and text selection remain available. The view retains 5,000 records; complete logs are stored on disk.
 
-![Fast log output animation](docs/ui-review/log-reveal.gif)
+![Fast log output animation](docs/ui-review/log-reveal-v252.gif)
 
 ## Before / After
 
