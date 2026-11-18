@@ -7,6 +7,8 @@
                   DowngradeErrorMessage="A newer version of ComiTrans is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="medium" MaximumUncompressedMediaSize="48" />
     <Property Id="ARPPRODUCTICON" Value="ComiTransIcon" />
+    <Property Id="COMITRANS_SETUP_MANAGED" Value="0" Secure="yes" />
+    <Property Id="COMITRANS_SETUP_SOURCE" Secure="yes" />
     <Icon Id="ComiTransIcon" SourceFile="$(Icon)" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -24,6 +26,10 @@
                          Type="string" Value="[ProductVersion]" />
           <RegistryValue Root="HKLM" Key="Software\ComiTrans\Installer" Name="ProductCode"
                          Type="string" Value="[ProductCode]" />
+          <RegistryValue Root="HKLM" Key="Software\ComiTrans\Installer" Name="SetupManaged"
+                         Type="string" Value="[COMITRANS_SETUP_MANAGED]" />
+          <RegistryValue Root="HKLM" Key="Software\ComiTrans\Installer" Name="SetupSource"
+                         Type="string" Value="[COMITRANS_SETUP_SOURCE]" />
           <RegistryValue Root="HKLM" Key="Software\Classes\.comitrans" Type="string" Value="ComiTrans.PdfProject" />
           <RegistryValue Root="HKLM" Key="Software\Classes\.comitrans\OpenWithProgids"
                          Name="ComiTrans.PdfProject" Type="string" Value="" />

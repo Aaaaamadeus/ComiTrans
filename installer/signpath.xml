@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters><parameter name="version" required="true" /></parameters>
   <zip-file>
     <msi-file path="ComiTrans-v*-x64.msi">
-      <pe-file path="ComiTrans.exe"><authenticode-sign /></pe-file>
-      <pe-file path="ComiTransReleaseService.exe"><authenticode-sign /></pe-file>
+      <pe-file path="ComiTrans.exe" product-name="ComiTrans" product-version="${version}"><authenticode-sign /></pe-file>
+      <pe-file path="ComiTransReleaseService.exe" product-name="ComiTrans" product-version="${version}"><authenticode-sign /></pe-file>
       <authenticode-sign />
     </msi-file>
   </zip-file>

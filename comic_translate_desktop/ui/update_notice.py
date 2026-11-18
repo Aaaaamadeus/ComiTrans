@@ -91,7 +91,7 @@ class UpdateNotice(QObject):
             reply.deleteLater()
 
     def _offer(self, data):
-        update = latest_stable(data, __version__)
+        update = latest_stable(data, __version__, setup=bool(self.product and self.product.setup))
         if update is None or not self.window.isVisible():
             return
         notice = QMessageBox(QMessageBox.Icon.Information, tr('发现 ComiTrans 新版本'),
@@ -119,7 +119,7 @@ class UpdateNotice(QObject):
 
     def _download(self, update):
         cache = config.PROJECT_ROOT / 'updates'
-        base = cache / installer_name(__version__)
+        base = cache / installer_name(__version__, setup=update.setup)
         if not base.is_file():
             base = original_package(self.product)
         canceled = Event()

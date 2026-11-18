@@ -38,4 +38,4 @@ if ($IncludeModels) {
 
 Write-Host ""
 Write-Host "打包完成: dist\ComiTrans\ComiTrans.exe"
-Write-Host "生成 Windows MSI：.\.venv\Scripts\python.exe installer/build.py"
+Write-Host "生成 Windows Setup EXE 与 MSI：.\.venv\Scripts\python.exe installer/build.py"

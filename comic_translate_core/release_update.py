@@ -17,18 +17,20 @@ RELEASE_API = 'https://api.github.com/repos/Aaaaamadeus/ComiTrans/releases/lates
 RESPONSE_LIMIT = 512 * 1024
 DELTA_LIMIT = 768 * 1024 * 1024
 DELTA_BLOCK_SIZE = 256 * 1024
+SETUP_DELTA_BLOCK_SIZE = 8 * 1024
 DELTA_OVERLAP = 1024 * 1024
 DELTA_FRAME = struct.Struct('<I')
 DELTA_COPY = 1 << 31
 VERSION = re.compile(r'v?(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})')
 
 
-def installer_name(version):
-    return f'ComiTrans-v{version}-x64.msi'
+def installer_name(version, *, setup=False):
+    suffix = '-Setup.exe' if setup else '.msi'
+    return f'ComiTrans-v{version}-x64{suffix}'
 
 
-def delta_name(source, target):
-    return f'ComiTrans-v{source}-to-v{target}-x64.msi.delta'
+def delta_name(source, target, *, setup=False):
+    return installer_name(f'{source}-to-v{target}', setup=setup) + '.delta'
 
 
 @dataclass(frozen=True)
@@ -44,9 +46,10 @@ class Release:
     url: str
     installer: Asset | None
     delta: Asset | None
+    setup: bool = False
 
 
-def latest_stable(data, current):
+def latest_stable(data, current, *, setup=False):
     if not isinstance(data, dict) or data.get('draft') or data.get('prerelease'):
         return None
     tag = data.get('tag_name')
@@ -71,7 +74,8 @@ def latest_stable(data, current):
             return Asset(download, size, digest[7:])
         return None
 
-    return Release(version, url, asset(installer_name(version)), asset(delta_name(current, version)))
+    return Release(version, url, asset(installer_name(version, setup=setup)),
+                   asset(delta_name(current, version, setup=setup)), setup)
 
 
 def _check_asset(path, asset):
@@ -94,24 +98,25 @@ def _download(asset, target, canceled):
     _check_asset(target, asset)
 
 
-def _expand_delta(delta, base, target, size, canceled):
+def _expand_delta(delta, base, target, size, canceled, *, setup=False):
     import zstandard as zstd
 
     decoder = zstd.ZstdDecompressor()
+    block_size = SETUP_DELTA_BLOCK_SIZE if setup else DELTA_BLOCK_SIZE
     with delta.open('rb') as source, base.open('rb') as previous, target.open('wb') as handle:
-        for offset in range(0, size, DELTA_BLOCK_SIZE):
+        for offset in range(0, size, block_size):
             if canceled():
                 raise InterruptedError('Update canceled')
             header = source.read(DELTA_FRAME.size)
             if len(header) != DELTA_FRAME.size:
                 raise ValueError('Incomplete update frame header')
             frame_info, = DELTA_FRAME.unpack(header)
-            expected = min(DELTA_BLOCK_SIZE, size - offset)
+            expected = min(block_size, size - offset)
             if frame_info & DELTA_COPY:
                 previous.seek(frame_info ^ DELTA_COPY)
                 block = previous.read(expected)
             else:
-                if not 0 < frame_info <= DELTA_BLOCK_SIZE + 65536:
+                if not 0 < frame_info <= block_size + 65536:
                     raise ValueError('Unexpected update frame size')
                 frame = source.read(frame_info)
                 if len(frame) != frame_info or zstd.frame_content_size(frame) != expected:
@@ -143,7 +148,7 @@ def prepare_update(release, current, cache, base, canceled):
     if installer is None:
         raise ValueError('Missing verified installer asset')
     cache.mkdir(parents=True, exist_ok=True)
-    target = cache / installer_name(release.version)
+    target = cache / installer_name(release.version, setup=release.setup)
     with tempfile.TemporaryDirectory(dir=cache) as directory:
         stage = Path(directory) / target.name
         delta = release.delta
@@ -153,9 +158,9 @@ def prepare_update(release, current, cache, base, canceled):
             try:
                 if base.stat().st_size > DELTA_LIMIT:
                     raise ValueError('Base installer exceeds delta size limit')
-                patch = Path(directory) / delta_name(current, release.version)
+                patch = Path(directory) / delta_name(current, release.version, setup=release.setup)
                 _download(delta, patch, canceled)
-                _expand_delta(patch, base, stage, installer.size, canceled)
+                _expand_delta(patch, base, stage, installer.size, canceled, setup=release.setup)
                 _check_asset(stage, installer)
             except InterruptedError:
                 raise
@@ -188,9 +193,15 @@ try {
     $stream = [IO.File]::Open($env:COMITRANS_INSTALL_PACKAGE, 'Open', 'Read', 'Read')
 """ + SIGNATURE_CHECK + r"""
     $log = Join-Path (Split-Path -Parent $env:COMITRANS_INSTALL_PACKAGE) 'install.log'
-    $msi = '"' + $env:COMITRANS_INSTALL_PACKAGE + '"'
-    $result = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\msiexec.exe') -Verb RunAs `
-        -ArgumentList '/i', $msi, '/quiet', '/norestart', '/L*v', ('"' + $log + '"') -PassThru -Wait -ErrorAction Stop
+    $quotedLog = '"' + $log + '"'
+    if ([IO.Path]::GetExtension($env:COMITRANS_INSTALL_PACKAGE) -eq '.exe') {
+        $result = Start-Process -FilePath $env:COMITRANS_INSTALL_PACKAGE `
+            -ArgumentList '/quiet', '/norestart', '/log', $quotedLog -PassThru -Wait -ErrorAction Stop
+    } else {
+        $msi = '"' + $env:COMITRANS_INSTALL_PACKAGE + '"'
+        $result = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\msiexec.exe') -Verb RunAs `
+            -ArgumentList '/i', $msi, '/quiet', '/norestart', '/L*v', $quotedLog -PassThru -Wait -ErrorAction Stop
+    }
     exit $result.ExitCode
 } finally {
     if ($stream) { $stream.Dispose() }

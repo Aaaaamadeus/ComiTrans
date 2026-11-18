@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+  <Bundle Name="ComiTrans" Manufacturer="ComiTrans" Version="$(Version)"
+          UpgradeCode="CA39CFD0-33FD-4F75-9C1D-28AC27F55B49"
+          IconSourceFile="$(Icon)" AboutUrl="https://github.com/Aaaaamadeus/ComiTrans">
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense" LicenseUrl="" LogoFile="$(Logo)" />
+    </BootstrapperApplication>
+    <Chain>
+      <MsiPackage SourceFile="$(Msi)" Visible="no" Vital="yes">
+        <MsiProperty Name="COMITRANS_SETUP_MANAGED" Value="1" />
+        <MsiProperty Name="COMITRANS_SETUP_SOURCE" Value="[WixBundleOriginalSource]" />
+      </MsiPackage>
+    </Chain>
+  </Bundle>
+</Wix>
