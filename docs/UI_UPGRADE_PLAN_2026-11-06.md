@@ -7,6 +7,7 @@
 ## 进度（2026-11-06）
 
 - [x] 启动时异步查询 GitHub 正式发行版，发现新版后用中 / 英 / 日文提示。MSI 安装版可确认下载更新，支持增量差分和安装事务回滚。[Windows 安装与更新](WINDOWS_INSTALLER.md)
+- [x] Windows 用户安装入口使用带 ComiTrans 图标的 Setup EXE，安装和回滚由内嵌 MSI 执行。Setup 与独立 MSI 均支持对应格式的增量更新。[Windows 安装与更新](WINDOWS_INSTALLER.md)
 
 - [x] 翻译偏好新增「保留上下文缓存」：只控制跨任务沿用，说明上下文始终参与翻译、缓存始终保存；开启时勾选并锁定断点续传，关闭时恢复续传选项可编辑。英文、日文文案同步；核心翻译与分叉并行由模型分支实现。
   - 2026-11-16 验收：473 项全量测试通过；修正窄窗偏好面板父容器裁切后，93 项 UI 回归通过（包含桌面、实时预览、大编辑器、缓存偏好、语言与主题）。`scripts/review_ui.py --context-only` 完成中 / 英 / 日 × 浅色 / 深色 × 1440 / 1024 / 820 的 36 张缓存选项截图，检查勾选锁定、文案宽度、提示换行及所有祖先容器的裁切边界，中英文字体为 Microsoft YaHei UI，日文为项目白名单内的 Yu Gothic。前后截图保存在本地 `tmp/context-ui-review/before-{light,dark}/` 与 `tmp/context-ui-review/{zh-CN,en,ja}-{light,dark}-final/`；全量与回归日志分别为 `tmp/context-ui-full-tests.log`、`tmp/context-ui-final-regression.log`。

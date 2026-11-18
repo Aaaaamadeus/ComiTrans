@@ -140,7 +140,7 @@ A fully successful translation batch has a 15% chance of showing a small reposit
 
 ### Release users (recommended)
 
-For releases that provide an MSI, download `ComiTrans-v<version>-x64.msi` from GitHub Releases and double-click it. Download the separate models archive on first install or reuse existing models. The app checks GitHub for a newer stable release at each launch. See [Windows installation and updates](docs/WINDOWS_INSTALLER.md).
+Download `ComiTrans-v<version>-x64-Setup.exe` from GitHub Releases and double-click it. The matching MSI is available for managed deployment. Download the separate models archive on first install or reuse existing models. The app checks GitHub for a newer stable release at each launch. See [Windows installation and updates](docs/WINDOWS_INSTALLER.md).
 
 #### Earlier ZIP releases (v2.5.2)
 

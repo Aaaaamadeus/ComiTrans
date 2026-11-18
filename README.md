@@ -136,7 +136,7 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ### Release 用户（推荐）
 
-有 MSI 的版本请从 GitHub Releases 下载 `ComiTrans-v<版本>-x64.msi` 并双击安装。首次安装仍需准备独立模型包，已有模型可复用。安装版每次启动查询 GitHub，发现较新正式版本时提示更新。详见 [Windows 安装与更新](docs/WINDOWS_INSTALLER.md)。
+从 GitHub Releases 下载 `ComiTrans-v<版本>-x64-Setup.exe` 并双击安装。管理员部署可使用同版 MSI。首次安装仍需准备独立模型包，已有模型可复用。应用每次启动查询 GitHub，发现较新正式版本时提示更新。详见 [Windows 安装与更新](docs/WINDOWS_INSTALLER.md)。
 
 #### 历史 ZIP 版（v2.5.2）
 
@@ -313,7 +313,7 @@ v2.5.1 本地预览只随包提供 CharSpot Small 日语 OCR，默认使用 Smal
 
 ### 生成发布包
 
-新版主程序使用 WiX 构建 MSI。官方签名、差分生成和模型包命令见 [Windows 安装与更新](docs/WINDOWS_INSTALLER.md)。以下命令用于维护历史 ZIP 版。
+新版主程序使用 WiX 构建 Setup EXE 和 MSI。官方签名、差分生成和模型包命令见 [Windows 安装与更新](docs/WINDOWS_INSTALLER.md)。以下命令用于维护历史 ZIP 版。
 
 ```powershell
 python package_release.py --output release/v2.5.2
