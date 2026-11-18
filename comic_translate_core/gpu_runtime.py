@@ -3,6 +3,8 @@ import os
 import sys
 from pathlib import Path
 
+from .windows_install import data_directory
+
 CUDA_DOWNLOAD_URL = 'https://developer.nvidia.com/cuda-12-8-1-download-archive'
 CUDNN_DOWNLOAD_URL = 'https://developer.nvidia.com/cudnn-9-10-2-download-archive'
 MSVC_DOWNLOAD_URL = 'https://aka.ms/vs/17/release/vc_redist.x64.exe'
@@ -14,7 +16,7 @@ def runtime_directories(environ=None):
     env = os.environ if environ is None else environ
     candidates = []
     if getattr(sys, 'frozen', False):
-        portable = Path(sys.executable).resolve().parent / 'gpu-runtime'
+        portable = data_directory(Path(sys.executable).resolve().parent) / 'gpu-runtime'
         candidates.extend([portable / 'nvidia-cu12-v1/bin', portable / 'bin'])
     for name in ('CUDA_PATH', 'CUDNN_PATH', *sorted(k for k in env if k.startswith('CUDA_PATH_V12_'))):
         value = env.get(name, '').strip().strip('"')

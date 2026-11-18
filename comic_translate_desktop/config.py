@@ -9,6 +9,7 @@ import yaml
 from comic_translate_core.detector_paths import LEGACY_PATH, SPLIT_PATH, REGION_FILE, LINE_FILE
 from comic_translate_core.chinese import normalize_target_language
 from comic_translate_core.layout_options import normalize_text_color, normalize_vertical_alignment
+from comic_translate_core.windows_install import data_directory
 from .i18n import normalize_ui_language
 from comic_translate_core.languages import (
     OCR_DEFAULTS, OCR_CONFIG_KEYS, effective_ocr_backend, source_language, validate_ocr_config,
@@ -16,15 +17,16 @@ from comic_translate_core.languages import (
 
 
 if getattr(sys, "frozen", False):
-    PROJECT_ROOT = Path(sys.executable).resolve().parent
-    AI_ROOT = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)) / "comic-translate-ai"
+    INSTALL_ROOT = Path(sys.executable).resolve().parent
+    PROJECT_ROOT = data_directory(INSTALL_ROOT)
+    AI_ROOT = Path(getattr(sys, "_MEIPASS", INSTALL_ROOT)) / "comic-translate-ai"
 else:
     PROJECT_ROOT = Path(__file__).resolve().parents[1]
     AI_ROOT = PROJECT_ROOT / "comic-translate-ai"
 MAIN_DIR = AI_ROOT / "main"
 MODELS_ROOT = PROJECT_ROOT / "comic-translate-ai" / "models"
 PAGE_BASE = PROJECT_ROOT if getattr(sys, "frozen", False) else AI_ROOT
-ICON_PATH = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)) / "assets" / "ComiTrans.ico" if getattr(sys, "frozen", False) else PROJECT_ROOT / "assets" / "ComiTrans.ico"
+ICON_PATH = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)) / "assets" / "ComiTrans.ico"
 if getattr(sys, "frozen", False):
     CONFIG_PATH = PROJECT_ROOT / "config.yaml"
     DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "page" / "output_page_output"

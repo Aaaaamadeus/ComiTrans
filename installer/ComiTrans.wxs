@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="ComiTrans" Manufacturer="ComiTrans" Version="$(Version)"
+           ProductCode="$(ProductCode)" UpgradeCode="23F0CF85-B729-4AC3-BED6-A992D1F5E89B"
+           Scope="perMachine" InstallerVersion="500">
+    <MajorUpgrade Schedule="afterInstallInitialize"
+                  DowngradeErrorMessage="A newer version of ComiTrans is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="medium" MaximumUncompressedMediaSize="48" />
+    <Property Id="ARPPRODUCTICON" Value="ComiTransIcon" />
+    <Icon Id="ComiTransIcon" SourceFile="$(Icon)" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="ComiTransInstallFolder" Name="ComiTrans">
+        <Directory Id="RuntimeFiles" Name="_internal" />
+        <Component Id="DesktopApp" Guid="*">
+          <File Id="ComiTransExe" Source="$(Payload)\ComiTrans.exe" KeyPath="yes" />
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="ComiTrans"
+                    WorkingDirectory="ComiTransInstallFolder" Target="[#ComiTransExe]" />
+          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="ComiTrans"
+                    WorkingDirectory="ComiTransInstallFolder" Target="[#ComiTransExe]" />
+          <RegistryValue Root="HKLM" Key="Software\ComiTrans\Installer" Name="InstallDir"
+                         Type="string" Value="[ComiTransInstallFolder]" />
+          <RegistryValue Root="HKLM" Key="Software\ComiTrans\Installer" Name="Version"
+                         Type="string" Value="[ProductVersion]" />
+          <RegistryValue Root="HKLM" Key="Software\ComiTrans\Installer" Name="ProductCode"
+                         Type="string" Value="[ProductCode]" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\.comitrans" Type="string" Value="ComiTrans.PdfProject" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\.comitrans\OpenWithProgids"
+                         Name="ComiTrans.PdfProject" Type="string" Value="" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\ComiTrans.PdfProject"
+                         Type="string" Value="ComiTrans PDF Project" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\ComiTrans.PdfProject\DefaultIcon"
+                         Type="string" Value="&quot;[#ComiTransExe]&quot;,0" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\ComiTrans.PdfProject\shell\open\command"
+                         Type="string" Value="&quot;[#ComiTransExe]&quot; &quot;%1&quot;" />
+        </Component>
+        <Component Id="ReleaseNotes" Guid="*">
+          <File Source="$(Payload)\README-release.md" />
+        </Component>
+        <Component Id="ChangeLog" Guid="*">
+          <File Source="$(Payload)\CHANGELOG.md" />
+        </Component>
+        <Component Id="ReleaseService" Guid="*">
+          <File Id="ReleaseServiceExe" Source="$(Payload)\ComiTransReleaseService.exe" KeyPath="yes" />
+          <ServiceInstall Id="InstallReleaseService" Name="ComiTransReleaseCheck"
+                          DisplayName="ComiTrans Release Check" Description="Checks GitHub for ComiTrans releases on request."
+                          Account="NT AUTHORITY\LocalService" Type="ownProcess" Start="auto" ErrorControl="normal" />
+          <ServiceControl Id="ControlReleaseService" Name="ComiTransReleaseCheck"
+                          Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
+    <ComponentGroup Id="ApplicationFiles" Directory="RuntimeFiles">
+      <Files Include="$(Payload)\_internal\**" />
+    </ComponentGroup>
+    <Feature Id="Complete" Title="ComiTrans" Level="1">
+      <ComponentGroupRef Id="ApplicationFiles" />
+      <ComponentRef Id="DesktopApp" />
+      <ComponentRef Id="ReleaseService" />
+      <ComponentRef Id="ReleaseNotes" />
+      <ComponentRef Id="ChangeLog" />
+    </Feature>
+  </Package>
+</Wix>

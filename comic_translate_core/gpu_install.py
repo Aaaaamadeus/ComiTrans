@@ -10,9 +10,13 @@ from uuid import uuid4
 
 import requests
 
+from .windows_install import data_directory
+
 
 def app_directory():
-    return Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parents[1]
+    if getattr(sys, 'frozen', False):
+        return data_directory(Path(sys.executable).resolve().parent)
+    return Path(__file__).resolve().parents[1]
 
 
 def install(progress=print, *, root=None, canceled=lambda: False):
@@ -20,7 +24,7 @@ def install(progress=print, *, root=None, canceled=lambda: False):
     manifest = (assets / 'gpu-runtime-windows.json').read_bytes()
     packages = json.loads(manifest)
     parent = (root or app_directory()) / 'gpu-runtime'
-    parent.mkdir(exist_ok=True)
+    parent.mkdir(parents=True, exist_ok=True)
     target = parent / 'nvidia-cu12-v1'
     if target.exists():
         if (target / 'manifest.json').read_bytes() == manifest and all((target / 'bin' / f).is_file() for f in REQUIRED):

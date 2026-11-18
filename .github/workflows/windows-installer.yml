@@ -1,0 +1,125 @@
+name: Build and sign Windows installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      previous_version:
+        description: Previous signed MSI release for the optional delta (e.g. 2.6.0)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    runs-on: windows-2022
+    if: github.ref_type == 'tag'
+    environment: windows-release-signing
+    env:
+      DOTNET_ROLL_FORWARD: Major
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Check release tag and install build dependencies
+        shell: pwsh
+        run: |
+          $version = python -c 'from comic_translate_desktop import __version__; print(__version__)'
+          if ($env:GITHUB_REF_NAME -cne "v$version") { throw 'Tag and application version differ.' }
+          python -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet tool install --tool-path build/wix wix --version 5.0.2
+      - name: Build the Windows x64 MSI
+        shell: powershell
+        run: |
+          .\build_app.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\.venv\Scripts\python.exe installer/build.py --wix build/wix/wix.exe --output release/unsigned
+      - name: Smoke-test MSI installation and removal on the Windows runner
+        shell: pwsh
+        run: |
+          $msi = (Get-Item "release/unsigned/ComiTrans-$env:GITHUB_REF_NAME-x64.msi").FullName
+          $path = 'HKLM:\Software\ComiTrans\Installer'
+          $log = Join-Path $env:RUNNER_TEMP 'comitrans-msi-smoke.log'
+          $install = Start-Process msiexec.exe -ArgumentList '/i', "`"$msi`"", '/quiet', '/norestart', '/L*v', "`"$log`"" -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            Get-Content -LiteralPath $log -Tail 50
+            throw "MSI exited with $($install.ExitCode)."
+          }
+          $registration = Get-ItemProperty -LiteralPath $path
+          try {
+            $app = Get-Item -LiteralPath (Join-Path $registration.InstallDir 'ComiTrans.exe')
+            if ($app.VersionInfo.ProductVersion -ne $registration.Version -or "v$($registration.Version)" -cne $env:GITHUB_REF_NAME) {
+              throw 'Installed MSI and EXE versions differ.'
+            }
+            if ((Get-Service ComiTransReleaseCheck).Status -ne 'Running') { throw 'Release service did not start.' }
+            $pipe = [IO.Pipes.NamedPipeClientStream]::new('.', 'ComiTrans.ReleaseCheck', [IO.Pipes.PipeDirection]::In)
+            try { $pipe.Connect(8000) } finally { $pipe.Dispose() }
+            $extension = Get-Item -LiteralPath 'HKLM:\Software\Classes\.comitrans'
+            if ($extension.GetValue('') -ne 'ComiTrans.PdfProject') { throw 'PDF project association missing.' }
+            foreach ($folder in 'CommonPrograms', 'CommonDesktopDirectory') {
+              if (!(Test-Path (Join-Path ([Environment]::GetFolderPath($folder)) 'ComiTrans.lnk'))) { throw "Missing $folder shortcut." }
+            }
+          } finally {
+            $remove = Start-Process msiexec.exe -ArgumentList '/x', $registration.ProductCode, '/quiet', '/norestart' -Wait -PassThru
+            if ($remove.ExitCode -ne 0) { throw "Uninstall exited with $($remove.ExitCode)." }
+            if ((Test-Path $path) -or (Get-Service ComiTransReleaseCheck -ErrorAction SilentlyContinue)) {
+              throw 'Uninstall left its registration behind.'
+            }
+          }
+      - name: Stage installer for verified signing
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-windows-msi
+          path: release/unsigned/ComiTrans-*-x64.msi
+          if-no-files-found: error
+      - name: Sign the installer and both ComiTrans executables
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: windows-msi
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: release/signed
+      - name: Verify the signed installer and generate the release checksums
+        shell: pwsh
+        env:
+          PREVIOUS_VERSION: ${{ inputs.previous_version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          function Confirm-ComiTransSignature($path) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $path
+            if ($signature.Status -ne 'Valid' -or !$signature.TimeStamperCertificate -or
+                $signature.SignerCertificate.GetNameInfo('SimpleName', $false) -ne 'SignPath Foundation') {
+              throw "Windows could not verify the timestamped SignPath Foundation signature: $path"
+            }
+          }
+          $target = "release/signed/ComiTrans-$env:GITHUB_REF_NAME-x64.msi"
+          Confirm-ComiTransSignature $target
+          if ($env:PREVIOUS_VERSION) {
+            if ($env:PREVIOUS_VERSION -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Invalid base version.' }
+            $name = "ComiTrans-v$env:PREVIOUS_VERSION-x64.msi"
+            gh release download "v$env:PREVIOUS_VERSION" --pattern $name --dir build/previous
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Confirm-ComiTransSignature "build/previous/$name"
+            .\.venv\Scripts\python.exe installer/build.py --delta "build/previous/$name" $target
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          .\.venv\Scripts\python.exe -c "from pathlib import Path; from package_release import write_checksums; p=Path('release/signed'); write_checksums(p, sorted(p.glob('ComiTrans-*.msi*')))"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-windows-release
+          path: release/signed/*
+          if-no-files-found: error

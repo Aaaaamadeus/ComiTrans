@@ -1156,7 +1156,7 @@ class EditorPage(QWidget):
 
     def _import_pages(self):
         paths, _ = QFileDialog.getOpenFileNames(self, tr('导入已翻译图片或 PDF'),
-            str(self.config.get('page_output_dir', '')), tr('漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf *.json)'))
+            str(self.config.get('page_output_dir', '')), tr('漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf *.json *.comitrans)'))
         if paths:
             self.request_import(paths)
 
@@ -1178,6 +1178,8 @@ class EditorPage(QWidget):
                     raise RuntimeError('页面索引已取消')
                 try:
                     path = Path(raw).resolve()
+                    if path.suffix.lower() == '.comitrans':
+                        path = path.with_suffix('.pdf')
                     if path.suffix.lower() == '.pdf' or path.name == 'project.json':
                         result.append((path, read_project_pages(path, cancelled)))
                     else:
@@ -1504,7 +1506,7 @@ class EditorPage(QWidget):
         self._import_jobs.invalidate()
         self._page_jobs.invalidate()
         self._indexing = self._requesting_page = False
-        if path.suffix.lower() == '.pdf' or path.name == 'project.json':
+        if path.suffix.lower() in {'.pdf', '.comitrans'} or path.name == 'project.json':
             return self.request_import([path])
         if path == self.output_path:
             self._page_jobs.invalidate()

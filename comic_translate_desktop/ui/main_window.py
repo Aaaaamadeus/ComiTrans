@@ -1687,13 +1687,22 @@ class MainWindow(QMainWindow):
         self._add_paths(paths)
         event.acceptProposedAction()
 
+    def close_for_update(self, launch) -> None:
+        self._launch_after_close = launch
+        try:
+            self.close()
+        finally:
+            self._launch_after_close = None
+
     def closeEvent(self, event) -> None:
         self._warmup_timer.stop()
         if (self._pref_save_timer.isActive() or self._pref_save_error) and not self._save_translation_preferences():
             self._set_status(tr('偏好未保存，请重试'), 'error')
             event.ignore()
             return
-        if not self.editor_page._allow_navigation(self.close):
+        launch = getattr(self, '_launch_after_close', None)
+        retry_close = (lambda: self.close_for_update(launch)) if launch else self.close
+        if not self.editor_page._allow_navigation(retry_close):
             event.ignore()
             return
         if self.worker and self.worker.isRunning():
@@ -1724,3 +1733,5 @@ class MainWindow(QMainWindow):
         self._star_prompt.dismiss()
         self.editor_page.shutdown_jobs()
         event.accept()
+        if launch:
+            launch()

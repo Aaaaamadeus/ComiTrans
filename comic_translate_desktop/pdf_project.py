@@ -20,7 +20,10 @@ class PdfProject:
 
 
 def project_link_path(pdf_path: str | Path) -> Path:
-    return Path(pdf_path).with_suffix('.comitrans.json')
+    pdf = Path(pdf_path)
+    link = pdf.with_suffix('.comitrans')
+    legacy = pdf.with_suffix('.comitrans.json')
+    return legacy if not link.exists() and legacy.is_file() else link
 
 
 def create_pdf_project(pdf_path: Path) -> Path:
@@ -79,7 +82,7 @@ def load_pdf_project(pdf_path: str | Path) -> PdfProject:
             raise ValueError('PDF 精修目录必须位于 PDF 所在文件夹内')
         return read_project(directory)
     except (OSError, ValueError, TypeError, KeyError) as exc:
-        raise PdfProcessingError(f'无法打开 PDF 精修资料（请保留同名 .comitrans.json 和配套目录）：{exc}') from exc
+        raise PdfProcessingError(f'无法打开 PDF 精修资料（请保留项目索引和配套目录）：{exc}') from exc
 
 
 def publish_pdf_project(pdf_path: Path, directory: Path) -> None:
