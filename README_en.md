@@ -140,6 +140,10 @@ A fully successful translation batch has a 15% chance of showing a small reposit
 
 ### Release users (recommended)
 
+For releases that provide an MSI, download `ComiTrans-v<version>-x64.msi` from GitHub Releases and double-click it. Download the separate models archive on first install or reuse existing models. The app checks GitHub for a newer stable release at each launch. See [Windows installation and updates](docs/WINDOWS_INSTALLER.md).
+
+#### Earlier ZIP releases (v2.5.2)
+
 1. Download `ComiTrans-v2.5.2-app.zip` from the [v2.5.2 release](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.5.2); for fresh installs or upgrades from v2.5.0 and earlier, also download `ComiTrans-v2.5.2-models.zip` (identical to v2.5.1 models; existing v2.5.1 users can reuse their models folder).
 2. Extract the required archives into the same parent directory and merge their top-level `ComiTrans` folders, preserving the subfolder structure. The final model path is `ComiTrans\comic-translate-ai\models\`.
 3. Double-click the merged `ComiTrans.exe` and enter your translation API key and model on the "Settings" page.
@@ -208,7 +212,7 @@ The `@ComiTrans` watermark is enabled by default. To disable it, uncheck Add @Co
 
 Per-page resume is enabled by default. After a network failure, cancellation, or restart, use the same source files, output folder, and translation settings to skip completed pages and reuse saved translations. Uncheck Resume in Translation Preferences to start over. [Resume guide](docs/RESUMABLE_TRANSLATION.md).
 
-A PDF is shown as one file task and processed through a bounded page pipeline. ComiTrans retains the translated PDF, a matching `.comitrans.json` index, and a separate directory of editable pages. Open the result in the Typesetting Editor or import the translated PDF to adjust text, layout, and backgrounds. Continuous Strip mode lets you scroll vertically and click a page to edit it in place. Editing and Save Image operate on individual images. Export PDF explicitly assembles saved pages in the background with lossless compression, progress and cancellation, preserving page count, order, and sizes. You can also import the project directory’s `project.json` without the PDF. Content is rasterized; password-protected PDFs are not supported. Keep the PDF, index, and project directory together when moving them. [PDF editing guide](docs/PDF_EDITING.md).
+A PDF is shown as one file task and processed through a bounded page pipeline. ComiTrans retains the translated PDF, a matching `.comitrans` index, and a separate directory of editable pages. Open the result in the Typesetting Editor or import the translated PDF to adjust text, layout, and backgrounds. Continuous Strip mode lets you scroll vertically and click a page to edit it in place. Editing and Save Image operate on individual images. Export PDF explicitly assembles saved pages in the background with lossless compression, progress and cancellation, preserving page count, order, and sizes. You can also import the project directory’s `project.json` without the PDF. Content is rasterized; password-protected PDFs are not supported. Keep the PDF, index, and project directory together when moving them. [PDF editing guide](docs/PDF_EDITING.md).
 
 ### OCR interfaces
 
@@ -309,6 +313,8 @@ By default the app is built without models. For local testing with models:
 ```
 
 ### Generate release packages
+
+Current Windows installers are built with WiX. See [Windows installation and updates](docs/WINDOWS_INSTALLER.md) for signing, delta generation and model packaging. The command below is for maintaining legacy ZIP releases.
 
 ```powershell
 python package_release.py --output release/v2.5.2

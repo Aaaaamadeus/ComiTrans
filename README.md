@@ -136,6 +136,10 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ### Release 用户（推荐）
 
+有 MSI 的版本请从 GitHub Releases 下载 `ComiTrans-v<版本>-x64.msi` 并双击安装。首次安装仍需准备独立模型包，已有模型可复用。安装版每次启动查询 GitHub，发现较新正式版本时提示更新。详见 [Windows 安装与更新](docs/WINDOWS_INSTALLER.md)。
+
+#### 历史 ZIP 版（v2.5.2）
+
 1. 在[发布页](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.5.2)下载 `ComiTrans-v2.5.2-app.zip`（程序包）；首次安装或从 v2.5.0 及更早版本升级请同时下载 `ComiTrans-v2.5.2-models.zip`（模型包，与 v2.5.1 一致，已有 v2.5.1 模型可直接复用）。
 2. 所需压缩包解压到同一个父目录，合并顶层同名 `ComiTrans` 文件夹，保留子目录结构。最终模型路径为 `ComiTrans\comic-translate-ai\models\`。
 3. 双击合并后的 `ComiTrans.exe`，在“设置”页填写翻译 API Key 和模型。
@@ -204,7 +208,7 @@ Copy-Item comic-translate-ai/main/config.example.yaml comic-translate-ai/main/co
 
 默认启用按页断点续传。网络失败或停止后，使用相同原文件、输出目录和翻译设置再次开始，即可跳过已完成页面并复用已保存译文；重启程序后同样有效。需要全部重译时，取消“翻译偏好 → 断点续传”勾选。[断点续传说明](docs/RESUMABLE_TRANSLATION.md)。
 
-PDF 会以一个文件任务显示，内部按在途页数上限连续处理，成功后输出 `<原文件名>_translated.pdf`，并保留同名 `.comitrans.json` 索引和独立精修资料目录。点击结果页的精修入口，或在“嵌字精修”导入译文 PDF，即可逐页改字、排版与修补背景；开启“连续长条”可纵向滚动浏览并点击页面原位编辑。精修始终操作逐页图片，“保存图片”和切页不会合成 PDF；需要成书时点击“导出 PDF”，选择文件名后在后台无损合成，支持进度与取消。也可直接导入资料目录中的 `project.json`，不依赖 PDF 本身。输出保留页数、顺序和页面尺寸，页面内容会栅格化；加密或需要密码的 PDF 暂不支持。移动项目时请一起保留 PDF、索引和资料目录。详见 [PDF 精修说明](docs/PDF_EDITING.md)。
+PDF 会以一个文件任务显示，内部按在途页数上限连续处理，成功后输出 `<原文件名>_translated.pdf`，并保留同名 `.comitrans` 索引和独立精修资料目录。点击结果页的精修入口，或在“嵌字精修”导入译文 PDF，即可逐页改字、排版与修补背景；开启“连续长条”可纵向滚动浏览并点击页面原位编辑。精修始终操作逐页图片，“保存图片”和切页不会合成 PDF；需要成书时点击“导出 PDF”，选择文件名后在后台无损合成，支持进度与取消。也可直接导入资料目录中的 `project.json`，不依赖 PDF 本身。输出保留页数、顺序和页面尺寸，页面内容会栅格化；加密或需要密码的 PDF 暂不支持。移动项目时请一起保留 PDF、索引和资料目录。详见 [PDF 精修说明](docs/PDF_EDITING.md)。
 
 ### OCR 接口
 
@@ -308,6 +312,8 @@ v2.5.1 本地预览只随包提供 CharSpot Small 日语 OCR，默认使用 Smal
 ```
 
 ### 生成发布包
+
+新版主程序使用 WiX 构建 MSI。官方签名、差分生成和模型包命令见 [Windows 安装与更新](docs/WINDOWS_INSTALLER.md)。以下命令用于维护历史 ZIP 版。
 
 ```powershell
 python package_release.py --output release/v2.5.2
