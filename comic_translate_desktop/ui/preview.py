@@ -3,14 +3,14 @@ from ..i18n import tr
 
 from pathlib import Path
 from functools import lru_cache
-from PySide6.QtCore import Qt, QRectF, QPointF, QSize, Signal, QEvent
+from PySide6.QtCore import Qt, QElapsedTimer, QRectF, QPointF, QSize, QTimer, Signal, QEvent
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap, QImageReader, QRegion
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QStackedLayout, QPushButton, QSizePolicy, QProgressBar
 from ..pdf_utils import render_pdf_preview
 from ..config import ICON_PATH
 from .halftone import COMPACT_BREAKPOINT, draw_corner_tones, draw_tone
 from .theme import color, display_font, theme_name, ui_font
-from .motion import fade_in
+from .motion import MonochromeShimmerBar, fade_in, reduced_motion
 
 
 @lru_cache(maxsize=4)
@@ -91,16 +91,67 @@ class PageCanvas(QLabel):
         self.regions = []
         self.regions_visible = True
         self._hover_index = -1
+        self._hover_strength = 0.0
+        self._select_pulse_until = 0
+        self._fx_clock = QElapsedTimer()
+        self._fx_clock.start()
+        self._fx_last_ms = 0.0
+        self._fx_timer = QTimer(self)
+        self._fx_timer.setInterval(16)
+        self._fx_timer.timeout.connect(self._step_fx)
         self._region_drag = None
         self._view_pixmap = None
         self._view_scale = 1.0
         self.setMouseTracking(True)
         self.setAccessibleName(tr('漫画画布'))
 
+    def _ensure_fx_timer(self):
+        hovering = self._hover_index is not None and self._hover_index >= 0
+        if reduced_motion() or not self.isVisible():
+            self._hover_strength = 1.0 if hovering else 0.0
+            self._select_pulse_until = 0
+            self._fx_timer.stop()
+            return
+        self._fx_last_ms = float(self._fx_clock.elapsed())
+        if not self._fx_timer.isActive():
+            self._fx_timer.start()
+
+    def trigger_select_pulse(self):
+        if reduced_motion():
+            self._select_pulse_until = 0
+            self._fx_timer.stop()
+            return
+        if self.region is None or self._region_drag is not None or not self.isVisible():
+            return
+        self._select_pulse_until = int(self._fx_clock.elapsed()) + 240
+        self._ensure_fx_timer()
+
+    def _step_fx(self):
+        now = float(self._fx_clock.elapsed())
+        dt = max(1.0, min(48.0, now - self._fx_last_ms))
+        self._fx_last_ms = now
+
+        hovering = self._hover_index is not None and self._hover_index >= 0
+        hover_target = 1.0 if hovering else 0.0
+        rate = 1.0 - (2.718281828 ** (-dt / 36.0))
+        self._hover_strength += (hover_target - self._hover_strength) * rate
+        hover_done = abs(self._hover_strength - hover_target) <= 0.01
+        if hover_done:
+            self._hover_strength = hover_target
+
+        pulse_done = now >= float(self._select_pulse_until)
+        if pulse_done:
+            self._select_pulse_until = 0
+
+        if hover_done and pulse_done:
+            self._fx_timer.stop()
+        self.update()
+
     def set_regions(self, regions, visible=True):
         self.regions = list(regions or ())
         self.regions_visible = bool(visible)
         self._hover_index = -1
+        self._hover_strength = 0.0
         self.update()
 
     def set_view(self, pixmap, scale, viewport):
@@ -299,6 +350,12 @@ class PageCanvas(QLabel):
         hover = self._region_at(event.position())
         if hover != self._hover_index:
             self._hover_index = hover
+            hovering = hover is not None and hover >= 0
+            if hovering and not reduced_motion() and self.isVisible():
+                self._hover_strength = 0.15
+                self._ensure_fx_timer()
+            else:
+                self._hover_strength = 1.0 if hovering else 0.0
             self.update()
         hit = self._region_hit(event.position())
         self._region_cursor(hit)
@@ -346,12 +403,15 @@ class PageCanvas(QLabel):
     def leaveEvent(self, event):
         if self._hover_index != -1:
             self._hover_index = -1
+            self._hover_strength = 0.0
             self.update()
         if self._region_drag is None:
             self.unsetCursor()
         super().leaveEvent(event)
 
     def hideEvent(self, event):
+        self._fx_timer.stop()
+        self._select_pulse_until = 0
         self.cancel_region_drag()
         super().hideEvent(event)
 
@@ -431,18 +491,19 @@ class PageCanvas(QLabel):
                     continue
                 guide = QColor(color('guide'))
                 if index == self._hover_index:
+                    hs = max(0.25, min(1.0, self._hover_strength if self._hover_strength > 0 else 1.0))
                     halo = QColor(color('guideHalo'))
-                    halo.setAlpha(180)
+                    halo.setAlpha(int(round(180 * hs)))
                     halo_pen = QPen(halo, 2.5, Qt.SolidLine)
                     halo_pen.setCosmetic(True)
                     painter.setPen(halo_pen)
                     painter.setBrush(Qt.NoBrush)
                     painter.drawRect(rect)
-                    guide.setAlpha(235)
+                    guide.setAlpha(int(round(235 * hs)))
                     pen = QPen(guide, 1.5, Qt.SolidLine)
                     pen.setCosmetic(True)
                     painter.setPen(pen)
-                    painter.setBrush(QColor(guide.red(), guide.green(), guide.blue(), 24))
+                    painter.setBrush(QColor(guide.red(), guide.green(), guide.blue(), int(round(24 * hs))))
                 else:
                     guide.setAlpha(85)
                     pen = QPen(guide, 1, Qt.DashLine)
@@ -467,6 +528,18 @@ class PageCanvas(QLabel):
             pen.setCosmetic(True)
             painter.setPen(pen)
             painter.drawRect(rect)
+            if self._select_pulse_until > 0 and not reduced_motion():
+                rem = self._select_pulse_until - int(self._fx_clock.elapsed())
+                if rem > 0:
+                    pt = 1.0 - max(0.0, min(1.0, rem / 240.0))
+                    spread = 2.0 + 7.0 * pt
+                    pulse_c = QColor(color('guide'))
+                    pulse_c.setAlpha(int(round(165 * (1.0 - pt) ** 2)))
+                    pulse_pen = QPen(pulse_c, 1.4, Qt.SolidLine)
+                    pulse_pen.setCosmetic(True)
+                    painter.setPen(pulse_pen)
+                    painter.setBrush(Qt.NoBrush)
+                    painter.drawRect(rect.adjusted(-spread, -spread, spread, spread))
             if selected_index is not None and rect.width() >= 24 and rect.height() >= 20:
                 badge_text = f'{selected_index + 1:02d}'
                 badge_font = ui_font(11, mono=True)
@@ -563,9 +636,10 @@ class ImagePreview(QWidget):
         self._state_title.setAlignment(Qt.AlignCenter)
         self._state_title.setWordWrap(True)
         state_layout.addWidget(self._state_title)
-        self._state_bar = QProgressBar()
+        self._state_bar = MonochromeShimmerBar()
         self._state_bar.setRange(0, 0)
         self._state_bar.setFixedWidth(180)
+        self._state_bar.setFixedHeight(5)
         self._state_bar.setTextVisible(False)
         self._state_bar.setObjectName('canvasStateBar')
         state_layout.addWidget(self._state_bar, 0, Qt.AlignHCenter)
@@ -863,7 +937,9 @@ class ImagePreview(QWidget):
 
     def set_region(self, box=None, *, editable=False):
         """Canvas-only selection guide; never alter the rendered/exported pixels."""
-        self._label.region = tuple(box) if box is not None else None
+        prev_box = self._label.region
+        new_box = tuple(box) if box is not None else None
+        self._label.region = new_box
         self._label.region_editable = editable and box is not None
         self._label.setFocusPolicy(Qt.StrongFocus if (self._label.region_editable
                                or self._label.region_creation or self._label.bubble_creation
@@ -874,6 +950,8 @@ class ImagePreview(QWidget):
         if (not self._label.region_editable and not self._label.region_creation
                 and not self._label.bubble_creation):
             self.cancel_region_drag()
+        if new_box is not None and new_box != prev_box and self._label._region_drag is None:
+            self._label.trigger_select_pulse()
         self._label.update()
 
     def cancel_region_drag(self):
