@@ -4,8 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import pi, sin
 
-from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
+from PySide6.QtCore import QElapsedTimer, QPointF, QRectF, Qt, QTimer
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QLinearGradient, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from ..i18n import tr, ui_language
@@ -54,8 +54,8 @@ STATUS_TEXT = {
 
 _NORMAL_HEIGHT = 112
 _COMPACT_HEIGHT = 66
-_PULSE_INTERVAL_MS = 60
-_PULSE_PERIOD_TICKS = 24
+_PULSE_INTERVAL_MS = 16
+_PULSE_PERIOD_TICKS = 75
 
 
 @dataclass(frozen=True)
@@ -117,6 +117,10 @@ class StepPanel(QWidget):
         self._tile_rects: list[tuple[QRectF, str, str]] = []
         self._hover_target: tuple[str, str] | None = None
         self._pulse_tick = 0
+        self._pulse_clock = QElapsedTimer()
+        self._pulse_clock.start()
+        self._prev_stage_states: dict[str, int] = {}
+        self._done_flash_until: dict[str, int] = {}
 
         self.setFixedHeight(_NORMAL_HEIGHT)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -535,8 +539,11 @@ class StepPanel(QWidget):
         return views
 
     def _sync_pulse_timer(self, views: dict[str, _StageView]) -> None:
+        now = int(self._pulse_clock.elapsed())
+        self._done_flash_until = {k: v for k, v in self._done_flash_until.items() if v > now}
         any_running = any(view.state == RUNNING for view in views.values())
-        should_pulse = any_running and not reduced_motion() and self.isVisible()
+        any_flashing = bool(self._done_flash_until)
+        should_pulse = (any_running or any_flashing) and not reduced_motion() and self.isVisible()
         if should_pulse:
             if not self._pulse_timer.isActive():
                 self._pulse_timer.start()
@@ -545,6 +552,8 @@ class StepPanel(QWidget):
 
     def _advance_pulse(self) -> None:
         self._pulse_tick = (self._pulse_tick + 1) % _PULSE_PERIOD_TICKS
+        if self._done_flash_until:
+            self._sync_pulse_timer(self._compute_stage_views())
         self.update()
 
     def showEvent(self, event) -> None:
@@ -558,9 +567,15 @@ class StepPanel(QWidget):
 
     def _refresh(self) -> None:
         views = self._compute_stage_views()
+        now = int(self._pulse_clock.elapsed())
+        can_flash = self.isVisible() and not reduced_motion()
         summary = []
         for index, stage in enumerate(STAGE_ORDER, start=1):
             view = views[stage]
+            old_state = self._prev_stage_states.get(stage)
+            if can_flash and old_state == RUNNING and view.state == DONE:
+                self._done_flash_until[stage] = now + 440
+            self._prev_stage_states[stage] = view.state
             name, status = self._labels[stage]
             name.setText(f'{index:02d} {tr(STAGE_LABELS[stage])}')
             status.setText(tr(STATUS_TEXT[view.state]))
@@ -582,6 +597,9 @@ class StepPanel(QWidget):
             if rect.contains(pos):
                 views = self._compute_stage_views()
                 tip = views[stage].tooltip
+                if self._hover_target != ('node', stage):
+                    self._hover_target = ('node', stage)
+                    self.update()
                 if self.toolTip() != tip:
                     self.setToolTip(tip)
                 return
@@ -783,11 +801,17 @@ class StepPanel(QWidget):
             painter.drawPath(chevron)
 
         if travel and energized and not reduced_motion() and self._pulse_timer.isActive():
-            t = (self._pulse_tick % _PULSE_PERIOD_TICKS) / float(_PULSE_PERIOD_TICKS)
-            pt = path.pointAtPercent(t)
+            base_t = ((self._pulse_clock.elapsed() % 1350) / 1350.0) * 1.12 - 0.02
             painter.setPen(Qt.NoPen)
-            painter.setBrush(QColor(color('ink')))
-            painter.drawEllipse(pt, 2.6, 2.6)
+            ink = QColor(color('ink'))
+            for offset, rad, alpha in ((0.0, 2.8, 255), (-0.055, 2.1, 150), (-0.11, 1.4, 70)):
+                t = base_t + offset
+                if 0.0 <= t <= 1.0:
+                    pt = path.pointAtPercent(t)
+                    c = QColor(ink)
+                    c.setAlpha(alpha)
+                    painter.setBrush(c)
+                    painter.drawEllipse(pt, rad, rad)
 
     def _draw_wires(
         self,
@@ -985,6 +1009,49 @@ class StepPanel(QWidget):
         painter.setBrush(fill)
         painter.drawRoundedRect(rect, radius, radius)
 
+        if self._hover_target == ('node', view.stage) and not is_running:
+            hover_c = QColor(color('ink'))
+            hover_c.setAlpha(18)
+            painter.setPen(QPen(QColor(color('ink')), 1.1))
+            painter.setBrush(hover_c)
+            painter.drawRoundedRect(rect, radius, radius)
+
+        if is_running and not reduced_motion() and self._pulse_timer.isActive():
+            inner = rect.adjusted(2.0, 4.0, -2.0, -4.0)
+            if inner.width() > 6.0 and inner.height() > 4.0:
+                painter.save()
+                clip = QPainterPath()
+                clip.addRoundedRect(inner, max(2.0, radius - 2.0), max(2.0, radius - 2.0))
+                painter.setClipPath(clip)
+                phase = (self._pulse_clock.elapsed() % 1350) / 1350.0
+                sweep = min(1.0, phase / 0.78)
+                band_w = max(20.0, inner.width() * 0.44)
+                cx = inner.left() - band_w * 0.6 + (inner.width() + band_w * 1.2) * sweep
+                sheen = QColor(color('paper'))
+                fade = 1.0 if phase <= 0.78 else max(0.0, 1.0 - (phase - 0.78) / 0.14)
+                sheen_c = QColor(sheen)
+                sheen_c.setAlpha(0)
+                sheen_peak = QColor(sheen)
+                sheen_peak.setAlpha(int(round(34 * fade)))
+                grad = QLinearGradient(cx - band_w * 0.5, inner.top(), cx + band_w * 0.5, inner.bottom())
+                grad.setColorAt(0.0, sheen_c)
+                grad.setColorAt(0.5, sheen_peak)
+                grad.setColorAt(1.0, sheen_c)
+                painter.fillRect(inner, grad)
+                painter.restore()
+
+        flash_until = self._done_flash_until.get(view.stage)
+        if flash_until is not None and not reduced_motion():
+            rem = flash_until - int(self._pulse_clock.elapsed())
+            if rem > 0:
+                ft = 1.0 - max(0.0, min(1.0, rem / 440.0))
+                spread = 1.5 + 5.5 * ft
+                ring_c = QColor(color('ink'))
+                ring_c.setAlpha(int(round(135 * (1.0 - ft) ** 2)))
+                painter.setPen(QPen(ring_c, 1.3))
+                painter.setBrush(Qt.NoBrush)
+                painter.drawRoundedRect(rect.adjusted(-spread, -spread, spread, spread), radius + spread * 0.4, radius + spread * 0.4)
+
         # Status glyph on the left inside the node
         pad_x = 6.0 if self._compact else 9.0
         glyph_r = 4.0 if self._compact else 5.2
@@ -1056,12 +1123,18 @@ class StepPanel(QWidget):
         if state == RUNNING:
             fg = QColor(color('paper') if inverted else color('ink'))
             if not reduced_motion() and self._pulse_timer.isActive():
-                phase = 0.5 + 0.5 * sin(2 * pi * self._pulse_tick / _PULSE_PERIOD_TICKS)
+                ms = float(self._pulse_clock.elapsed())
+                phase = 0.5 + 0.5 * sin(2 * pi * ms / 1100.0)
                 ring = QColor(fg)
-                ring.setAlphaF(0.25 + 0.45 * phase)
+                ring.setAlphaF(0.28 + 0.48 * phase)
                 painter.setPen(QPen(ring, 1.3))
                 painter.setBrush(Qt.NoBrush)
-                painter.drawEllipse(center, r * (0.85 + 0.25 * phase), r * (0.85 + 0.25 * phase))
+                painter.drawEllipse(center, r * (0.86 + 0.24 * phase), r * (0.86 + 0.24 * phase))
+                echo_t = (ms % 1100.0) / 1100.0
+                echo_c = QColor(fg)
+                echo_c.setAlphaF(0.45 * ((1.0 - echo_t) ** 2))
+                painter.setPen(QPen(echo_c, 1.0))
+                painter.drawEllipse(center, r * (0.95 + 0.85 * echo_t), r * (0.95 + 0.85 * echo_t))
             painter.setPen(Qt.NoPen)
             painter.setBrush(fg)
             painter.drawEllipse(center, r * 0.52, r * 0.52)

@@ -27,7 +27,7 @@ from ..i18n import UI_LANGUAGES
 from comic_translate_core.languages import SOURCE_LANGUAGES
 from .advanced_config import AdvancedConfigSection
 from .manga_components import PanelHeading
-from .motion import set_reduced_motion
+from .motion import install_tab_motion, set_reduced_motion
 from .theme import apply_theme
 
 
@@ -49,6 +49,7 @@ class ApiConfigPage(QWidget):
         self._sections = QTabWidget()
         self._sections.setDocumentMode(True)
         self._sections.setAccessibleName(tr('设置分类'))
+        install_tab_motion(self._sections)
         body_layout.addWidget(self._sections)
         outer.addWidget(body, 1)
         root = self._add_section(tr('01  翻译服务'), tr('连接你的翻译服务'), tr('配置接口、翻译方式和输出水印，保存后将在下一次任务生效。'))

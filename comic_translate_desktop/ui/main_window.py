@@ -17,6 +17,7 @@ from PySide6.QtCore import (
     QTimer,
     QThread,
     QUrl,
+    QVariantAnimation,
 )
 from PySide6.QtGui import (
     QDesktopServices,
@@ -70,7 +71,20 @@ from .editor_page import EditorPage
 from .error_log_page import ErrorLogPage
 from .step_panel import StepPanel
 from .theme import apply_theme, brand_font, refresh_style, set_themed_icon
-from .motion import reduced_motion, set_pulse, set_reduced_motion
+from .motion import (
+    STANDARD,
+    SlidingNavUnderline,
+    StatusShimmerOverlay,
+    fade_in,
+    install_list_motion,
+    install_stack_motion,
+    install_tab_motion,
+    play_reveal_overlay,
+    play_slide_overlay,
+    reduced_motion,
+    set_pulse,
+    set_reduced_motion,
+)
 from .window_chrome import apply_window_chrome, watch_window_chrome
 from .preview import ImagePreview
 from .log_panel import LogPanel
@@ -170,6 +184,7 @@ class MainWindow(QMainWindow):
         self.status_pill.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         self.status_pill.setMinimumWidth(96)
         self.status_pill.setMaximumWidth(190)
+        self._status_shimmer = StatusShimmerOverlay(self.status_pill)
         pill_layout = QHBoxLayout(self.status_pill)
         pill_layout.setContentsMargins(8, 4, 10, 4)
         pill_layout.setSpacing(6)
@@ -234,10 +249,12 @@ class MainWindow(QMainWindow):
         self.editor_page = EditorPage()
         self.tabs.addWidget(self.editor_page)
         root.addWidget(self.tabs, 1)
+        install_stack_motion(self.tabs)
         self._apply_compact_layout()
         self._nav_auto.clicked.connect(lambda: self.tabs.setCurrentWidget(self.translate_tab))
         self._nav_editor.clicked.connect(lambda: self.tabs.setCurrentWidget(self.editor_page))
         self._nav_auto.setChecked(True)
+        self._nav_underline = SlidingNavUnderline(top_bar, [self._nav_auto, self._nav_editor])
         self.tabs.currentChanged.connect(self._on_tab_changed)
         self._add_btn.clicked.connect(self._choose_files)
         self._folder_btn.clicked.connect(self._choose_folder)
@@ -307,6 +324,7 @@ class MainWindow(QMainWindow):
         self.file_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.file_list.setAccessibleName(tr('漫画文件队列'))
         self.file_list.itemSelectionChanged.connect(self._on_file_selection)
+        install_list_motion(self.file_list)
         layout.addWidget(self.file_list, 1)
         buttons = QHBoxLayout()
         self._remove_btn = QPushButton(tr('移除选中'))
@@ -607,6 +625,7 @@ class MainWindow(QMainWindow):
         self.result_view = ImagePreview(illustration='studio-editor-v1.png')
         self.preview_tabs.addTab(self.original_view, tr('原图'))
         self.preview_tabs.addTab(self.result_view, tr('译图'))
+        install_tab_motion(self.preview_tabs)
         self._log_panel = LogPanel(self.diagnostics.log_path)
         self.log_view = self._log_panel.view
         self.work_splitter = QSplitter(Qt.Vertical)
@@ -894,6 +913,13 @@ class MainWindow(QMainWindow):
         self._status_dot.setProperty("state", state)
         refresh_style(self.status_label)
         refresh_style(self._status_dot)
+        active_work = state in ('running', 'warming', 'stopping')
+        active_prop = 'true' if active_work else 'false'
+        if self.status_pill.property('active') != active_prop:
+            self.status_pill.setProperty('active', active_prop)
+            refresh_style(self.status_pill)
+        if hasattr(self, '_status_shimmer'):
+            self._status_shimmer.set_active(active_work)
         set_pulse(self._status_dot, state in ('running', 'warming'))
         self.status_label.setAccessibleName(tr(text))
         self.status_pill.setToolTip(tr(text))
@@ -1372,32 +1398,39 @@ class MainWindow(QMainWindow):
             previous.deleteLater()
             self._pref_animation = None
         target = self._pref_target_height() if expand else 0
-        duration = 220 if expand else 180
-        if reduced_motion() or self.height() < 760:
+        duration = 230 if expand else 195
+        if reduced_motion() or self.height() < 680:
             # Short windows hide the log and stage focus while the foldout is open;
             # apply compact visibility first so _pref_target_height sees freed space.
             self._pref_animating = False
             self._apply_compact_layout()
             target = self._pref_target_height() if expand else 0
+            container.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
             container.setVisible(expand)
             container.setMinimumHeight(target)
             container.setMaximumHeight(target)
             if expand:
                 self._restore_preferences_scroll()
             return
-        start = container.maximumHeight() if container.isVisible() else 0
+        start = container.height() if container.isVisible() else 0
         if start > 10000:
             start = 0
+        container.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         container.setVisible(True)
-        container.setMinimumHeight(start)
-        container.setMaximumHeight(start)
-        animation = QPropertyAnimation(container, b"minimumHeight", self)
+        if expand:
+            container.verticalScrollBar().setValue(self._pref_scroll_value)
+        container.setFixedHeight(start)
+
+        animation = QVariantAnimation(self)
         animation.setDuration(duration)
-        animation.setStartValue(start)
-        animation.setEndValue(target)
-        animation.setEasingCurve(QEasingCurve.OutCubic)
-        animation.valueChanged.connect(
-            lambda value: container.setMaximumHeight(int(value)))
+        animation.setStartValue(float(start))
+        animation.setEndValue(float(target))
+        animation.setEasingCurve(STANDARD)
+
+        def _on_val(value) -> None:
+            container.setFixedHeight(max(0, int(round(float(value)))))
+
+        animation.valueChanged.connect(_on_val)
         animation.finished.connect(
             lambda: self._finish_preferences_animation(expand, target))
         self._pref_animation = animation
@@ -1411,10 +1444,13 @@ class MainWindow(QMainWindow):
         else:
             target = 0
         container = self._pref_container
+        container.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         container.setMinimumHeight(target)
         container.setMaximumHeight(target)
         if expand:
-            self._restore_preferences_scroll()
+            bar = container.verticalScrollBar()
+            if bar.value() != self._pref_scroll_value:
+                bar.setValue(self._pref_scroll_value)
         else:
             container.setVisible(False)
         self._apply_compact_layout()
@@ -1424,7 +1460,16 @@ class MainWindow(QMainWindow):
             0, lambda: self._pref_container.verticalScrollBar().setValue(self._pref_scroll_value))
 
     def _toggle_log_panel(self, visible: bool) -> None:
-        self._log_panel.setVisible(visible)
+        was_visible = self._log_panel.isVisible()
+        if self.isVisible() and was_visible != visible:
+            if visible:
+                self._log_panel.setVisible(True)
+                play_reveal_overlay(self._log_panel, edge='bottom', duration=185)
+            else:
+                play_slide_overlay(self._log_panel, edge='bottom', duration=160)
+                self._log_panel.setVisible(False)
+        else:
+            self._log_panel.setVisible(visible)
         self._log_toggle.setText(tr('详细日志') if visible else tr('展开日志'))
         self._log_toggle.setArrowType(Qt.DownArrow if visible else Qt.RightArrow)
         self._apply_compact_layout()

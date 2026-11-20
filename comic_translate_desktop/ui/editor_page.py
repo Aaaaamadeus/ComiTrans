@@ -5,7 +5,7 @@ import sys
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
-from PySide6.QtCore import Qt, QRect, QSize, QSettings, QTimer, QEvent, QPoint
+from PySide6.QtCore import Qt, QRect, QSize, QSettings, QTimer, QEvent, QPoint, QVariantAnimation
 from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QIcon, QImageReader, QShortcut, QKeySequence
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView, QStyledItemDelegate, QStyle)
 from ..config import load_ai_config, MAIN_DIR
@@ -26,6 +26,16 @@ from .strip_preview import StripPreview
 from .thumbnail_loader import ThumbnailLoader
 from .theme import color, set_themed_icon, ui_font
 from .manga_components import PanelHeading
+from .motion import (
+    STANDARD,
+    fade_in,
+    fade_out,
+    install_list_motion,
+    install_tab_motion,
+    play_reveal_overlay,
+    play_slide_overlay,
+    reduced_motion,
+)
 from .searchable_combo import SearchableFontCombo
 from .favorite_fonts import FavoriteFontBar
 from .tool_flow import ToolFlowLayout
@@ -335,7 +345,7 @@ class EditorPage(QWidget):
         self._zoom.setInsertPolicy(QComboBox.NoInsert)
         self._zoom.lineEdit().setReadOnly(True)
         self._zoom.lineEdit().setAlignment(Qt.AlignCenter)
-        self._zoom.setMinimumWidth(88)
+        self._zoom.setMinimumWidth(116)
         self._zoom.setToolTip(tr('缩放：Alt+滚轮以光标为中心，空格+拖动平移；Ctrl+0/1/2 适应页面/100%/适应宽度'))
         toolbar.addWidget(self._zoom)
         self._zoom_in_btn = QPushButton()
@@ -421,6 +431,7 @@ class EditorPage(QWidget):
         self.page_list.setTextElideMode(Qt.ElideMiddle)
         self.page_list.currentItemChanged.connect(self._select_page)
         self.page_list.itemSelectionChanged.connect(self._update_repair_controls)
+        install_list_motion(self.page_list)
         left.addWidget(self.page_list, 1)
         sidebar_footer = QFrame()
         sidebar_footer.setObjectName('sidebarFooter')
@@ -470,7 +481,7 @@ class EditorPage(QWidget):
         self._zoom_hud_timer = QTimer(self)
         self._zoom_hud_timer.setSingleShot(True)
         self._zoom_hud_timer.setInterval(900)
-        self._zoom_hud_timer.timeout.connect(self._zoom_hud.hide)
+        self._zoom_hud_timer.timeout.connect(lambda: fade_out(self._zoom_hud, 160))
 
         canvas_tools_frame = QFrame()
         canvas_tools_frame.setObjectName('canvasToolBar')
@@ -600,8 +611,10 @@ class EditorPage(QWidget):
         self.block_list.setMouseTracking(True)
         self.block_list.setItemDelegate(_BlockItemDelegate(self.block_list))
         self.block_list.currentRowChanged.connect(self._load_properties)
+        install_list_motion(self.block_list)
         self._inspector_tabs = QTabWidget()
         self._inspector_tabs.setDocumentMode(True)
+        install_tab_motion(self._inspector_tabs)
         self._inspector_splitter = QSplitter(Qt.Vertical)
         self._inspector_splitter.setObjectName('inspectorSplitter')
         self._inspector_splitter.setChildrenCollapsible(False)
@@ -634,6 +647,8 @@ class EditorPage(QWidget):
         self._source_text.setReadOnly(True)
         self._source_text.setFixedHeight(92)
         self._source_text.setFont(ui_font(japanese=True))
+        self._source_anim = None
+        self._source_anim_gen = 0
         text_props.addWidget(self._source_text)
         self._source_toggle.toggled.connect(self._toggle_source_text)
         target_label = QLabel(tr('译文'))
@@ -963,7 +978,10 @@ class EditorPage(QWidget):
             self._zoom_hud.setText(text)
             self._zoom_hud.adjustSize()
             self._place_zoom_hud()
+            was_visible = self._zoom_hud.isVisible()
             self._zoom_hud.show()
+            if not was_visible:
+                fade_in(self._zoom_hud, 110)
             self._zoom_hud.raise_()
             self._zoom_hud_timer.start()
 
@@ -1013,7 +1031,18 @@ class EditorPage(QWidget):
             button.blockSignals(True)
             button.setChecked(effective[index])
             button.blockSignals(False)
-            panel.setVisible(effective[index])
+            was_visible = panel.isVisible()
+            want_visible = effective[index]
+            if self.isVisible() and was_visible != want_visible:
+                edge = 'left' if index == 0 else 'right'
+                if want_visible:
+                    panel.setVisible(True)
+                    play_reveal_overlay(panel, edge=edge, duration=190)
+                else:
+                    play_slide_overlay(panel, edge=edge, duration=160)
+                    panel.setVisible(False)
+            else:
+                panel.setVisible(want_visible)
             button.setToolTip(tr('窗口较窄时暂时收起；展开此栏会让出另一个侧栏的位置。')
                               if self._desired_panels[index] and not effective[index] and not focused else '')
         if not compact and self._was_compact and not focused and self._wide_splitter_state is not None:
@@ -1024,12 +1053,28 @@ class EditorPage(QWidget):
     def _toggle_canvas_focus(self, focused):
         if focused:
             self._focus_splitter_state = self.splitter.saveState()
-        self._apply_panel_layout()
-        if not focused:
+            self._apply_panel_layout()
+        else:
             self.splitter.restoreState(self._focus_splitter_state)
             self._apply_panel_layout()
-        for widget in (self._canvas_heading, self._status, self._pages_toggle, self._properties_toggle):
-            widget.setVisible(not focused)
+        for widget, edge, slide_hide in (
+            (self._canvas_heading, 'top', True),
+            (self._status, 'bottom', True),
+            (self._pages_toggle, 'top', False),
+            (self._properties_toggle, 'top', False),
+        ):
+            want_visible = not focused
+            was_visible = widget.isVisible()
+            if self.isVisible() and was_visible != want_visible:
+                if want_visible:
+                    widget.setVisible(True)
+                    play_reveal_overlay(widget, edge=edge, duration=155)
+                else:
+                    if slide_hide:
+                        play_slide_overlay(widget, edge=edge, duration=135)
+                    widget.setVisible(False)
+            else:
+                widget.setVisible(want_visible)
         self._update_toolbar_labels()
 
     def _update_toolbar_labels(self):
@@ -1126,7 +1171,56 @@ class EditorPage(QWidget):
         self._source_toggle.setChecked(expanded)
         self._source_toggle.blockSignals(False)
         self._source_toggle.setArrowType(Qt.DownArrow if expanded else Qt.RightArrow)
-        self._source_text.setVisible(expanded)
+        if getattr(self, '_source_anim', None) is not None:
+            self._source_anim.stop()
+            self._source_anim.deleteLater()
+            self._source_anim = None
+        self._source_anim_gen += 1
+        gen = self._source_anim_gen
+
+        if not self.isVisible() or reduced_motion():
+            self._source_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            self._source_text.setFixedHeight(92 if expanded else 0)
+            self._source_text.setVisible(expanded)
+            return
+
+        was_visible = self._source_text.isVisible()
+        if was_visible == expanded and self._source_text.height() == (92 if expanded else 0):
+            return
+
+        start_h = self._source_text.height() if was_visible else 0
+        end_h = 92 if expanded else 0
+        self._source_text.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._source_text.setVisible(True)
+        self._source_text.setFixedHeight(start_h)
+
+        anim = QVariantAnimation(self)
+        anim.setDuration(195 if expanded else 160)
+        anim.setStartValue(float(start_h))
+        anim.setEndValue(float(end_h))
+        anim.setEasingCurve(STANDARD)
+
+        def _on_val(val):
+            if gen != self._source_anim_gen:
+                return
+            self._source_text.setFixedHeight(max(0, int(round(float(val)))))
+
+        def _on_done():
+            if gen != self._source_anim_gen:
+                return
+            self._source_anim = None
+            self._source_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            if expanded:
+                self._source_text.setFixedHeight(92)
+                self._source_text.setVisible(True)
+            else:
+                self._source_text.setFixedHeight(0)
+                self._source_text.setVisible(False)
+
+        anim.valueChanged.connect(_on_val)
+        anim.finished.connect(_on_done)
+        self._source_anim = anim
+        anim.start()
 
     def _set_editable(self, enabled):
         restored = 0 <= self._loaded_row < len(self.items) and self.items[self._loaded_row].get('restore_original', False)

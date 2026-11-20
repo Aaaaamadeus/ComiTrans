@@ -5,7 +5,7 @@ from functools import lru_cache
 from math import ceil, hypot, sqrt
 
 from PySide6.QtCore import QByteArray, QRectF, Qt
-from PySide6.QtGui import QPainter, QPainterPath
+from PySide6.QtGui import QPainter, QPainterPath, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 from .theme import theme
@@ -78,19 +78,37 @@ def _renderer(width, height, compact, mask, profile, direction, dot_color):
     return QSvgRenderer(QByteArray(halftone_svg(width, height, compact, mask, profile, direction, dot_color)))
 
 
+@lru_cache(maxsize=96)
+def _tone_pixmap(width, height, dpr_tenth, compact, mask, profile, direction, dot_color):
+    dpr = max(1.0, dpr_tenth / 10.0)
+    pix = QPixmap(max(1, round(width * dpr)), max(1, round(height * dpr)))
+    pix.fill(Qt.transparent)
+    pix.setDevicePixelRatio(dpr)
+    p = QPainter(pix)
+    _renderer(width, height, compact, mask, profile, direction, dot_color).render(
+        p, QRectF(0, 0, width, height)
+    )
+    p.end()
+    return pix
+
+
 def draw_tone(painter, bounds, *, compact=False, mask='linear', profile='section', direction='left'):
     if bounds.width() <= 0 or bounds.height() <= 0:
         return
     palette = theme()
-    renderer = _renderer(max(1, round(bounds.width())), max(1, round(bounds.height())),
-                         compact, mask, profile, direction, palette['tone'])
+    w = max(1, round(bounds.width()))
+    h = max(1, round(bounds.height()))
+    dev = painter.device()
+    dpr = dev.devicePixelRatioF() if dev is not None and hasattr(dev, 'devicePixelRatioF') else 1.0
+    dpr_tenth = max(10, round(dpr * 10))
+    pix = _tone_pixmap(w, h, dpr_tenth, compact, mask, profile, direction, palette['tone'])
     painter.save()
     if palette['toneBlend'] == 'multiply':
         # QWidget 中用 Qt 的对应混合模式实现 SVG 的 mix-blend-mode: multiply。
         painter.setCompositionMode(QPainter.CompositionMode_Multiply)
     else:
         painter.setOpacity(palette['toneAlpha'])
-    renderer.render(painter, bounds)
+    painter.drawPixmap(bounds, pix, QRectF(0, 0, pix.width(), pix.height()))
     painter.restore()
 
 
@@ -98,8 +116,8 @@ def draw_corner_tones(painter, bounds, *, compact=False):
     """Small page-edge accents; keep the central reading area open."""
     if bounds.width() < 320 or bounds.height() < 150:
         return
-    width = min(192, bounds.width() * .24)
-    height = min(112, bounds.height() * .28)
+    width = max(16, round(min(192, bounds.width() * .24) / 8) * 8)
+    height = max(16, round(min(112, bounds.height() * .28) / 8) * 8)
     painter.save()
     painter.setRenderHint(QPainter.Antialiasing)
     painter.setOpacity(.3 if theme()['toneBlend'] == 'multiply' else 1.0)
