@@ -25,13 +25,13 @@ STAGE_LABELS = {
 }
 STAGE_COMPACT_LABELS = dict(zip(STAGE_ORDER, ('读取', '检测', '识别', '翻译', '修复', '排版', '保存')))
 STAGE_DESCRIPTIONS = {
-    "start": "读取原始图片或按页渲染原分辨率 PDF 页图",
+    "start": "读取图片，或按页准备 PDF、CBZ 的原分辨率页图",
     "detect": "检测漫画气泡与文字框范围",
     "ocr": "识别框内原文并测量字号与排向",
     "translate": "按阅读顺序调用翻译模型，结合前文上下文并缓存译文",
     "inpaint": "与翻译并行在独立线程生成擦字掩膜并修补背景",
     "typeset": "翻译与修补汇合后，校对空译文并完成横竖排嵌字",
-    "save": "写入译图、清理底图与布局文件，全部完成后合成译文 PDF",
+    "save": "写入译图、底图和布局，全部完成后生成译文 PDF 或 CBZ",
 }
 
 PENDING = 0
@@ -321,11 +321,13 @@ class StepPanel(QWidget):
             if state == 'running':
                 self._publishing_pdf = {
                     'name': event.get('document_name', ''),
+                    'format': event.get('output_format') or 'PDF',
                     'state': 'running',
                 }
             elif state == 'failed':
                 self._publishing_pdf = {
                     'name': event.get('document_name', ''),
+                    'format': event.get('output_format') or 'PDF',
                     'state': 'failed',
                 }
                 self._task_phase = 'failed'
@@ -468,15 +470,13 @@ class StepPanel(QWidget):
             detail_line = tr(STAGE_DESCRIPTIONS[stage])
 
             if stage == "save" and self._publishing_pdf:
+                badge = self._publishing_pdf['format']
+                sublabel = tr('CBZ 打包') if badge == 'CBZ' else tr('PDF 合成')
                 if self._publishing_pdf.get('state') == 'failed':
                     state = FAILED
-                    badge = "PDF"
-                    sublabel = tr('PDF 合成')
                 else:
                     state = RUNNING
-                    badge = "PDF"
-                    sublabel = tr('PDF 合成')
-                    detail_line = tr('正在合成译文 PDF · {_0}', _0=self._publishing_pdf.get('name', ''))
+                    detail_line = self._publish_status()
             elif failed:
                 pid = failed[0]
                 state = FAILED
@@ -654,6 +654,12 @@ class StepPanel(QWidget):
         join_pt = QPointF(rects["typeset"].left() - fork_gap * 0.34, cy)
         return rects, fork_pt, join_pt
 
+    def _publish_status(self):
+        name = self._publishing_pdf['name']
+        if self._publishing_pdf['format'] == 'CBZ':
+            return tr('正在打包译文 CBZ · {_0}', _0=name)
+        return tr('正在合成译文 PDF · {_0}', _0=name)
+
     def _header_texts(self, views: dict[str, _StageView]) -> tuple[str, list[str]]:
         work_ids = self._work_page_ids()
         total_pages = len(self._page_order)
@@ -661,7 +667,7 @@ class StepPanel(QWidget):
         resumed = self._resumed_count()
 
         if self._publishing_pdf and self._publishing_pdf.get('state') == 'running':
-            headline = tr('正在合成译文 PDF · {_0}', _0=self._publishing_pdf.get('name', ''))
+            headline = self._publish_status()
         elif self._task_phase == 'failed' or any(v.state == FAILED for v in views.values()):
             headline = tr('流程中断 · 请查看报错日志')
         elif self._task_phase == 'cancelled':

@@ -211,6 +211,18 @@ class StripPreview(ImagePreview):
         if self._active_path:
             self.reveal_page(self._active_path)
 
+    def reveal_region(self, box):
+        self.reveal_active()
+        rect = self._label._box_rect(box)
+        if rect.isEmpty():
+            return
+        scroll = self._strip_scroll if self._continuous else self._scroll
+        viewport = scroll.viewport()
+        center = self._label.mapTo(viewport, rect.center().toPoint())
+        horizontal, vertical = scroll.horizontalScrollBar(), scroll.verticalScrollBar()
+        horizontal.setValue(horizontal.value() + center.x() - viewport.width() // 2)
+        vertical.setValue(vertical.value() + center.y() - viewport.height() // 2)
+
     def reveal_page(self, key):
         if not self._continuous or key not in self._indices:
             return

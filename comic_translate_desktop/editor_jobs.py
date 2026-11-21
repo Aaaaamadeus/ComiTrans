@@ -121,6 +121,39 @@ def read_page(path, settings=None, cancelled=lambda: False):
         return PageData(preview, None, [], f'缺少或无法读取配套清理底图、布局：{exc}')
 
 
+@dataclass(frozen=True)
+class TranscriptEntry:
+    path: Path
+    label: str
+    index: int
+    source: str
+    translation: str
+    restored: bool
+
+
+def read_transcript(pages, current_path, current_items, cancelled):
+    entries, skipped = [], 0
+    for path, label in pages:
+        if cancelled():
+            break
+        if path == current_path:
+            items = current_items
+        else:
+            layout = path.parent.parent / f'{path.parent.name}_layout' / f'{path.stem}_layout.json'
+            try:
+                items = json.loads(layout.read_text(encoding='utf-8'))
+                if not isinstance(items, list):
+                    raise ValueError('Expected layout items')
+            except (OSError, ValueError):
+                skipped += 1
+                continue
+        entries.extend(
+            TranscriptEntry(path, label, index, str(item.get('source_text') or ''),
+                            str(item.get('text') or ''), bool(item.get('restore_original')))
+            for index, item in enumerate(items) if isinstance(item, dict))
+    return entries, skipped
+
+
 def prepare_legacy_regions(data, settings):
     legacy = [item for item in data.items if len(item.get('mask_box', [])) < 4]
     if not legacy:

@@ -64,6 +64,7 @@ from comic_translate_core.chinese import TARGET_LANGUAGES, target_language_name
 from comic_translate_core.layout_options import VERTICAL_ALIGNMENTS
 from ..diagnostics import Diagnostics
 from ..pdf_utils import render_pdf_preview
+from ..cbz import PROJECT_EXTS, render_cbz_preview
 from ..pdf_project import project_link_path
 from ..worker import BatchWorker
 from .api_config_page import ApiConfigPage
@@ -96,7 +97,7 @@ from .star_prompt import StarPrompt, STAR_PROMPT_PROBABILITY
 
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
-DOCUMENT_EXTS = IMAGE_EXTS | {".pdf"}
+DOCUMENT_EXTS = IMAGE_EXTS | PROJECT_EXTS
 
 
 class MainWindow(QMainWindow):
@@ -289,7 +290,7 @@ class MainWindow(QMainWindow):
         heading = PanelHeading("01", tr('漫画队列'), sidebar=True)
         layout.addWidget(heading)
         self._file_count_label = QLabel(tr('0 个文件'))
-        self._file_selection_label = QLabel(tr('支持图片与 PDF'))
+        self._file_selection_label = QLabel(tr('支持图片、PDF 与 CBZ'))
         self._file_selection_label.setProperty("muted", True)
         layout.addWidget(self._file_count_label)
         layout.addWidget(self._file_selection_label)
@@ -311,7 +312,7 @@ class MainWindow(QMainWindow):
         self._folder_btn.setProperty("role", "chip")
         drop.addWidget(self._add_btn)
         drop.addWidget(self._folder_btn)
-        hint = QLabel('PNG / JPG / WEBP / BMP / PDF')
+        hint = QLabel('PNG / JPG / WEBP / BMP / PDF / CBZ')
         hint.setObjectName("dropHint")
         hint.setWordWrap(True)
         self._drop_hint = hint
@@ -823,9 +824,11 @@ class MainWindow(QMainWindow):
         self._update_actions()
 
     def _thumbnail_icon(self, path: Path) -> QIcon:
-        if path.suffix.lower() == ".pdf":
+        suffix = path.suffix.lower()
+        if suffix in PROJECT_EXTS:
             try:
-                return QIcon(QPixmap.fromImage(render_pdf_preview(path, QSize(96, 96))))
+                preview = render_cbz_preview if suffix == '.cbz' else render_pdf_preview
+                return QIcon(QPixmap.fromImage(preview(path, QSize(96, 96))))
             except Exception:
                 return QIcon()
         reader = QImageReader(str(path))
@@ -839,9 +842,9 @@ class MainWindow(QMainWindow):
     def _choose_files(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
             self,
-            tr('选择漫画图片或 PDF'),
+            tr('选择漫画文件'),
             "",
-            tr('漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf);;图片文件 (*.png *.jpg *.jpeg *.webp *.bmp);;PDF 文件 (*.pdf)'),
+            tr('漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf *.cbz);;图片文件 (*.png *.jpg *.jpeg *.webp *.bmp);;PDF 文件 (*.pdf);;CBZ 文件 (*.cbz)'),
         )
         self._add_paths(paths)
 
@@ -1099,22 +1102,22 @@ class MainWindow(QMainWindow):
         self._page_progress_label.setVisible((count > 0 or running) and not compact_pref)
         self._progress_label.setVisible((count > 0 or running) and not compact_pref)
         self._file_selection_label.setText(
-            tr('已选 {_0} 个', _0=selected_count) if selected_count else tr('支持图片与 PDF')
+            tr('已选 {_0} 个', _0=selected_count) if selected_count else tr('支持图片、PDF 与 CBZ')
         )
         selected = self.file_list.selectedItems()
         output = self.results.get(selected[-1].data(Qt.UserRole)) if selected else None
         self._edit_result_btn.setEnabled(bool(output and (
-            Path(output).suffix.lower() != ".pdf" or project_link_path(output).is_file())))
-        self._edit_result_btn.setToolTip(tr('精修已生成的图片或 PDF') if self._edit_result_btn.isEnabled() else tr('请选择已完成且带精修资料的图片或 PDF'))
+            Path(output).suffix.lower() not in PROJECT_EXTS or project_link_path(output).is_file())))
+        self._edit_result_btn.setToolTip(tr('精修已生成的结果') if self._edit_result_btn.isEnabled() else tr('请选择已完成且带精修资料的结果'))
         editable = self._editable_outputs()
         self._edit_all_btn.setEnabled(bool(editable) and not running)
         self._edit_all_btn.setToolTip(
-            tr('把上次任务生成的全部图片或 PDF 加入嵌字精修列表') if editable
+            tr('把上次任务的全部结果加入嵌字精修列表') if editable
             else tr('上次任务还没有可精修的结果'))
         if warming:
             self._start_btn.setToolTip(tr('本地模型正在准备，完成后即可开始'))
         elif not count:
-            self._start_btn.setToolTip(tr('请先添加漫画图片或 PDF'))
+            self._start_btn.setToolTip(tr('请先添加漫画文件'))
         else:
             self._start_btn.setToolTip(tr('开始处理当前列表中的 {_0} 个文件', _0=count))
 
@@ -1143,7 +1146,8 @@ class MainWindow(QMainWindow):
             return
         self.step_panel.consume_workflow_event(event)
         if event.get('type') == 'publish' and event.get('state') == 'running':
-            self.stage_focus.set_stage('07', tr('合成译文 PDF'), event.get('document_name', ''))
+            title = tr('打包译文 CBZ') if event.get('output_format') == 'CBZ' else tr('合成译文 PDF')
+            self.stage_focus.set_stage('07', title, event.get('document_name', ''))
 
     def _on_stage_event(self, event) -> None:
         if self.worker is None or event['task_id'] != self.worker.task_id:
@@ -1346,7 +1350,7 @@ class MainWindow(QMainWindow):
             key = str(path)
             if key in seen or not path.exists():
                 continue
-            if path.suffix.lower() == '.pdf' and not project_link_path(path).is_file():
+            if path.suffix.lower() in PROJECT_EXTS and not project_link_path(path).is_file():
                 continue
             seen.add(key)
             outputs.append(key)
