@@ -384,6 +384,9 @@ QSpinBox::up-button, QDoubleSpinBox::up-button, QSpinBox::down-button, QDoubleSp
 QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { image: url("@icons/chevron-up.svg"); width: 12px; height: 12px; }
 QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { image: url("@icons/chevron-down.svg"); width: 12px; height: 12px; }
 QListWidget, QTreeView { padding: 0; border: none; background: transparent; }
+QTableView#transcriptTable { border: 1px solid @rule; border-radius: 8px; background: @paper; color: @ink; gridline-color: @rule; selection-background-color: @muted; selection-color: @ink; }
+QTableView#transcriptTable::item { padding: 6px; }
+QTableView#transcriptTable QHeaderView::section { padding: 6px; border: none; border-bottom: 1px solid @rule; background: @workspace; color: @ink; }
 QListWidget::item { padding: 8px 6px; border: none; border-left: 2px solid transparent; }
 QListWidget::item:selected { background: @muted; color: @ink; border-left: 2px solid @ink; }
 QListWidget::item:hover:!selected { background: @workspace; }

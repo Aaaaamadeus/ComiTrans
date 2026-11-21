@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QElapsedTimer, QRectF, QPointF, QSize, QTimer, Si
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap, QImageReader, QRegion
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QStackedLayout, QPushButton, QSizePolicy, QProgressBar
 from ..pdf_utils import render_pdf_preview
+from ..cbz import render_cbz_preview
 from ..config import ICON_PATH
 from .halftone import COMPACT_BREAKPOINT, draw_corner_tones, draw_tone
 from .theme import color, display_font, theme_name, ui_font
@@ -768,8 +769,11 @@ class ImagePreview(QWidget):
 
     def set_image(self, path):
         try:
-            if Path(path).suffix.lower() == '.pdf':
+            suffix = Path(path).suffix.lower()
+            if suffix == '.pdf':
                 self.set_pixmap(QPixmap.fromImage(render_pdf_preview(path, QSize(1600, 1600))))
+            elif suffix == '.cbz':
+                self.set_pixmap(QPixmap.fromImage(render_cbz_preview(path, QSize(1600, 1600))))
             else:
                 reader = QImageReader(str(path))
                 reader.setAutoTransform(True)

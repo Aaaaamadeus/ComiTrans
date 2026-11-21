@@ -10,16 +10,17 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QIcon, QImageReader,
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView, QStyledItemDelegate, QStyle)
 from ..config import load_ai_config, MAIN_DIR
 from ..font_library import available_fonts, font_description, font_display_name, font_reference, inspect_font, resolve_font_reference
-from comic_translate_core.page_compositor import compose_page, layer_bounds
+from comic_translate_core.page_compositor import compose_page, intersection, layer_bounds
 from comic_translate_core.restoration import (
     find_original, save_original, original_snapshot_path, legacy_region, protected_region,
     intersects_restored_region,
 )
 from comic_translate_core.layout_options import VERTICAL_ALIGNMENTS, normalize_text_color
 from ..background_repair import BackgroundRepair, RepairWorker, save_editor_files
+from ..cbz import PROJECT_EXTS
 from ..pdf_export import PdfExportWorker
 from ..pdf_utils import PdfProcessingError
-from ..editor_jobs import LatestJobQueue, read_page, read_project_pages, SaveRequest
+from ..editor_jobs import LatestJobQueue, read_page, read_project_pages, read_transcript, SaveRequest
 from ..lettering_transform import text_transform, transform_layer, outline_width
 from .color_picker import TextColorPicker
 from .strip_preview import StripPreview
@@ -136,6 +137,7 @@ class EditorPage(QWidget):
         self._import_jobs = LatestJobQueue(self)
         self._save_jobs = LatestJobQueue(self)
         self._after_save = None
+        self._save_failure_callback = None
         self._save_again = False
         self._requesting_page = False
         self._indexing = False
@@ -378,6 +380,13 @@ class EditorPage(QWidget):
         self._export_pdf_btn.setEnabled(False)
         self._export_pdf_btn.clicked.connect(self._export_action)
         toolbar.addWidget(self._export_pdf_btn)
+        self._export_cbz_btn = QPushButton(tr('导出 CBZ'))
+        self._export_cbz_btn.setProperty('role', 'chip')
+        self._export_cbz_btn.setProperty('compact', True)
+        self._export_cbz_btn.setToolTip(tr('将已保存的图片按页面顺序打包为 CBZ。'))
+        self._export_cbz_btn.setEnabled(False)
+        self._export_cbz_btn.clicked.connect(lambda: self._export_action('cbz'))
+        toolbar.addWidget(self._export_cbz_btn)
         self._save_btn = QPushButton(tr('保存图片'))
         self._save_btn.setProperty('role', 'primary')
         toolbar.addWidget(self._save_btn)
@@ -388,7 +397,7 @@ class EditorPage(QWidget):
         self._favorite_fonts.add_current_requested.connect(self._add_favorite_font)
         root.addWidget(self._favorite_fonts)
 
-        self._status = QLabel(tr('导入带布局数据的已翻译图片或 PDF，或从自动处理结果进入精修。'))
+        self._status = QLabel(tr('导入带布局数据的译稿，或从自动处理结果进入精修。'))
         self._status.setWordWrap(True)
         self._status.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._status.setObjectName('editorStatus')
@@ -415,11 +424,17 @@ class EditorPage(QWidget):
         self._page_count_label.setFont(ui_font(12, mono=True))
         page_head.addWidget(self._page_count_label)
         left.addLayout(page_head)
-        add = QPushButton(tr('导入译图 / PDF'))
+        add = QPushButton(tr('导入译图'))
         set_themed_icon(add, 'plus')
         add.setProperty('role', 'chip')
         add.clicked.connect(self._import_pages)
         left.addWidget(add)
+        self._transcript_btn = QPushButton(tr('全书译稿'))
+        self._transcript_btn.setProperty('role', 'chip')
+        self._transcript_btn.setProperty('compact', True)
+        self._transcript_btn.setEnabled(False)
+        self._transcript_btn.clicked.connect(self.open_transcript)
+        left.addWidget(self._transcript_btn)
         self.page_list = QListWidget()
         self.page_list.setObjectName('pageList')
         self.page_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -462,8 +477,8 @@ class EditorPage(QWidget):
         self._strip_toggle.toggled.connect(self.preview.set_continuous)
         self.preview.page_requested.connect(self._request_canvas_page)
         self.preview.clear(tr('选择一页，开始精修'))
-        self.preview._hint.setText(tr('导入带布局数据的已翻译图片或 PDF，或从自动处理结果进入精修。'))
-        self.preview.import_button.setText(tr('导入已翻译图片或 PDF'))
+        self.preview._hint.setText(tr('导入带布局数据的译稿，或从自动处理结果进入精修。'))
+        self.preview.import_button.setText(tr('导入已翻译的漫画'))
         self.preview.import_requested.connect(self._import_pages)
         self.preview.region_edited.connect(self._resize_region_from_canvas)
         self.preview.region_edit_finished.connect(self.apply_changes)
@@ -641,7 +656,15 @@ class EditorPage(QWidget):
         self._source_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self._source_toggle.setProperty('role', 'quiet')
         self._source_toggle.setProperty('compact', True)
-        text_props.addWidget(self._source_toggle)
+        source_row = QHBoxLayout()
+        source_row.addWidget(self._source_toggle, 1)
+        self._retranslate_btn = QPushButton(tr('重译气泡'))
+        self._retranslate_btn.setProperty('compact', True)
+        self._retranslate_btn.setProperty('role', 'chip')
+        self._retranslate_btn.setEnabled(False)
+        self._retranslate_btn.clicked.connect(self.open_retranslation)
+        source_row.addWidget(self._retranslate_btn)
+        text_props.addLayout(source_row)
         self._source_text = QPlainTextEdit()
         self._source_text.setObjectName('textSource')
         self._source_text.setReadOnly(True)
@@ -1084,9 +1107,11 @@ class EditorPage(QWidget):
             (self._zoom_tool_btn, tr('缩放工具'), tr('缩放')),
             (self._strip_toggle, tr('连续长条'), tr('长条')),
             (self._export_pdf_btn, tr('导出 PDF'), 'PDF'),
+            (self._export_cbz_btn, tr('导出 CBZ'), 'CBZ'),
             (self._save_btn, tr('保存图片'), tr('保存')),
         ):
-            button.setText(short if compact else full)
+            if self._export_worker is None or button not in (self._export_pdf_btn, self._export_cbz_btn):
+                button.setText(short if compact else full)
             button.setAccessibleName(full)
         self._focus_btn.setText(tr('退出专注') if self._focus_btn.isChecked()
                                 else tr('专注') if compact else tr('专注画布'))
@@ -1249,8 +1274,8 @@ class EditorPage(QWidget):
             self._status.setText(tr('字体库未能打开：{_0}', _0=exc))
 
     def _import_pages(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, tr('导入已翻译图片或 PDF'),
-            str(self.config.get('page_output_dir', '')), tr('漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf *.json)'))
+        paths, _ = QFileDialog.getOpenFileNames(self, tr('导入已翻译的漫画'),
+            str(self.config.get('page_output_dir', '')), tr('漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf *.cbz *.json)'))
         if paths:
             self.request_import(paths)
 
@@ -1272,7 +1297,7 @@ class EditorPage(QWidget):
                     raise RuntimeError('页面索引已取消')
                 try:
                     path = Path(raw).resolve()
-                    if path.suffix.lower() == '.pdf' or path.name == 'project.json':
+                    if path.suffix.lower() in PROJECT_EXTS or path.name == 'project.json':
                         result.append((path, read_project_pages(path, cancelled)))
                     else:
                         reader = QImageReader(str(path))
@@ -1593,27 +1618,29 @@ class EditorPage(QWidget):
             return True
         return False
 
-    def request_page(self, output_path):
+    def request_page(self, output_path, *, block=None):
         path = Path(output_path).resolve()
         self._import_jobs.invalidate()
         self._page_jobs.invalidate()
         self._indexing = self._requesting_page = False
-        if path.suffix.lower() == '.pdf' or path.name == 'project.json':
+        if path.suffix.lower() in PROJECT_EXTS or path.name == 'project.json':
             return self.request_import([path])
         if path == self.output_path:
             self._page_jobs.invalidate()
             self._requesting_page = False
             self._restore_page_selection()
             self._update_repair_controls()
+            if block is not None:
+                self._jump_to_block(block)
             return True
         self._restore_page_selection()
-        if not self._allow_navigation(lambda: self.request_page(path)):
+        if not self._allow_navigation(lambda: self.request_page(path, block=block)):
             self._update_repair_controls()
             return False
-        self._begin_page_load(path)
+        self._begin_page_load(path, after=None if block is None else lambda: self._jump_to_block(block))
         return True
 
-    def _begin_page_load(self, path, *, import_notice=''):
+    def _begin_page_load(self, path, *, import_notice='', after=None, failed=None):
         revision, previous = self._edit_revision, self.output_path
         settings = deepcopy(self.config)
         self._requesting_page = True
@@ -1623,13 +1650,105 @@ class EditorPage(QWidget):
         def accept(data):
             self._requesting_page = False
             if self.output_path != previous or self._edit_revision != revision:
-                self._status.setText(tr('加载期间当前页有新修改，已保留当前页；请重新选择目标页。'))
+                message = tr('加载期间当前页有新修改，已保留当前页；请重新选择目标页。')
+                self._status.setText(message)
                 self._update_repair_controls()
+                if failed:
+                    failed(message)
                 return
-            if self.load_page(path, _payload=data, _approved=True) and import_notice:
-                self._status.setText(f'{self._status.text()} · {import_notice}')
-        self._page_jobs.submit(lambda cancelled: read_page(path, settings, cancelled), accept, self._page_load_failed, cancellable=True)
+            if self.load_page(path, _payload=data, _approved=True):
+                if import_notice:
+                    self._status.setText(f'{self._status.text()} · {import_notice}')
+                if after:
+                    after()
+            elif failed:
+                failed(self._status.text())
+        def reject(message):
+            self._page_load_failed(message)
+            if failed:
+                failed(message)
+        self._page_jobs.submit(lambda cancelled: read_page(path, settings, cancelled), accept, reject, cancellable=True)
         self._update_repair_controls()
+
+    def open_transcript(self):
+        from .transcript_dialog import TranscriptDialog
+        if not self._transcript_btn.isEnabled():
+            return
+        if self._text_dialog is not None:
+            self._text_dialog.close()
+        project = self._pdf_projects.get(str(self.output_path))
+        dialog = TranscriptDialog(lambda jobs, loaded, failed: self._index_transcript(
+            jobs, loaded, failed, project), self._replace_transcript, self)
+        if dialog.exec() and dialog.selection is not None:
+            self.request_page(dialog.selection.path, block=dialog.selection.index)
+        dialog.deleteLater()
+
+    def _index_transcript(self, jobs, loaded, failed, project):
+        self._store_properties()
+        keys = [str(path) for path in project.images] if project else [
+            self.page_list.item(row).data(Qt.UserRole) for row in range(self.page_list.count())]
+        pages = [(Path(key), self._page_items[key].data(Qt.UserRole + 1))
+                 for key in keys if key in self._page_items]
+        current = self.output_path if self._cleaned_image is not None else None
+        items = deepcopy(self.items)
+        jobs.submit(lambda cancelled: read_transcript(pages, current, items, cancelled),
+                    loaded, failed, cancellable=True)
+
+    def _replace_transcript(self, replacements, complete, progress):
+        grouped = {}
+        for entry, text in replacements:
+            grouped.setdefault(entry.path, []).append((entry, text))
+        pages = list(grouped.items())
+        starting_page = self.output_path
+        saved_start = starting_page
+        completed = 0
+
+        def finish(error=''):
+            if error:
+                complete(tr('已保存 {_0} 页。替换暂停（{_1}）', _0=completed, _1=error))
+            else:
+                complete(tr('已保存 {_0} 页的译文替换', _0=completed))
+
+        def save_next():
+            if completed == len(pages):
+                finish()
+                return
+            path, changes = pages[completed]
+            if path == starting_page:
+                path = saved_start
+            progress(completed + 1, len(pages))
+
+            def apply():
+                if any(entry.index >= len(self.items)
+                       or self.items[entry.index].get('restore_original')
+                       or str(self.items[entry.index].get('source_text') or '') != entry.source
+                       or str(self.items[entry.index].get('text') or '') != entry.translation
+                       for entry, _text in changes):
+                    finish(tr('页面内容已更新，请重新预览替换'))
+                    return
+                for entry, text in changes:
+                    self.items[entry.index]['text'] = text
+                    self._refresh_block_item(entry.index)
+                self._load_properties(self._loaded_row)
+                self._mark_dirty(properties=False)
+                self.request_save(after=saved, on_error=finish)
+
+            if path == self.output_path:
+                apply()
+            else:
+                self._begin_page_load(path, after=apply, failed=finish)
+
+        def saved():
+            nonlocal completed
+            completed += 1
+            save_next()
+
+        def start():
+            nonlocal saved_start
+            saved_start = self.output_path
+            save_next()
+
+        self.request_save(after=start, on_error=finish)
 
     def _page_load_failed(self, error):
         self._requesting_page = False
@@ -1643,7 +1762,7 @@ class EditorPage(QWidget):
 
     def confirm_discard(self):
         if self._export_worker is not None:
-            self._status.setText(tr('正在导出 PDF，请完成或取消导出后再切页或退出。'))
+            self._status.setText(tr('正在导出，请完成或取消后再切页或退出。'))
             return False
         if self._repair_worker is not None:
             self._status.setText(tr('正在修补背景，请稍候再保存或切换页面。'))
@@ -1660,7 +1779,7 @@ class EditorPage(QWidget):
 
     def load_page(self, output_path, *, _payload=None, _approved=False):
         path = Path(output_path).resolve()
-        if path.suffix.lower() == '.pdf' or path.name == 'project.json':
+        if path.suffix.lower() in PROJECT_EXTS or path.name == 'project.json':
             try:
                 pages = self._register_pdf(path)
             except Exception as exc:
@@ -1838,12 +1957,12 @@ class EditorPage(QWidget):
                              else tr('此气泡已还原为原图 · 未保存，点击保存图片后保留。'))
         return True
 
-    def _mark_dirty(self):
+    def _mark_dirty(self, *, properties=True):
         if self._loading or not self.items:
             return
         self._edit_revision += 1
         self._dirty = True
-        self._row_dirty = True
+        self._row_dirty = self._row_dirty or properties
         self._preview_dirty = True
         self._status.setText(tr('● 未保存修改 · {_0}', _0=self.output_path.name))
         self._refresh_page_dirty_label()
@@ -1874,6 +1993,92 @@ class EditorPage(QWidget):
         if self._loading or self._text_input.toPlainText() == text:
             return
         self._text_input.setPlainText(text)
+
+    def open_retranslation(self):
+        from ..bubble_translation import retranslate_bubble
+        from .retranslate_dialog import RetranslateDialog
+
+        if not self._retranslate_btn.isEnabled() or not self.apply_changes():
+            return
+        if self._text_dialog is not None:
+            self._text_dialog.close()
+        index = self._loaded_row
+        item = self.items[index]
+        config = load_ai_config()
+        language = item.get('source_language') or config.get('source_language', 'ja')
+        original = find_original(self.output_path)
+        bounds = (0, 0, *self._cleaned_image.size)
+        box = intersection(item['box'][:4], bounds)
+        source = str(item.get('source_text') or '')
+        current = str(item.get('text') or '')
+        neighbors = [
+            {'原文': row.get('source_text', ''), '译文': row.get('text', '')}
+            for row in self.items[max(0, index - 2):index + 3] if row is not item]
+        context = '相邻气泡，仅供参考：\n' + json.dumps(neighbors, ensure_ascii=False) if neighbors else ''
+        def translate(text, instruction, cancelled):
+            return retranslate_bubble(config, language, text, instruction, context,
+                                      original if box else None, box, cancelled)
+        dialog = RetranslateDialog(source, current, translate,
+                                   lambda candidate: self._preview_retranslation(index, candidate), self)
+        try:
+            if dialog.exec() and dialog.result_text is not None:
+                revised_source = dialog.source.toPlainText().strip()
+                if revised_source != source:
+                    item.setdefault('ocr_raw_text', source)
+                    item['source_text'] = revised_source
+                item['text'] = dialog.result_text
+                self._load_properties(index)
+                self._mark_dirty(properties=False)
+                self._preview_timer.start()
+                self._status.setText(tr('已应用候选译文，保存后写入图片'))
+        finally:
+            dialog.deleteLater()
+
+    def _preview_retranslation(self, index, candidate):
+        from PIL.ImageQt import ImageQt
+
+        item = self.items[index]
+        box = self._mask_box(item)
+        rectangles = [box]
+        cached = self._layer_cache.get(index)
+        if cached:
+            rectangles.append(layer_bounds(cached[1:4]))
+        layer = None
+        if candidate is not None:
+            revised = {**item, 'text': candidate}
+            typesetter = self._typesetter_for_item(item)
+            size = item.get('font_size') if item.get('manual_layout') else item.get('rendered_font_size') or item.get('font_size')
+            layer = self._draw_lettering(self._cleaned_image, revised, typesetter, box, int(size or 0))
+            if layer is not None:
+                rectangles.append(layer_bounds(layer))
+        left = min(rect[0] for rect in rectangles)
+        top = min(rect[1] for rect in rectangles)
+        right = max(rect[2] for rect in rectangles)
+        bottom = max(rect[3] for rect in rectangles)
+        padding = max(12, round(max(right - left, bottom - top) * .12))
+        bounds = (0, 0, *self._rendered.size)
+        crop = intersection((left - padding, top - padding, right + padding, bottom + padding), bounds) or bounds
+
+        def preview(image):
+            sample = image.crop(crop)
+            sample.thumbnail((600, 280))
+            return ImageQt(sample).copy()
+
+        current = preview(self._rendered)
+        if candidate is None:
+            return current, None
+        layers = []
+        for row in range(len(self.items)):
+            if row == index:
+                if layer is not None:
+                    layers.append(layer)
+            elif row in self._layer_cache:
+                layers.append(self._layer_cache[row][1:4])
+        original = self._get_original_image() if any(i.get('restore_original') for i in self.items) else None
+        revised_image, _ = compose_page(self._cleaned_image, self._rendered, layers, [crop],
+            watermark=bool(self.config.get('watermark_enabled', True)),
+            original=original, items=self.items, copy_previous=True)
+        return current, preview(revised_image)
 
     def _layout_spins(self):
         return (self._size_spin, self._offset_x, self._offset_y, self._mask_width, self._mask_height,
@@ -1952,6 +2157,15 @@ class EditorPage(QWidget):
         item = self.block_list.item(index)
         if item is not None:
             self.block_list.scrollToItem(item, QAbstractItemView.PositionAtCenter)
+
+    def _jump_to_block(self, index):
+        if not 0 <= index < len(self.items):
+            return
+        self._select_block(index)
+        self._inspector_tabs.setCurrentIndex(0)
+        item = self.items[index]
+        box = item['box'][:4] if item.get('restore_original') else self._mask_box(item)
+        self.preview.reveal_region(box)
 
     def _resize_region_from_canvas(self, box):
         if self._repair_mode.isChecked():
@@ -2199,6 +2413,7 @@ class EditorPage(QWidget):
         self._fill_black_btn.setToolTip(fill_tip or tr('把框选区域整块填成黑色（可撤回）。'))
         self._fill_custom_btn.setToolTip(fill_tip or tr('用当前颜色填充框选区域（可撤回）。'))
         selected = 0 <= self._loaded_row < len(self.items)
+        self._retranslate_btn.setEnabled(ready and selected and not self.items[self._loaded_row].get('restore_original'))
         self._restore_bubble_btn.setEnabled(ready and selected)
         self._restore_bubble_btn.setText(tr('恢复处理结果') if selected and self.items[self._loaded_row].get('restore_original') else tr('还原此气泡'))
         self._link_original_btn.setEnabled(ready)
@@ -2206,7 +2421,13 @@ class EditorPage(QWidget):
                        and (self._original_image is not None or find_original(self.output_path) is not None))
         self._repair_undo.setEnabled(ready and (bool(self._repair_history) or can_restore))
         self._save_btn.setEnabled(ready)
+        if self._export_worker is None:
+            can_export = self.output_path is not None and not busy and not self.page_io_busy
+            self._export_pdf_btn.setEnabled(can_export)
+            self._export_cbz_btn.setEnabled(can_export)
         page_list_busy = (busy or self._export_worker is not None or self.page_io_busy)
+        self._transcript_btn.setEnabled(not page_list_busy and not self._save_jobs.busy
+                                        and self.page_list.count() > 0)
         self.page_list.setEnabled(not page_list_busy)
         self._remove_pages_btn.setEnabled(not page_list_busy and bool(self.page_list.selectedItems()))
         self._clear_pages_btn.setEnabled(not page_list_busy and self.page_list.count() > 0)
@@ -2371,6 +2592,20 @@ class EditorPage(QWidget):
             label = item.data(Qt.UserRole + 1)
             item.setText(tr('● 未保存\n{_0}', _0=label) if self._dirty else label)
 
+    @staticmethod
+    def _draw_lettering(image, item, typesetter, box, size):
+        typesetter.draw_text(
+            image, box, item['text'], item.get('style', 'dialogue'),
+            direction=int(item.get('direction', 1)),
+            target_font_size=size if size > 0 else None,
+            non_bubble=bool(item.get('non_bubble', False)), manual_layout=True,
+            text_effect=item.get('text_effect', 'auto'),
+            source_outline_ratio=item.get('source_outline_ratio'),
+            vertical_alignment=item.get('vertical_alignment', 'center'),
+            text_color=normalize_text_color(item.get('text_color')),
+            outline_width=outline_width(item), composite=False)
+        return transform_layer(typesetter.last_render_layer, text_transform(item))
+
     def render(self) -> None:
         if self._cleaned_image is None:
             raise ValueError(tr('缺少配套清理底图，请重新导入页面'))
@@ -2405,24 +2640,8 @@ class EditorPage(QWidget):
                 layers.append(layer)
                 signatures[index] = (key, layer_bounds(layer))
                 continue
-            typesetter.draw_text(
-                image,
-                box,
-                text,
-                item.get("style", "dialogue"),
-                direction=int(item.get("direction", 1)),
-                target_font_size=size if size > 0 else None,
-                non_bubble=bool(item.get("non_bubble", False)),
-                manual_layout=True,
-                text_effect=item.get('text_effect', 'auto'),
-                source_outline_ratio=item.get('source_outline_ratio'),
-                vertical_alignment=item.get('vertical_alignment', 'center'),
-                text_color=normalize_text_color(item.get('text_color')),
-                outline_width=outline_width(item),
-                composite=False,
-            )
+            layer = self._draw_lettering(image, item, typesetter, box, size)
             item['rendered_font_size'] = typesetter.last_font_size
-            layer = transform_layer(typesetter.last_render_layer, text_transform(item))
             if layer is not None:
                 surface, left, top = layer
                 layers.append(layer)
@@ -2453,45 +2672,56 @@ class EditorPage(QWidget):
         if 0 <= self._loaded_row < len(self.items):
             self._refresh_block_item(self._loaded_row)
 
-    def _export_action(self):
+    def _export_action(self, kind='pdf'):
         if self._export_worker is not None:
             self._cancel_pdf_export()
         else:
-            self.export_pdf()
+            self._export_comic(kind if isinstance(kind, str) else 'pdf')
 
     def export_pdf(self, output_path=None):
+        return self._export_comic('pdf', output_path)
+
+    def export_cbz(self, output_path=None):
+        return self._export_comic('cbz', output_path)
+
+    def _export_comic(self, kind, output_path=None):
         if self._export_worker is not None or self.output_path is None or self._repair_worker is not None:
             return False
+        suffix = f'.{kind}'
+        sizes = []
         project = self._pdf_projects.get(str(self.output_path))
         if project is not None:
             images, sizes = project.images, project.page_sizes
             source = self._pdf_sources[str(self.output_path)]
-            default = (source.parent / f'{source.stem}_edited.pdf') if source.suffix.lower() == '.pdf' else source.parent / 'edited.pdf'
+            filename = f'{source.stem}_edited{suffix}' if source.suffix.lower() in PROJECT_EXTS else f'edited{suffix}'
+            default = source.parent / filename
         else:
             images = [Path(self.page_list.item(i).data(Qt.UserRole)) for i in range(self.page_list.count())]
-            sizes = []
-            for path in images:
-                reader = QImageReader(str(path))
-                size = reader.size()
-                if reader.transformation().value & 4:
-                    size.transpose()
-                if not size.isValid():
-                    self._status.setText(tr('无法读取译图：{_0}', _0=path.name))
-                    return False
-                sizes.append((size.width() * 72 / 200, size.height() * 72 / 200))
-            default = self.output_path.with_name('edited.pdf')
+            if kind == 'pdf':
+                for path in images:
+                    reader = QImageReader(str(path))
+                    size = reader.size()
+                    if reader.transformation().value & 4:
+                        size.transpose()
+                    if not size.isValid():
+                        self._status.setText(tr('无法读取译图：{_0}', _0=path.name))
+                        return False
+                    sizes.append((size.width() * 72 / 200, size.height() * 72 / 200))
+            default = self.output_path.with_name(f'edited{suffix}')
+        format_name = kind.upper()
         if output_path is None:
-            chosen, _ = QFileDialog.getSaveFileName(self, tr('导出 PDF'), str(default), 'PDF (*.pdf)')
+            chosen, _ = QFileDialog.getSaveFileName(self, tr('导出 {_0}', _0=format_name),
+                                                    str(default), f'{format_name} (*{suffix})')
             if not chosen:
                 return False
             output_path = Path(chosen)
-        output_path = Path(output_path).with_suffix('.pdf')
+        output_path = Path(output_path).with_suffix(suffix)
         # Flush pending spin-box text even before it has marked the page dirty.
         # Plain images without editing metadata can be exported directly.
         for spin in self._layout_spins():
             spin.interpretText()
         if self._dirty or self._save_jobs.busy:
-            return self.request_save(after=lambda: self.export_pdf(output_path))
+            return self.request_save(after=lambda: self._export_comic(kind, output_path))
         worker = PdfExportWorker(images, sizes, output_path, self)
         self._export_worker = worker
         worker.progress.connect(self._pdf_export_progress)
@@ -2500,23 +2730,26 @@ class EditorPage(QWidget):
         worker.cancelled.connect(self._pdf_export_cancelled)
         worker.finished.connect(self._pdf_export_finished)
         self._update_repair_controls()
-        self._export_pdf_btn.setText(tr('取消导出'))
-        self._export_pdf_btn.setToolTip(tr('取消导出'))
-        self._status.setText(tr('正在后台导出 PDF…'))
+        button, other = (self._export_cbz_btn, self._export_pdf_btn) if kind == 'cbz' else (self._export_pdf_btn, self._export_cbz_btn)
+        other.setEnabled(False)
+        button.setText(tr('取消导出'))
+        button.setToolTip(tr('取消导出'))
+        self._status.setText(tr('正在后台导出 {_0}…', _0=format_name))
         worker.start()
         return True
 
     def _pdf_export_progress(self, done, total):
-        self._status.setText(tr('正在导出 PDF：{_0}/{_1} 页', _0=done, _1=total))
+        self._status.setText(tr('正在导出 {_0}：{_1}/{_2} 页',
+                                _0=self._export_worker.output.suffix[1:].upper(), _1=done, _2=total))
 
     def _pdf_export_succeeded(self, path):
-        self._status.setText(tr('已导出 PDF：{_0}', _0=path))
+        self._status.setText(tr('已导出 {_0}：{_1}', _0=Path(path).suffix[1:].upper(), _1=path))
 
     def _pdf_export_failed(self, message):
-        self._status.setText(tr('PDF 导出失败：{_0}。已保存的图片仍然保留。', _0=message))
+        self._status.setText(tr('导出失败：{_0}。已保存的图片仍然保留。', _0=message))
 
     def _pdf_export_cancelled(self):
-        self._status.setText(tr('已取消 PDF 导出，已保存的图片仍然保留。'))
+        self._status.setText(tr('已取消导出，已保存的图片仍然保留。'))
 
     def _cancel_pdf_export(self):
         if self._export_worker is not None:
@@ -2527,9 +2760,9 @@ class EditorPage(QWidget):
         self._export_worker = None
         if worker is not None:
             worker.deleteLater()
-        self._export_pdf_btn.setEnabled(self.output_path is not None)
-        self._export_pdf_btn.setText(tr('导出 PDF'))
+        self._update_toolbar_labels()
         self._export_pdf_btn.setToolTip(tr('将已保存的图片按页面顺序导出为 PDF；编辑时不会合成 PDF。'))
+        self._export_cbz_btn.setToolTip(tr('将已保存的图片按页面顺序打包为 CBZ。'))
         self._update_repair_controls()
 
     def _save_request(self):
@@ -2580,21 +2813,26 @@ class EditorPage(QWidget):
             tr('✓ 已保存图片与布局 · {_0}', _0=self.output_path.name))
 
     def _save_failed(self, message):
+        callback, self._save_failure_callback = self._save_failure_callback, None
         self._saving_image = None
         self._after_save = None
         self._save_again = False
         self._update_repair_controls()
         self._status.setText(tr('保存失败：{_0}。修改仍保留，请检查输出目录后重试。', _0=message))
+        if callback:
+            callback(message)
 
-    def request_save(self, checked=False, *, after=None):
+    def request_save(self, checked=False, *, after=None, on_error=None):
         if after is not None:
             self._after_save = after
+            self._save_failure_callback = on_error
         if self._save_jobs.busy:
             self._save_again = True
             return True
         for spin in self._layout_spins():
             spin.interpretText()
         if not self._dirty:
+            self._save_failure_callback = None
             action, self._after_save = self._after_save, None
             if action:
                 action()
@@ -2605,7 +2843,7 @@ class EditorPage(QWidget):
             self._save_failed(str(exc))
             return False
         if request is None:
-            self._after_save = None
+            self._save_failed(self._status.text())
             return False
         previous, revision = self.output_path, self._edit_revision
         def saved(result):
@@ -2615,6 +2853,7 @@ class EditorPage(QWidget):
             if self._dirty and (again or self._after_save is not None):
                 self.request_save()
             else:
+                self._save_failure_callback = None
                 action, self._after_save = self._after_save, None
                 if action:
                     action()
