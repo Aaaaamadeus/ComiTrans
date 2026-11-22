@@ -104,6 +104,7 @@ class StripPreview(ImagePreview):
             label.region_edited.connect(self.region_edited)
             label.region_edit_finished.connect(self.region_edit_finished)
             label.region_clicked.connect(self.region_clicked)
+            label.region_context_menu.connect(self.region_context_menu)
             label.bubble_created.connect(self.bubble_created)
         label.setToolTip(Path(key).name)
         self._pages[key][0] = label

@@ -304,6 +304,8 @@ QPushButton[role="quiet"]:hover, QToolButton[role="quiet"]:hover { background: @
 QPushButton[role="quiet"]:focus, QToolButton[role="quiet"]:focus { border-color: @ruleStrong; }
 QPushButton[role="nav"]:focus { border-bottom-color: @ink; }
 QPushButton[compact="true"], QToolButton[compact="true"] { min-height: 22px; padding: 3px 9px; }
+QToolButton[menuButton="true"] { padding-right: 22px; }
+QToolButton[menuButton="true"]::menu-indicator { subcontrol-origin: padding; subcontrol-position: center right; right: 6px; width: 12px; height: 12px; image: url("@icons/chevron-down.svg"); }
 QPushButton:disabled, QToolButton:disabled { background: transparent; color: @disabled; border-color: transparent; }
 QPushButton[role="primary"]:disabled { background: @muted; color: @disabled; border-color: transparent; }
 QGroupBox { margin-top: 24px; padding: 16px 0 0 0; border: none; background: transparent; font-weight: 700; }
@@ -353,6 +355,8 @@ QComboBox QAbstractItemView::item:hover, QCompleter QAbstractItemView::item:hove
 QComboBox QAbstractItemView::item:selected, QCompleter QAbstractItemView::item:selected { background: @ink; color: @paper; }
 QFrame#inspectorCard QSpinBox, QFrame#inspectorCard QDoubleSpinBox { min-height: 18px; padding: 2px 7px; border: 1px solid @rule; border-bottom: 1px solid @ruleStrong; background: @workspace; }
 QFrame#inspectorCard QSpinBox:focus, QFrame#inspectorCard QDoubleSpinBox:focus { border: 1px solid @focusRing; background: @paper; }
+QFrame#editorInspector QSpinBox#quickSizeSpin { min-height: 20px; padding: 1px 6px; border: 1px solid @rule; border-bottom: 1px solid @ruleStrong; background: @workspace; }
+QFrame#editorInspector QSpinBox#quickSizeSpin:focus { border: 1px solid @focusRing; background: @paper; }
 QFrame#inspectorCard QComboBox { min-height: 22px; padding: 3px 4px 3px 8px; border: 1px solid @rule; border-radius: 7px; background: @workspace; }
 QFrame#inspectorCard QComboBox:hover { border-color: @ruleStrong; background: @paper; }
 QFrame#inspectorCard QComboBox:focus, QFrame#inspectorCard QComboBox:on { border: 1.5px solid @ink; background: @paper; }
@@ -365,7 +369,7 @@ QPlainTextEdit#textInput { background: @paper; border: 1px solid @rule; border-r
 QPlainTextEdit#textInput:focus { border: 1.5px solid @focusRing; background: @paper; }
 QPlainTextEdit#textSource { background: @paper; border: 1px solid @rule; border-radius: 8px; padding: 7px 10px; font-size: 14px; }
 QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QPlainTextEdit:disabled { background: @workspace; color: @disabled; border-color: transparent; }
-QFrame#inspectorCard QComboBox:disabled, QFrame#inspectorCard QSpinBox:disabled, QFrame#inspectorCard QDoubleSpinBox:disabled { background: @workspace; color: @disabled; border-color: @rule; }
+QFrame#inspectorCard QComboBox:disabled, QFrame#inspectorCard QSpinBox:disabled, QFrame#inspectorCard QDoubleSpinBox:disabled, QFrame#editorInspector QSpinBox#quickSizeSpin:disabled { background: @workspace; color: @disabled; border-color: @rule; }
 QFrame#controlCard QLineEdit { min-height: 28px; padding: 4px 10px; border-color: transparent; font-size: 13px; }
 QFrame#controlCard QLineEdit:focus { border-color: @ruleStrong; }
 QFrame#controlCard QComboBox { min-height: 28px; padding: 4px 6px 4px 10px; border: 1px solid @rule; border-radius: 8px; background: @workspace; font-size: 13px; }
@@ -417,9 +421,14 @@ QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid @ruleStrong;
 QCheckBox::indicator:checked { background: @ink; image: url("@icons/check.svg"); }
 QCheckBox:focus { color: @black; }
 QToolTip { padding: 6px 8px; border: 1px solid @rule; border-radius: 6px; background: @elevated; color: @ink; }
-QMenu { background: @elevated; border: 1px solid @rule; padding: 4px; }
-QMenu::item { padding: 8px 20px; }
+QMenu { background: @elevated; border: 1px solid @ruleStrong; border-radius: 10px; padding: 4px; }
+QMenu::item { padding: 6px 26px 6px 14px; border-radius: 6px; color: @ink; }
 QMenu::item:selected { background: @ink; color: @paper; }
+QMenu::item:disabled { color: @disabled; background: transparent; }
+QMenu::separator { height: 1px; background: @rule; margin: 4px 8px; }
+QMenu::indicator { width: 14px; height: 14px; margin-left: 6px; }
+QMenu::indicator:checked { background: @ink; border-radius: 3px; image: url("@icons/check.svg"); }
+QMenu::indicator:unchecked { border: 1px solid @ruleStrong; border-radius: 3px; background: @paper; }
 '''
 
 APP_STYLESHEET = build_stylesheet(PALETTES['light'])

@@ -3,6 +3,7 @@ from ..i18n import tr
 
 from pathlib import Path
 from functools import lru_cache
+import time
 from PySide6.QtCore import Qt, QElapsedTimer, QRectF, QPointF, QSize, QTimer, Signal, QEvent
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap, QImageReader, QRegion
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QStackedLayout, QPushButton, QSizePolicy, QProgressBar
@@ -78,6 +79,7 @@ class PageCanvas(QLabel):
     region_edited = Signal(object)
     region_edit_finished = Signal()
     region_clicked = Signal(int)
+    region_context_menu = Signal(int, object)
     bubble_created = Signal(object)
 
     def __init__(self, parent=None):
@@ -301,6 +303,17 @@ class PageCanvas(QLabel):
                 event.accept()
                 return
         super().mousePressEvent(event)
+
+    def contextMenuEvent(self, event):
+        if self._region_drag is not None or self.region_creation or self.bubble_creation:
+            event.ignore()
+            return
+        index = self._region_at(QPointF(event.pos()))
+        if index is not None:
+            self.region_context_menu.emit(index, event.globalPos())
+            event.accept()
+            return
+        super().contextMenuEvent(event)
 
     def _drag_region_to(self, point):
         hit, start, original = self._region_drag
@@ -569,6 +582,7 @@ class ImagePreview(QWidget):
     region_edited = Signal(object)
     region_edit_finished = Signal()
     region_clicked = Signal(int)
+    region_context_menu = Signal(int, object)
     bubble_created = Signal(object)
     zoom_changed = Signal(object)
     color_picked = Signal(object)
@@ -586,6 +600,7 @@ class ImagePreview(QWidget):
         self._space_pan = False
         self._zoom_tool = False
         self._color_picking = False
+        self._suppress_context_until = 0.0
         self.setMinimumSize(120, 100)
         self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self._stack = QStackedLayout(self)
@@ -660,6 +675,7 @@ class ImagePreview(QWidget):
         self._label.region_edited.connect(self.region_edited)
         self._label.region_edit_finished.connect(self.region_edit_finished)
         self._label.region_clicked.connect(self.region_clicked)
+        self._label.region_context_menu.connect(self.region_context_menu)
         self._label.bubble_created.connect(self.bubble_created)
         self._label.installEventFilter(self)
         self._label.setObjectName('previewLabel')
@@ -682,9 +698,16 @@ class ImagePreview(QWidget):
                 return super().eventFilter(watched, event)
         elif watched is not self._label:
             return super().eventFilter(watched, event)
+        if event.type() == QEvent.ContextMenu and (
+                self._color_picking or time.monotonic() <= self._suppress_context_until):
+            self._suppress_context_until = 0.0
+            event.accept()
+            return True
         if self._color_picking:
             if (event.type() == QEvent.KeyPress and event.key() == Qt.Key_Escape
                     or event.type() == QEvent.MouseButtonPress and event.button() == Qt.RightButton):
+                if event.type() == QEvent.MouseButtonPress and event.button() == Qt.RightButton:
+                    self._suppress_context_until = time.monotonic() + 0.25
                 self.cancel_color_picking()
                 return True
             if (event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton
@@ -706,6 +729,8 @@ class ImagePreview(QWidget):
             if event.type() == QEvent.MouseMove and not self._space_pan and self._pan is None:
                 self._label.setCursor(Qt.CrossCursor)
                 return True
+        elif event.type() == QEvent.MouseButtonPress:
+            self._suppress_context_until = 0.0
         if event.type() == QEvent.Wheel:
             if event.modifiers() & (Qt.ControlModifier | Qt.AltModifier):
                 step = 1.12 if event.angleDelta().y() > 0 else 1 / 1.12
