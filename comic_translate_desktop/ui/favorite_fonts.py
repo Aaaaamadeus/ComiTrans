@@ -6,7 +6,7 @@ import json
 from PySide6.QtCore import Qt, QSettings, Signal
 from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QFormLayout, QFrame, QGridLayout, QHBoxLayout,
-    QLabel, QPushButton, QSizePolicy, QVBoxLayout,
+    QLabel, QMenu, QPushButton, QSizePolicy, QToolButton, QVBoxLayout,
 )
 
 from ..font_library import available_fonts, font_description, font_display_name, font_reference, inspect_font, resolve_font_reference
@@ -18,6 +18,8 @@ from .theme import set_themed_icon
 class FavoriteFontBar(QFrame):
     font_selected = Signal(str)
     add_current_requested = Signal()
+    hide_requested = Signal()
+    slots_changed = Signal(bool)
     SETTINGS_KEY = 'ui/editorFavoriteFonts'
 
     def __init__(self, config, parent=None):
@@ -41,13 +43,27 @@ class FavoriteFontBar(QFrame):
         title = QLabel(tr('常用字体'))
         title.setObjectName('barCaption')
         heading.addWidget(title)
-        self.add_button = QPushButton(tr('加入当前字体'))
+        self.manage_button = QToolButton(self)
+        self.manage_button.setText(tr('管理'))
+        self.manage_button.setProperty('compact', True)
+        self.manage_button.setProperty('role', 'chip')
+        self.manage_button.setProperty('menuButton', True)
+        self.manage_button.setPopupMode(QToolButton.InstantPopup)
+        self.manage_button.setToolTip(tr('管理快捷字体槽位与显示'))
+        self.manage_menu = QMenu(self.manage_button)
+        self._add_action = self.manage_menu.addAction(tr('加入当前字体'), self.add_current_requested.emit)
+        self._settings_action = self.manage_menu.addAction(tr('设置快捷字体…'), self.configure)
+        self.manage_menu.addSeparator()
+        self._hide_action = self.manage_menu.addAction(tr('隐藏快捷字体栏'), self.hide_requested.emit)
+        self.manage_button.setMenu(self.manage_menu)
+        heading.addWidget(self.manage_button)
+        self.add_button = QPushButton(tr('加入当前字体'), self)
         set_themed_icon(self.add_button, 'plus', size=12)
         self.add_button.clicked.connect(self.add_current_requested)
-        heading.addWidget(self.add_button)
-        self.settings_button = QPushButton(tr('设置快捷字体'))
+        self.add_button.hide()
+        self.settings_button = QPushButton(tr('设置快捷字体'), self)
         self.settings_button.clicked.connect(self.configure)
-        heading.addWidget(self.settings_button)
+        self.settings_button.hide()
         for button in (self.add_button, self.settings_button):
             button.setProperty('compact', True)
             button.setProperty('role', 'chip')
@@ -77,10 +93,14 @@ class FavoriteFontBar(QFrame):
         self.setToolTip(tr('数字键 1–9 切换当前文本块字体；输入文字时不触发。'))
         self._refresh()
 
+    def has_active_slots(self):
+        return any(bool(slot) for slot in self.slots)
+
     def set_slots(self, slots):
         self.slots = (list(slots) + [''] * 9)[:9]
         QSettings().setValue(self.SETTINGS_KEY, json.dumps(self.slots, ensure_ascii=False))
         self._refresh()
+        self.slots_changed.emit(self.has_active_slots())
 
     def add_font(self, reference):
         if reference in self.slots:
@@ -101,6 +121,7 @@ class FavoriteFontBar(QFrame):
     def set_apply_enabled(self, enabled):
         self._can_apply = bool(enabled)
         self.add_button.setEnabled(self._can_apply)
+        self._add_action.setEnabled(self._can_apply)
         for index, button in enumerate(self.buttons):
             button.setEnabled(self._can_apply and self._available[index])
 
@@ -128,7 +149,7 @@ class FavoriteFontBar(QFrame):
         has_active = bool(active_indices)
         self._empty_hint.setVisible(not has_active)
         columns = max(1, len(active_indices))
-        available = max(0, self.width() - self._heading.sizeHint().width() - 40)
+        available = max(0, self.width() - self._heading.sizeHint().width() - 36)
         for button in self.buttons:
             self._grid.removeWidget(button)
         for column in range(9):

@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from ..ai_diagnosis import AiDiagnosis
 from .theme import ui_font
 from .manga_components import PanelHeading
+from .motion import install_tab_motion
 
 
 class DiagnosisWorker(QThread):
@@ -64,6 +65,7 @@ class ErrorLogPage(QWidget):
         self._sections.setAccessibleName(tr('诊断工作区'))
         self._sections.addTab(self._build_prompt_panel(), tr('01  诊断资料'))
         self._sections.addTab(self._build_ai_panel(), tr('02  AI 对话'))
+        install_tab_motion(self._sections)
         content.addWidget(self._sections, 1)
         content.addWidget(self._file_label)
         root.addWidget(body, 1)

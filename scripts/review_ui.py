@@ -195,8 +195,7 @@ def main():
                 window._pref_toggle.setChecked(True)
                 QTest.qWait(320)
                 capture('automatic-preferences', window.translate_tab,
-                        (window._font_picker.combo, window._font_picker.import_button,
-                         window._font_picker.library_button))
+                        (window._font_picker.combo, window._font_picker.manage_button))
                 check_font_search(window._font_picker.combo)
                 capture_context(1440)
                 library = FontLibraryDialog(window.config, window)
@@ -218,10 +217,10 @@ def main():
                 imported_font = window._font_picker.import_paths([config.AI_ROOT / 'font_file/CN/special/851tegaki_zatsu_normal_0883.ttf'])[0]
                 assert window._font_picker.combo.currentData() == font_reference(imported_font.path)
                 assert config.load_ai_config()['translation_font_active']
-                capture('automatic-custom-font', window.translate_tab, (window._font_picker.combo, window._font_picker.import_button))
+                capture('automatic-custom-font', window.translate_tab, (window._font_picker.combo, window._font_picker.manage_button))
                 window._font_picker.combo.setCurrentIndex(0)
                 editor = window.editor_page
-                capture('editor-empty', editor, (editor.preview.import_button, editor._focus_btn))
+                capture('editor-empty', editor, (editor.preview.import_button, editor._view_menu_btn, editor._file_menu_btn))
                 settings = window.api_config_page
                 settings._model_input.setText('你的翻译模型')
                 capture('settings', settings, (settings._save_btn,))
@@ -268,7 +267,7 @@ def main():
                 editor._repair_box = (60, 120, 300, 320)
                 editor._update_region_guide()
                 editor._update_repair_controls()
-                capture('editor-fill', editor, (editor._fill_white_btn, editor._fill_black_btn))
+                capture('editor-fill', editor, (editor._repair_btn, editor._fill_menu_btn))
                 favorite_references = [font_reference(font.path) for font in available_fonts(editor.config)][:9]
                 editor._favorite_fonts.set_slots(favorite_references)
 
@@ -277,31 +276,30 @@ def main():
                     editor._repair_box = (60, 120, 300, 320)
                     editor._update_region_guide()
                     editor._update_repair_controls()
+                    assert editor._favorite_fonts.isVisible()
                     controls = (editor._repair_mode, editor._add_bubble_btn, editor._repair_btn,
-                                editor._pages_toggle, editor._properties_toggle, editor._focus_btn,
-                                editor._zoom_tool_btn, editor._strip_toggle, editor._save_btn,
-                                editor._export_pdf_btn,
-                                editor._repair_undo, editor._fill_white_btn, editor._fill_black_btn,
-                                editor._fill_color_btn, editor._pick_fill_btn, editor._fill_custom_btn,
-                                editor._favorite_fonts.add_button, editor._favorite_fonts.settings_button,
+                                editor._fill_menu_btn, editor._repair_undo,
+                                editor._view_menu_btn, editor._file_menu_btn, editor._save_btn,
+                                editor._favorite_fonts.manage_button,
                                 *editor._favorite_fonts.buttons)
                     capture(f'editor-fill-fonts-{suffix}', editor, controls)
                     for button in controls:
-                        assert button.width() >= button.fontMetrics().horizontalAdvance(button.text()) + 16, (
+                        extra = 26 if button.property('menuButton') else 16
+                        assert button.width() >= button.fontMetrics().horizontalAdvance(button.text()) + extra, (
                             suffix, button.text(), button.width())
                         parent = button.parentWidget()
                         assert parent.rect().contains(button.geometry()), (suffix, button.text(), parent.size())
                     editor._pick_fill_btn.click()
-                    capture(f'editor-color-pick-{suffix}', editor, (editor._pick_fill_btn,))
+                    capture(f'editor-color-pick-{suffix}', editor, (editor._pick_cancel_btn,))
                     editor.preview.cancel_color_picking()
                     editor._repair_mode.setChecked(False)
 
                 capture_fill_fonts(1440)
                 if args.editor_tools_only:
-                    for width, height in ((1024, 720), (820, 480)):
+                    for width, height in ((1024, 720), (820, 640), (820, 480)):
                         window.resize(width, height)
                         editor._properties_toggle.setChecked(True)
-                        capture_fill_fonts(width)
+                        capture_fill_fonts(width if height != 640 else '820x640')
                     report['success'] = True
                     return
                 editor._repair_mode.setChecked(False)
@@ -381,7 +379,7 @@ def main():
                 assert editor.items[0]['font_reference'] == font_reference(config.AI_ROOT / config.FONT_DEFAULTS['serious'])
                 assert 'font_reference' not in editor.items[1]
                 editor._properties_scroll.ensureWidgetVisible(editor._style_combo)
-                capture('editor-font-switch', editor, (editor._style_combo, editor._font_library_btn, editor._save_btn))
+                capture('editor-font-switch', editor, (editor._style_combo, editor._font_menu_btn, editor._save_btn))
                 check_font_search(editor._style_combo)
                 assert editor.save_image()
                 restored = type(editor)()
@@ -416,6 +414,7 @@ def main():
                     window.tabs.setCurrentWidget(editor)
                     editor._properties_toggle.setChecked(True)
                     editor._inspector_tabs.setCurrentIndex(1)
+                    editor._advanced_style_toggle.setChecked(True)
                     app.processEvents()
                     for name, fields in (
                         ('outline', (editor._outline_width, editor._hollow_preset_btn)),
@@ -475,46 +474,57 @@ def main():
                 capture('automatic-preview', window.translate_tab)
                 window._on_image_done(str(page), str(page))
                 capture('automatic-complete', window.translate_tab)
-                for width, height in ((1024, 720), (960, 540), (820, 480)):
+                for width, height in ((1024, 720), (960, 540), (820, 640), (820, 480)):
                     window.resize(min(width, int(screen.width() * .94)), min(height, int(screen.height() * .94)))
-                    if width in (1024, 820):
+                    tag = '820x640' if (width, height) == (820, 640) else width
+                    if width in (1024, 820) and height != 640:
                         capture_context(width)
-                    capture(f'automatic-{width}', window.translate_tab,
-                            (window._add_btn, window._cuda_toggle, window._cuda_help, window._start_btn))
-                    settings._sections.setCurrentIndex(2)
-                    capture(f'settings-{width}', settings, (settings._save_btn,))
-                    settings._sections.setCurrentIndex(3)
-                    window.tabs.setCurrentWidget(settings)
-                    app.processEvents()
-                    model_browser = settings._advanced._browse_buttons['detector_model']
-                    model_path = settings._advanced._path_fields['detector_model']
-                    scroll = settings._sections.currentWidget()
-                    scroll.ensureWidgetVisible(model_path, 0, 12)
-                    capture(f'settings-advanced-{width}', settings, (settings._save_btn, model_browser))
-                    for widget in (model_path, model_browser):
-                        for point in (widget.rect().topLeft(), widget.rect().bottomRight()):
-                            assert scroll.viewport().rect().contains(widget.mapTo(scroll.viewport(), point))
-                    capture(f'diagnosis-{width}', diagnosis, (diagnosis._send_btn,))
+                    if (width, height) != (820, 640):
+                        capture(f'automatic-{width}', window.translate_tab,
+                                (window._add_btn, window._cuda_toggle, window._cuda_help, window._start_btn))
+                        settings._sections.setCurrentIndex(2)
+                        capture(f'settings-{width}', settings, (settings._save_btn,))
+                        settings._sections.setCurrentIndex(3)
+                        window.tabs.setCurrentWidget(settings)
+                        app.processEvents()
+                        model_browser = settings._advanced._browse_buttons['detector_model']
+                        model_path = settings._advanced._path_fields['detector_model']
+                        scroll = settings._sections.currentWidget()
+                        scroll.ensureWidgetVisible(model_path, 0, 12)
+                        capture(f'settings-advanced-{width}', settings, (settings._save_btn, model_browser))
+                        for widget in (model_path, model_browser):
+                            for point in (widget.rect().topLeft(), widget.rect().bottomRight()):
+                                assert scroll.viewport().rect().contains(widget.mapTo(scroll.viewport(), point))
+                        capture(f'diagnosis-{width}', diagnosis, (diagnosis._send_btn,))
                     window.tabs.setCurrentWidget(editor)
                     app.processEvents()
                     editor._properties_toggle.setChecked(True)
-                    capture(f'editor-{width}', editor, (editor._save_btn, editor._apply_btn))
+                    editor._inspector_tabs.setCurrentIndex(0)
+                    app.processEvents()
+                    if (width, height) == (820, 640):
+                        assert editor._text_input.height() >= 110, editor._text_input.height()
+                    if width == 1024:
+                        canvas_bar = editor.preview.parentWidget().findChild(type(editor._pages_panel), 'canvasToolBar')
+                        assert not editor._pages_panel.isVisible(), 'pages panel stayed visible at 1024px'
+                        assert canvas_bar is not None and canvas_bar.height() <= 46, canvas_bar.height()
+                        assert editor._text_input.height() >= 110, editor._text_input.height()
+                    capture(f'editor-{tag}', editor, (editor._save_btn, editor._apply_btn, editor._quick_size_spin))
                     editor._inspector_tabs.setCurrentIndex(1)
                     editor._properties_scroll.ensureWidgetVisible(editor._mask_height)
                     app.processEvents()
                     check_action(window, editor._mask_height)
                     assert editor._properties_scroll.viewport().rect().contains(
                         editor._mask_height.mapTo(editor._properties_scroll.viewport(), editor._mask_height.rect().center()))
-                    editor._properties_scroll.ensureWidgetVisible(editor._font_library_btn)
+                    editor._properties_scroll.ensureWidgetVisible(editor._font_menu_btn)
                     app.processEvents()
-                    check_action(window, editor._font_library_btn)
+                    check_action(window, editor._font_menu_btn)
                     assert editor._properties_scroll.viewport().rect().contains(
-                        editor._font_library_btn.mapTo(editor._properties_scroll.viewport(), editor._font_library_btn.rect().center()))
-                    capture_lettering(width)
-                    capture_fill_fonts(width)
+                        editor._font_menu_btn.mapTo(editor._properties_scroll.viewport(), editor._font_menu_btn.rect().center()))
+                    capture_lettering(tag)
+                    capture_fill_fonts(tag)
                     editor._inspector_tabs.setCurrentIndex(0)
                     editor._focus_btn.setChecked(True)
-                    capture(f'editor-focus-{width}', editor, (editor._save_btn, editor._focus_btn))
+                    capture(f'editor-focus-{tag}', editor, (editor._save_btn, editor._focus_btn))
                     assert not editor._pages_panel.isVisible()
                     assert not editor._properties_panel.isVisible()
                     editor._focus_btn.setChecked(False)

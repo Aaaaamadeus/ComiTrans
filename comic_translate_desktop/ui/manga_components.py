@@ -2,12 +2,13 @@
 from __future__ import annotations
 from ..i18n import tr
 
-from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QPainter
+from PySide6.QtCore import QElapsedTimer, QPointF, QRectF, QTimer, Qt
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from .theme import color, ui_font
 from .halftone import COMPACT_BREAKPOINT, draw_tone
+from .motion import reduced_motion
 
 def label(parent, text, size, *, weight=QFont.Bold):
     result = QLabel(tr(text), parent)
@@ -67,14 +68,34 @@ class StageFocus(QWidget):
         self._detail = label(self, tr('添加漫画后，开始自动处理'), 12, weight=QFont.Normal)
         self._detail.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self._detail.setProperty('muted', True)
+        self._last_key = ('—', tr('等待任务'))
+        self._pulse_until = 0
+        self._clock = QElapsedTimer()
+        self._clock.start()
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.setInterval(16)
+        self._pulse_timer.timeout.connect(self._step_pulse)
+
+    def _step_pulse(self):
+        if int(self._clock.elapsed()) >= self._pulse_until:
+            self._pulse_until = 0
+            self._pulse_timer.stop()
+        self.update()
 
     def set_stage(self, number, title, detail):
+        key = (str(number), str(title))
+        changed = key != self._last_key
+        self._last_key = key
         self._number.setText(tr(number))
         self._title.setText(tr(title))
         self._detail.setText(tr(detail))
         self.setToolTip(tr(detail))
         self.setAccessibleName(f'{title}，{detail}')
         self._place()
+        if changed and self.isVisible() and not reduced_motion():
+            self._pulse_until = int(self._clock.elapsed()) + 340
+            if not self._pulse_timer.isActive():
+                self._pulse_timer.start()
         self.update()
 
     def _place(self):
@@ -89,6 +110,11 @@ class StageFocus(QWidget):
         super().resizeEvent(event)
         self._place()
 
+    def hideEvent(self, event):
+        self._pulse_timer.stop()
+        self._pulse_until = 0
+        super().hideEvent(event)
+
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
@@ -96,4 +122,14 @@ class StageFocus(QWidget):
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(color('muted')))
         p.drawEllipse(QRectF(1, 4, 26, 26))
+        if self._pulse_until > 0 and not reduced_motion():
+            rem = self._pulse_until - int(self._clock.elapsed())
+            if rem > 0:
+                t = 1.0 - max(0.0, min(1.0, rem / 340.0))
+                ring = QColor(color('ink'))
+                ring.setAlpha(int(round(145 * ((1.0 - t) ** 2))))
+                p.setPen(QPen(ring, 1.3))
+                p.setBrush(Qt.NoBrush)
+                r = 12.0 + 2.5 * t
+                p.drawEllipse(QPointF(14.0, 17.0), r, r)
         p.end()

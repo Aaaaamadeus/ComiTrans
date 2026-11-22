@@ -6,6 +6,8 @@ from PySide6.QtCore import QEvent, QTimer, Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QToolButton, QVBoxLayout, QWidget
 
+from .motion import fade_in
+
 
 REPOSITORY_URL = 'https://github.com/Aaaaamadeus/ComiTrans'
 STAR_PROMPT_PROBABILITY = 0.15
@@ -60,6 +62,7 @@ class StarPrompt(QFrame):
     def show_prompt(self):
         self.reposition()
         self.show()
+        fade_in(self, 180)
         self.raise_()
         self._idle_timer.start()
 
@@ -73,6 +76,8 @@ class StarPrompt(QFrame):
 
     def dismiss(self):
         self._idle_timer.stop()
+        if self.graphicsEffect() is not None:
+            self.setGraphicsEffect(None)
         self.hide()
 
     def _open_repository(self):

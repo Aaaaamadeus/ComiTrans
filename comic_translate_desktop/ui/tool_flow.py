@@ -53,6 +53,8 @@ class ToolFlowLayout(QLayout):
         if widget is not None and hasattr(widget, 'text') and not widget.property('toolDivider'):
             # Some styles reserve less than the compact button's text padding.
             width = widget.fontMetrics().horizontalAdvance(widget.text()) + 20
+            if widget.property('menuButton'):
+                width += 14
             if hasattr(widget, 'icon') and not widget.icon().isNull():
                 width += widget.iconSize().width() + 4
             size.setWidth(max(size.width(), width))
