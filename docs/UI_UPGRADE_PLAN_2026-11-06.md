@@ -6,6 +6,8 @@
 
 ## 进度（2026-11-06）
 
+- [x] 2026-11-23：启动时比较客户端版本与 GitHub 正式发布标签。发现更高版本时，在模型状态左侧显示「有更新」，点击查看版本详情。
+
 - [x] 启动时异步查询 GitHub 正式发行版，发现新版后用中 / 英 / 日文提示。MSI 安装版可确认下载更新，支持增量差分和安装事务回滚。[Windows 安装与更新](WINDOWS_INSTALLER.md)
 - [x] Windows 用户安装入口使用带 ComiTrans 图标的 Setup EXE，安装和回滚由内嵌 MSI 执行。Setup 与独立 MSI 均支持对应格式的增量更新。[Windows 安装与更新](WINDOWS_INSTALLER.md)
 
