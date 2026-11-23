@@ -54,7 +54,7 @@ class ModelUpgradeTests(unittest.TestCase):
         from onnx_text_detector import create_text_detector
         from comic_translate_core.detector_paths import REGION_FILE
 
-        with (patch('onnx_text_detector.create_onnx_session') as session,
+        with (patch('onnx_text_detector.create_image_session') as session,
               patch('onnx_split_detector.SplitTextDetector') as split):
             self.assertIs(create_text_detector(REGION_FILE, "cpu", cuda_model_path="fast.onnx"),
                           split.return_value)

@@ -14,6 +14,9 @@ from .ui.window_chrome import install_window_chrome
 
 
 def main() -> int:
+    from comic_translate_core.image_session import enable_desktop_model_host
+
+    enable_desktop_model_host()
     parser = argparse.ArgumentParser(description="ComiTrans desktop client")
     parser.add_argument('project', type=Path, nargs='?', help='Open an editable .comitrans PDF project')
     parser.add_argument("--smoke-test", metavar="OUTPUT_DIR", help="Verify startup/resources/models, write evidence, then exit")
