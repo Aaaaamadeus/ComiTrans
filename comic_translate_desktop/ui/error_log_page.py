@@ -1,5 +1,4 @@
 from __future__ import annotations
-from ..i18n import tr
 
 from PySide6.QtCore import QThread, QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices
@@ -16,9 +15,10 @@ from PySide6.QtWidgets import (
 )
 
 from ..ai_diagnosis import AiDiagnosis
-from .theme import ui_font
+from ..i18n import tr
 from .manga_components import PanelHeading
 from .motion import install_tab_motion
+from .theme import ui_font
 
 
 class DiagnosisWorker(QThread):
@@ -50,22 +50,24 @@ class ErrorLogPage(QWidget):
         root.setSpacing(0)
 
         body = QFrame()
-        body.setObjectName('pageBody')
+        body.setObjectName('settingsBody')
         content = QVBoxLayout(body)
-        content.setContentsMargins(24, 16, 24, 16)
-        content.setSpacing(12)
+        content.setContentsMargins(24, 14, 24, 14)
+        content.setSpacing(10)
 
         self._file_label = QLabel(tr('日志文件: {_0}', _0=self._diagnostics.log_path))
-        self._file_label.setProperty("muted", True)
+        self._file_label.setObjectName('statusCallout')
+        self._file_label.setFont(ui_font(12, mono=True))
         self._file_label.setWordWrap(True)
         self._file_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self._file_label.setMaximumHeight(48)
+        self._file_label.setMaximumHeight(54)
+
         self._sections = QTabWidget()
         self._sections.setDocumentMode(True)
         self._sections.setAccessibleName(tr('诊断工作区'))
+        install_tab_motion(self._sections)
         self._sections.addTab(self._build_prompt_panel(), tr('01  诊断资料'))
         self._sections.addTab(self._build_ai_panel(), tr('02  AI 对话'))
-        install_tab_motion(self._sections)
         content.addWidget(self._sections, 1)
         content.addWidget(self._file_label)
         root.addWidget(body, 1)
@@ -74,9 +76,9 @@ class ErrorLogPage(QWidget):
 
     def _build_prompt_panel(self) -> QWidget:
         panel = QFrame()
-        panel.setObjectName('editorPanel')
+        panel.setObjectName('settingsBody')
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(16, 16, 16, 12)
+        layout.setContentsMargins(4, 16, 4, 4)
         layout.setSpacing(12)
         layout.addWidget(PanelHeading('01', tr('诊断资料')))
         hint = QLabel(tr('复制诊断资料用于分析问题，或切换到 AI 对话继续追问。'))
@@ -85,29 +87,36 @@ class ErrorLogPage(QWidget):
         layout.addWidget(hint)
 
         self.prompt_view = QPlainTextEdit()
+        self.prompt_view.setObjectName('logSurface')
         self.prompt_view.setReadOnly(True)
         self.prompt_view.setPlaceholderText(tr('暂无报错日志'))
         self.prompt_view.setFont(ui_font(13, mono=True))
         layout.addWidget(self.prompt_view, 1)
 
         buttons = QHBoxLayout()
+        buttons.setSpacing(8)
         self._copy_prompt_btn = QPushButton(tr('复制诊断提示词'))
+        self._copy_prompt_btn.setProperty('role', 'primary')
         self._copy_raw_btn = QPushButton(tr('复制原始日志'))
         self._open_log_btn = QPushButton(tr('打开日志文件'))
         self._clear_btn = QPushButton(tr('清空日志'))
-        self._clear_btn.setProperty("role", "danger")
+        self._clear_btn.setProperty('role', 'danger')
+        for button in (self._copy_raw_btn, self._open_log_btn):
+            button.setProperty('role', 'utility')
+        for button in (self._copy_prompt_btn, self._copy_raw_btn, self._open_log_btn, self._clear_btn):
+            button.setProperty('compact', True)
+            button.setCursor(Qt.PointingHandCursor)
+
         self._status_label = QLabel('')
-        self._status_label.setProperty("muted", True)
+        self._status_label.setProperty('muted', True)
 
         buttons.addWidget(self._copy_prompt_btn)
         buttons.addWidget(self._copy_raw_btn)
         buttons.addWidget(self._open_log_btn)
-        buttons.addWidget(self._clear_btn)
         buttons.addStretch(1)
+        buttons.addWidget(self._status_label)
+        buttons.addWidget(self._clear_btn)
         layout.addLayout(buttons)
-        layout.addWidget(self._status_label)
-        for button in (self._copy_prompt_btn, self._copy_raw_btn, self._open_log_btn, self._clear_btn):
-            button.setProperty('compact', True)
 
         self._copy_prompt_btn.clicked.connect(self.copy_prompt)
         self._copy_raw_btn.clicked.connect(self.copy_raw_logs)
@@ -117,9 +126,9 @@ class ErrorLogPage(QWidget):
 
     def _build_ai_panel(self) -> QWidget:
         group = QFrame()
-        group.setObjectName('editorPanel')
+        group.setObjectName('settingsBody')
         layout = QVBoxLayout(group)
-        layout.setContentsMargins(16, 16, 16, 12)
+        layout.setContentsMargins(4, 16, 4, 4)
         layout.setSpacing(12)
         layout.addWidget(PanelHeading('02', tr('AI 对话')))
         hint = QLabel(tr('描述遇到的问题，AI 将结合当前日志分析；后续追问会保留上下文。'))
@@ -128,31 +137,40 @@ class ErrorLogPage(QWidget):
         layout.addWidget(hint)
 
         self.history_view = QPlainTextEdit()
+        self.history_view.setObjectName('logSurface')
         self.history_view.setReadOnly(True)
         self.history_view.setPlaceholderText(tr('在这里发起 AI 诊断，后续问题会保留上下文。'))
         self.history_view.setFont(ui_font(14))
         layout.addWidget(self.history_view, 1)
 
         self._input_view = QPlainTextEdit()
+        self._input_view.setObjectName('logInput')
         self._input_view.setPlaceholderText(tr('描述报错现象，或直接问：帮我分析当前日志'))
-        self._input_view.setMaximumHeight(80)
+        self._input_view.setMaximumHeight(82)
         self._input_view.setMinimumHeight(56)
         layout.addWidget(self._input_view)
 
         buttons = QHBoxLayout()
+        buttons.setSpacing(8)
         self._send_btn = QPushButton(tr('发送诊断'))
-        self._send_btn.setProperty("role", "primary")
+        self._send_btn.setProperty('role', 'primary')
+        self._send_btn.setCursor(Qt.PointingHandCursor)
         self._copy_result_btn = QPushButton(tr('复制诊断结果'))
+        self._copy_result_btn.setProperty('role', 'utility')
+        self._copy_result_btn.setProperty('compact', True)
+        self._copy_result_btn.setCursor(Qt.PointingHandCursor)
         self._clear_context_btn = QPushButton(tr('清空上下文'))
+        self._clear_context_btn.setProperty('role', 'utility')
+        self._clear_context_btn.setProperty('compact', True)
+        self._clear_context_btn.setCursor(Qt.PointingHandCursor)
         self._ai_status = QLabel('')
-        self._ai_status.setProperty("muted", True)
+        self._ai_status.setProperty('muted', True)
 
         buttons.addWidget(self._copy_result_btn)
         buttons.addWidget(self._clear_context_btn)
-        buttons.addStretch(1)
+        buttons.addWidget(self._ai_status, 1)
         buttons.addWidget(self._send_btn)
         layout.addLayout(buttons)
-        layout.addWidget(self._ai_status)
 
         self._send_btn.clicked.connect(self._send_diagnosis)
         self._copy_result_btn.clicked.connect(self.copy_diagnosis_result)
@@ -214,7 +232,7 @@ class ErrorLogPage(QWidget):
         self._worker.start()
 
     def _on_diagnosis_finished(self, answer: str) -> None:
-        self._append_history("AI", answer)
+        self._append_history('AI', answer)
         self._send_btn.setEnabled(True)
         self._ai_status.setText(tr('诊断完成，上下文已保留'))
 
@@ -224,7 +242,7 @@ class ErrorLogPage(QWidget):
         self._ai_status.setText(tr('诊断失败'))
 
     def _append_history(self, role: str, content: str) -> None:
-        self.history_view.appendPlainText(f"【{role}】\n{content}\n")
+        self.history_view.appendPlainText(f'【{role}】\n{content}\n')
 
     def shutdown(self) -> None:
         if self._worker is not None and self._worker.isRunning():

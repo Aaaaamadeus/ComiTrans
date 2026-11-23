@@ -22,8 +22,11 @@ from PySide6.QtCore import QThread, Signal
 
 from . import config as app_config
 from .pdf_utils import PdfPageRenderer, plan_pdf_pages, RenderedPdfPage
-from .pdf_project import create_pdf_project, publish_pdf_project, write_project_metadata
+from .cbz import CbzReader, PROJECT_EXTS
+from .pdf_project import create_pdf_project, publish_pdf_project, publish_project, write_project_metadata
 from .checkpoints import DocumentCheckpoint
+from .productivity import UsageMeter, desktop_translation_config
+from .desktop_translation import DesktopTranslationMixin
 from comic_translate_core.languages import OCR_CONFIG_KEYS
 from comic_translate_core.chinese import normalize_target_language
 from comic_translate_core.layout_options import normalize_text_color, normalize_vertical_alignment
@@ -110,7 +113,13 @@ class BatchWorker(QThread):
         self.task_id = uuid.uuid4().hex
         self._stage_context = threading.local()
         self._pdf_renderer = None
-        self._pdf_document = None
+        self._cbz_reader = None
+        self._reader_document = None
+        self._usage_meter = UsageMeter(lambda usage: self._emit_workflow('usage', usage=usage))
+        self.usage_report = {}
+        self._trial_limit = max(0, min(3, int(self._config.get('trial_page_limit') or 0)))
+        if self._trial_limit:
+            self._config.update(resume_enabled=False, retain_translation_context=False)
 
     def stop(self) -> None:
         self._stop = True
@@ -168,6 +177,7 @@ class BatchWorker(QThread):
             raise
 
     def _configure_pipeline(self, pipeline) -> None:
+        pipeline.usage_meter = self._usage_meter
         pipeline.cancel_callback = self._is_stopped
         pipeline.progress_callback = self._emit_stage
         pipeline.watermark_enabled = bool(self._config.get("watermark_enabled", True))
@@ -210,7 +220,9 @@ class BatchWorker(QThread):
 
         self.log.emit("[预热] 开始实例化 AI 管线")
         with self._capture_pipeline_output():
-            pipeline = ComicTranslatorPipeline(
+            class DesktopPipeline(DesktopTranslationMixin, ComicTranslatorPipeline):
+                pass
+            pipeline = DesktopPipeline(
                 det_model_path=self._config["detector_model"],
                 cuda_detector_model_path=self._config.get("cuda_detector_model"),
                 font_map=self._config["font_map"],
@@ -239,6 +251,7 @@ class BatchWorker(QThread):
                 cancel_callback=self._is_stopped,
             )
         self.log.emit("[预热] 实例化完成")
+        self._apply_api_config(pipeline, self._config)
         return pipeline
 
     def _make_document_jobs(self) -> list[_DocumentJob]:
@@ -262,30 +275,38 @@ class BatchWorker(QThread):
                 if not input_path.exists():
                     raise FileNotFoundError(f"文件不存在: {input_path}")
                 document.checkpoint = DocumentCheckpoint(input_path, document.output_path, self._config)
-                if is_pdf:
+                if suffix in PROJECT_EXTS:
                     source_dir = document.checkpoint.project_directory()
                     if source_dir is None:
                         source_dir = create_pdf_project(document.output_path)
                         document.checkpoint.set_project_directory(source_dir)
                     document.project_dir = source_dir
-                    self.log.emit(f"[PDF] {input_path.name}: 精修资料保存在 {source_dir}")
-                    rendered = plan_pdf_pages(input_path, source_dir / "source", dpi=pdf_dpi,
+                    kind = suffix[1:].upper()
+                    self.log.emit(f"[{kind}] {input_path.name}: 精修资料保存在 {source_dir}")
+                    if is_pdf:
+                        plan = plan_pdf_pages(input_path, source_dir / "source", dpi=pdf_dpi,
                                               cancel_callback=self._check_cancelled)
-                    write_project_metadata(source_dir, input_path.name,
-                                           [(page.width_points, page.height_points) for page in rendered])
-                    for page in rendered:
+                        sizes = [(page.width_points, page.height_points) for page in plan]
+                        source_paths = [page.image_path for page in plan]
+                    else:
+                        with CbzReader(input_path) as reader:
+                            sizes = reader.page_sizes(self._check_cancelled)
+                        source_paths = [source_dir / "source" / f"page_{n:04d}.png"
+                                        for n in range(1, len(sizes) + 1)]
+                    write_project_metadata(source_dir, input_path.name, sizes)
+                    for number, (source, size) in enumerate(zip(source_paths, sizes), 1):
                         document.pages.append(
                             _PageJob(
                                 document=document,
-                                input_path=page.image_path,
+                                input_path=source,
                                 output_path=source_dir
                                 / "translated"
-                                / f"page_{page.page_index + 1:04d}.png",
-                                page_number=page.page_index + 1,
-                                page_size_points=(page.width_points, page.height_points),
+                                / f"page_{number:04d}.png",
+                                page_number=number,
+                                page_size_points=size,
                             )
                         )
-                    self.log.emit(f"[PDF] {input_path.name}: 共 {len(document.pages)} 页，将按批次以原分辨率渲染")
+                    self.log.emit(f"[{kind}] {input_path.name}: 共 {len(document.pages)} 页，将按批次准备原分辨率页图")
                 else:
                     document.pages.append(
                         _PageJob(
@@ -302,37 +323,62 @@ class BatchWorker(QThread):
             except Exception as exc:
                 document.error = str(exc)
                 document.error_stack = traceback.format_exc().strip()
+        self._total_pages = sum(len(document.pages) for document in documents)
+        self._total_pages_known = all(not document.error for document in documents)
+        if self._trial_limit:
+            remaining, sampled = self._trial_limit, []
+            for document in documents:
+                if remaining <= 0:
+                    break
+                if document.error:
+                    sampled.append(document)
+                    continue
+                document.pages = document.pages[:remaining]
+                remaining -= len(document.pages)
+                if document.project_dir is not None:
+                    write_project_metadata(document.project_dir, document.source_path.name,
+                                           [page.page_size_points for page in document.pages])
+                sampled.append(document)
+            documents = sampled
         return documents
 
     def _check_cancelled(self):
         if self._is_stopped():
             raise TaskCancelledError("任务已取消")
 
-    def _close_pdf_renderer(self):
-        if self._pdf_renderer is not None:
-            self._pdf_renderer.close()
-            self._pdf_renderer = None
-            self._pdf_document = None
+    def _close_project_reader(self):
+        reader = self._pdf_renderer or self._cbz_reader
+        if reader is not None:
+            reader.close()
+        self._pdf_renderer = self._cbz_reader = self._reader_document = None
 
-    def _ensure_pdf_page(self, page):
-        if not page.document.is_pdf:
+    def _ensure_project_page(self, page):
+        document = page.document
+        if document.project_dir is None:
             return
         self._check_cancelled()
-        if self._pdf_document is not page.document:
-            self._close_pdf_renderer()
-            dpi = max(96, min(400, int(self._config.get('pdf_dpi') or 200)))
-            self._pdf_renderer = PdfPageRenderer(page.document.source_path, dpi)
-            self._pdf_document = page.document
+        if self._reader_document is not document:
+            self._close_project_reader()
+            if document.is_pdf:
+                dpi = max(96, min(400, int(self._config.get('pdf_dpi') or 200)))
+                self._pdf_renderer = PdfPageRenderer(document.source_path, dpi)
+            else:
+                self._cbz_reader = CbzReader(document.source_path)
+            self._reader_document = document
         started = perf_counter()
-        self._page_event('start', 'running', '正在准备原分辨率 PDF 页图')
-        self._pdf_renderer.render(
-            RenderedPdfPage(page.page_number - 1, page.input_path, *page.page_size_points),
-            reuse_cached=True, cancel_callback=self._check_cancelled)
-        self.log.emit(f'[耗时] {self._page_label(page)}: PDF 页图准备 {perf_counter() - started:.2f} 秒')
+        kind = document.source_path.suffix[1:].upper()
+        self._page_event('start', 'running', f'正在准备原分辨率 {kind} 页图')
+        if document.is_pdf:
+            self._pdf_renderer.render(
+                RenderedPdfPage(page.page_number - 1, page.input_path, *page.page_size_points),
+                reuse_cached=True, cancel_callback=self._check_cancelled)
+        else:
+            self._cbz_reader.render(page.page_number - 1, page.input_path, self._check_cancelled)
+        self.log.emit(f'[耗时] {self._page_label(page)}: {kind} 页图准备 {perf_counter() - started:.2f} 秒')
 
     @staticmethod
     def _page_label(page: _PageJob) -> str:
-        if page.document.is_pdf:
+        if page.document.project_dir is not None:
             return tr('{_0} 第 {_1}/{_2} 页', _0=page.document.source_path.name,
                       _1=page.page_number, _2=len(page.document.pages))
         return page.document.source_path.name
@@ -350,7 +396,7 @@ class BatchWorker(QThread):
 
     @staticmethod
     def _apply_api_config(pipeline, config) -> None:
-        apply_runtime_settings(pipeline, config)
+        apply_runtime_settings(pipeline, desktop_translation_config(config))
 
     def _cancel_page(self, page):
         self._page_event('cancelled', 'cancelled', '已取消')
@@ -367,7 +413,7 @@ class BatchWorker(QThread):
         label = self._page_label(page)
         self.stage_changed.emit(page.document.index, 'start', tr('{_0}: 准备中', _0=label))
         try:
-            self._ensure_pdf_page(page)
+            self._ensure_project_page(page)
             started = perf_counter()
             with inference_cancellation(self._check_cancelled):
                 prepared = self._preparation_pipeline.prepare_comic_page(str(page.input_path))
@@ -490,6 +536,7 @@ class BatchWorker(QThread):
         return False
 
     def run(self) -> None:
+        task_started = perf_counter()
         main_dir = str(app_config.MAIN_DIR)
         if main_dir not in sys.path:
             sys.path.insert(0, main_dir)
@@ -516,8 +563,9 @@ class BatchWorker(QThread):
                 self.finished.emit(0, 0)
                 return
             self._translation_context = TranslationContext.start(
-                app_config.PROJECT_ROOT / '.cache' / 'translation-context.json',
-                retain=bool(self._config.get('retain_translation_context', False)))
+                (self._output_dir / '.translation-context.json' if self._trial_limit else
+                 app_config.PROJECT_ROOT / '.cache' / 'translation-context.json'),
+                retain=not self._trial_limit and bool(self._config.get('retain_translation_context', False)))
             self._pipeline.translation_context = self._translation_context
             self._pipeline.translation_context_managed = True
             self._translation_settings = TranslationSettings.from_pipeline(self._pipeline)
@@ -528,6 +576,7 @@ class BatchWorker(QThread):
             self._output_dir.mkdir(parents=True, exist_ok=True)
             documents = self._make_document_jobs()
             page_jobs = [page for document in documents for page in document.pages]
+            processing_started = perf_counter()
             completed_pages = sum(page.resumed for page in page_jobs)
             self.page_progress.emit(completed_pages, len(page_jobs))
             max_workers = max(1, int(self._config.get("max_workers") or 4))
@@ -558,7 +607,7 @@ class BatchWorker(QThread):
             with self._capture_pipeline_output(), PagePrefetch(
                 page_jobs, self._prepare_page, self._translate_and_cache,
                 capacity=max_workers, cancelled=self._is_stopped,
-                close_preparation=self._close_pdf_renderer,
+                close_preparation=self._close_project_reader,
                 translation_workers=1,
                 repair=self._repair_page if callable(getattr(self._pipeline, 'repair_comic_page', None)) else None,
             ) as pages:
@@ -585,29 +634,36 @@ class BatchWorker(QThread):
                 if self._stop:
                     break
                 self._current_index = document.index
-                if not document.error and document.is_pdf:
+                if not document.error and document.project_dir is not None:
+                    kind = document.source_path.suffix[1:].upper()
                     self._emit_workflow(
                         'publish',
                         document_index=document.index,
                         document_name=document.source_path.name,
+                        output_format=kind,
                         state='running',
                     )
                     try:
-                        publish_pdf_project(document.output_path, document.project_dir)
+                        if document.is_pdf:
+                            publish_pdf_project(document.output_path, document.project_dir)
+                        else:
+                            publish_project(document.output_path, document.project_dir,
+                                            cancel_callback=self._check_cancelled)
                         self._emit_workflow(
                             'publish',
                             document_index=document.index,
                             document_name=document.source_path.name,
                             state='done',
                         )
-                        self.log.emit(
-                            f"[PDF] {document.source_path.name}: 已生成 {len(document.pages)} 页译文 PDF"
-                        )
+                        self.log.emit(f"[{kind}] {document.source_path.name}: 已生成 {len(document.pages)} 页译文 {kind}")
+                    except TaskCancelledError:
+                        break
                     except Exception as exc:
                         self._emit_workflow(
                             'publish',
                             document_index=document.index,
                             document_name=document.source_path.name,
+                            output_format=kind,
                             state='failed',
                         )
                         self._set_document_error(document, exc)
@@ -631,6 +687,19 @@ class BatchWorker(QThread):
 
         finally:
             self._preparation_pipeline = None
-            self._close_pdf_renderer()
+            self._close_project_reader()
+            if self._files:
+                pages = locals().get('page_jobs', [])
+                self.usage_report = dict(
+                    trial=bool(self._trial_limit), model=self._config.get('translation_model', ''),
+                    total_pages=getattr(self, '_total_pages', len(pages)), planned_pages=len(pages),
+                    total_pages_known=getattr(self, '_total_pages_known', False),
+                    completed_pages=sum(page.completed or page.resumed for page in pages),
+                    elapsed_seconds=perf_counter() - task_started,
+                    processing_seconds=perf_counter() - locals().get('processing_started', task_started),
+                    cancelled=self._stop, failed=failed_count or bool(self._fatal_error),
+                    usage=self._usage_meter.snapshot(),
+                    outputs=[str(doc.output_path) for doc in locals().get('documents', [])
+                             if not doc.error and doc.pages and all(page.completed or page.resumed for page in doc.pages)])
 
         self.finished.emit(success_count, failed_count)

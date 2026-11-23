@@ -3,7 +3,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 from comic_translate_core.inference_control import run_inference
-from comic_translate_core.onnx_session import create_onnx_session
+from comic_translate_core.image_session import create_image_session
 
 from comic_text_detector.utils.db_utils import SegDetectorRepresenter
 from comic_text_detector.utils.imgproc_utils import letterbox
@@ -122,7 +122,7 @@ def create_text_detector(model_path, device="cpu", language="ja", *, cuda_model_
 
 class OnnxTextDetector:
     def __init__(self, model_path: str, input_size: int = 1024, device: str = "cpu", conf_thresh: float = 0.4, nms_thresh: float = 0.35, mask_thresh: float = 0.3, *, require_cuda=False):
-        self.session = create_onnx_session(model_path, device, require_cuda=True) if require_cuda else create_onnx_session(model_path, device)
+        self.session = create_image_session(model_path, device, require_cuda=require_cuda)
         self.input_size = input_size if isinstance(input_size, tuple) else (input_size, input_size)
         self.conf_thresh = conf_thresh
         self.nms_thresh = nms_thresh

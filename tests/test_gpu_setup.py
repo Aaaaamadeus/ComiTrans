@@ -63,3 +63,20 @@ class GpuSetupTests(unittest.TestCase):
                 self.assertEqual(open_url.call_count, 3)
             finally:
                 destroy_widget(dialog)
+
+    def test_gpu_setup_dialog_styles_actions_and_toggles_progress(self):
+        app = QApplication.instance() or QApplication([])
+        dialog = GpuSetupDialog()
+        self.addCleanup(destroy_widget, dialog)
+        self.assertEqual(dialog.install_button.property('role'), 'primary')
+        for button in dialog.download_buttons:
+            self.assertEqual(button.property('role'), 'utility')
+        self.assertFalse(dialog.install_progress.isVisible())
+        with patch.object(dialog.installer, 'start'):
+            dialog.show()
+            dialog.start_install()
+            self.assertTrue(dialog.install_progress.isVisible())
+            self.assertFalse(dialog.install_button.isEnabled())
+        dialog._install_finished()
+        self.assertFalse(dialog.install_progress.isVisible())
+        self.assertTrue(dialog.install_button.isEnabled())

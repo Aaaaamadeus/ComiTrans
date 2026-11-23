@@ -1,5 +1,6 @@
-"""Explicit, cancellable image-to-PDF export; never runs on the UI thread."""
+"""Explicit, cancellable comic export; never runs on the UI thread."""
 from PySide6.QtCore import QThread, Signal
+from .cbz import build_cbz_from_images
 from .pdf_utils import build_pdf_from_images
 
 
@@ -24,8 +25,11 @@ class PdfExportWorker(QThread):
 
     def run(self):
         try:
-            result = build_pdf_from_images(self.images, self.sizes, self.output,
-                progress_callback=self.progress.emit, cancel_callback=self._check_cancel)
+            options = dict(progress_callback=self.progress.emit, cancel_callback=self._check_cancel)
+            if self.output.suffix.lower() == '.cbz':
+                result = build_cbz_from_images(self.images, self.output, **options)
+            else:
+                result = build_pdf_from_images(self.images, self.sizes, self.output, **options)
             self.succeeded.emit(str(result))
         except PdfExportCancelled:
             self.cancelled.emit()

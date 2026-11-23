@@ -15,7 +15,7 @@
 
 ```text
 漫画_translated.pdf
-漫画_translated.comitrans.json
+漫画_translated.comitrans
 漫画_translated_edit_<独立编号>/
   project.json                    # 原文件名、原始页面尺寸与顺序
   source/page_0001.png             # 原始 PDF 页图

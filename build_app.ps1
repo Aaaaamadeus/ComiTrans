@@ -38,4 +38,4 @@ if ($IncludeModels) {
 
 Write-Host ""
 Write-Host "打包完成: dist\ComiTrans\ComiTrans.exe"
-Write-Host "发布时只上传程序和模型两个包；GPU 运行库由软件内的官方安装链接提供，不打包上传。"
+Write-Host "生成 Windows Setup EXE 与 MSI：.\.venv\Scripts\python.exe installer/build.py"

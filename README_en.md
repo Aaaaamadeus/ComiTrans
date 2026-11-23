@@ -18,7 +18,10 @@ Source-language selection supports Japanese, Korean, English, and **Custom OCR**
 
 ComiTrans is a manga translation desktop client. Detection, built-in Japanese/Korean/English OCR, inpainting, and Chinese typesetting run locally; translation uses your configured LLM API. No web frontend is required.
 
-Since v2.2.1, detection, OCR, and inpainting are powered entirely by **ONNX Runtime**, removing PyTorch / torchvision / transformers dependencies. The app and models are released as separate packages: app updates no longer require re-downloading unchanged models.
+Since v2.2.1, detection, OCR, and inpainting have run on **ONNX Runtime**, with no PyTorch, torchvision, or transformers dependencies.
+
+> [!NOTE]
+> **v2.6.0 for Windows x64** bundles the app and models in one installer. Model warm-up runs in a separate process. Project glossaries and trial translations help check a batch before running it. [Release notes and upgrade instructions](docs/RELEASE-v2.6.0.md)
 
 > [!NOTE]
 > **v2.5.2 update:** rolling cross-page translation context with optional cache retention, an OCR-forked sequential-translation ∥ background-repair Fork-Join pipeline, a redesigned live workflow graph on the translation page, plus manual bubble boxes, eyedropper & custom RGB fills, 9-slot favorite fonts (`1–9`), lettering stretch/rotation/outline, and fractional-edge PDF export fixes. v2.5.1 models remain reusable. [v2.5.2 release notes](docs/RELEASE-v2.5.2.md) · [Changelog](CHANGELOG.md).
@@ -117,7 +120,7 @@ Logs use the Aa handwriting font and reveal at about 250 characters per second, 
 - **Native desktop UI**: PySide6 app with a manga magazine design and a clean editing canvas.
 - **Source languages and OCR**: Japanese, Korean, English, or a custom language; independent HTTP and compatible vision OCR endpoints.
 - **All-ONNX inference**: text detection, Japanese/Korean/English local OCR, and LaMa inpainting all use ONNX; no PyTorch required.
-- **Split release packages**: models ship separately, so app updates do not require re-downloading models.
+- **Single Windows installer**: v2.6.0 bundles the app and local models in one Setup.
 - **Startup warmup**: the AI pipeline loads automatically when the app opens.
 - **GPU inference**: new installations prefer NVIDIA CUDA. Settings provide official CUDA/cuDNN installation links; a compatible NVIDIA driver is required; logs report the actual device. Existing CPU preferences are preserved.
 - **Multimodal translation toggle**: sends the full page image to the AI for visual context; pure-text mode sends OCR results. Font selection, size, and orientation are local by default. Experimental font comparison requires a separate opt-in.
@@ -139,6 +142,12 @@ The interface supports **中文 / English / 日本語**, with Chinese as the def
 A fully successful translation batch has a 15% chance of showing a small repository support prompt in the bottom-right corner. It closes after eight idle seconds or via its X button; GitHub opens only when its action button is clicked.
 
 ### Release users (recommended)
+
+Download `ComiTrans-v2.6.0-x64-Setup.exe` and `SHA256SUMS.txt`. Verify the SHA-256, close ComiTrans and run Setup. Enter your translation API key and model in Settings. [Download v2.6.0](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.6.0)
+
+This installer is unsigned. Windows may display “Unknown publisher.” Install this release manually. At startup the app checks GitHub for a newer stable release. Select **Update** beside the model status to view the version and open its release page. [Installation and migration guide](docs/WINDOWS_INSTALLER.md)
+
+#### Earlier ZIP releases (v2.5.2)
 
 1. Download `ComiTrans-v2.5.2-app.zip` from the [v2.5.2 release](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.5.2); for fresh installs or upgrades from v2.5.0 and earlier, also download `ComiTrans-v2.5.2-models.zip` (identical to v2.5.1 models; existing v2.5.1 users can reuse their models folder).
 2. Extract the required archives into the same parent directory and merge their top-level `ComiTrans` folders, preserving the subfolder structure. The final model path is `ComiTrans\comic-translate-ai\models\`.
@@ -208,7 +217,7 @@ The `@ComiTrans` watermark is enabled by default. To disable it, uncheck Add @Co
 
 Per-page resume is enabled by default. After a network failure, cancellation, or restart, use the same source files, output folder, and translation settings to skip completed pages and reuse saved translations. Uncheck Resume in Translation Preferences to start over. [Resume guide](docs/RESUMABLE_TRANSLATION.md).
 
-A PDF is shown as one file task and processed through a bounded page pipeline. ComiTrans retains the translated PDF, a matching `.comitrans.json` index, and a separate directory of editable pages. Open the result in the Typesetting Editor or import the translated PDF to adjust text, layout, and backgrounds. Continuous Strip mode lets you scroll vertically and click a page to edit it in place. Editing and Save Image operate on individual images. Export PDF explicitly assembles saved pages in the background with lossless compression, progress and cancellation, preserving page count, order, and sizes. You can also import the project directory’s `project.json` without the PDF. Content is rasterized; password-protected PDFs are not supported. Keep the PDF, index, and project directory together when moving them. [PDF editing guide](docs/PDF_EDITING.md).
+A PDF is shown as one file task and processed through a bounded page pipeline. ComiTrans retains the translated PDF, a matching `.comitrans` index, and a separate directory of editable pages. Open the result in the Typesetting Editor or import the translated PDF to adjust text, layout, and backgrounds. Continuous Strip mode lets you scroll vertically and click a page to edit it in place. Editing and Save Image operate on individual images. Export PDF explicitly assembles saved pages in the background with lossless compression, progress and cancellation, preserving page count, order, and sizes. You can also import the project directory’s `project.json` without the PDF. Content is rasterized; password-protected PDFs are not supported. Keep the PDF, index, and project directory together when moving them. [PDF editing guide](docs/PDF_EDITING.md).
 
 ### OCR interfaces
 
@@ -310,18 +319,13 @@ By default the app is built without models. For local testing with models:
 
 ### Generate release packages
 
+After building the desktop app, run the following command with NSIS installed. Setup includes the default models and uses the version declared by the desktop package. [Windows packaging guide](docs/WINDOWS_INSTALLER.md)
+
 ```powershell
-python package_release.py --output release/v2.5.2
+.\.venv\Scripts\python.exe installer/build.py --include-models
 ```
 
-The local build produces two v2.5.2 archives.
-
-- `ComiTrans-v2.5.2-app.zip`: program only, no models
-- `ComiTrans-v2.5.2-models.zip`: ONNX models matching v2.5.1 (Japanese CharSpot Small, dual detectors, Korean & English OCR, LaMa); existing v2.5.1 models can be reused
-
-CUDA/cuDNN libraries are not distributed in this release. GPU users can open official installation links from Settings. The release includes `SHA256SUMS.txt` and `baseline.json`.
-
-Version metadata is stored and committed in the source repository:
+Historical ZIP release metadata
 
 - [docs/releases/v2.5.2/baseline.json](docs/releases/v2.5.2/baseline.json): v2.5.2 target build fingerprint
 - [docs/releases/v2.5.2/SHA256SUMS.txt](docs/releases/v2.5.2/SHA256SUMS.txt): v2.5.2 app, models and target baseline checksums
@@ -362,6 +366,10 @@ ComiTrans
 ```
 
 ## Changelog
+
+### v2.6.0 (2026-11-23)
+
+Windows Setup includes the default models. The desktop app adds background model warm-up, project glossaries, trial translations and a compact update indicator. [Release notes](docs/RELEASE-v2.6.0.md)
 
 ### v2.5.2 (2026-11-17)
 
@@ -489,11 +497,11 @@ App and models remain separate packages; v2.3.0 users can reuse their models. Se
 
 **Do releases require Python or GPU libraries?**
 
-Python is not required. CPU users can extract the app and models and run. GPU users need a compatible NVIDIA driver, CUDA 12 and cuDNN 9; Settings provide official installation links. Existing compatible installations can be reused. Logs show the actual provider.
+Setup includes the CPU runtime and models, so no Python installation is required. CUDA acceleration requires a compatible NVIDIA driver, CUDA 12, and cuDNN 9. See GPU setup in Settings for instructions.
 
 **Where do models go?**
 
-Beside the exe at `comic-translate-ai/models/`. Extract both archives into the same parent directory and merge their top-level `ComiTrans` folders; avoid nesting `ComiTrans/ComiTrans`.
+The v2.6.0 Setup installs the models with the app. For v2.5.2 and earlier ZIP releases, follow the extraction instructions above.
 
 **Why is English text not translated?**
 
@@ -509,7 +517,7 @@ Report issues at [GitHub Issues](https://github.com/Aaaaamadeus/ComiTrans/issues
 
 ## License
 
-- Project code is released under the license in the repository.
+- Project source code is licensed under [GPL-3.0](LICENSE).
 - Fonts: Smiley Sans, LXGW WenKai, LXGW Marker Gothic (SIL OFL 1.1), Klee One, Source Han Sans/Serif, setofont (SetoFont), and 851tegakizatsu are free for commercial use, each under its own license.
 - UI fonts Skribble and Aa retain their embedded copyright information; see [font provenance](assets/ui/fonts/README.md).
 - Models: CharSpot Small weights use CC BY-NC-SA 4.0. For attribution, terms, and sources of each model see [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md).

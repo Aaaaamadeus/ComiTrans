@@ -24,7 +24,7 @@ MODEL_ARCHIVE_PREFIX = "ComiTrans/comic-translate-ai/models/"
 SKIP_DIRS = {"models", "gpu-runtime", "user_fonts", "Log", "logs", "__pycache__", ".cache"}
 
 
-def collect_app(dist: Path):
+def collect_app(dist: Path, *, portable_tools=True):
     required = ["ComiTrans.exe", "_internal/assets/gpu-runtime-windows.json", "_internal/assets/ui/fonts/Skribble.ttf",
                 "_internal/assets/ui/fonts/AaJinRiHuaQing-ChunLanMaoKun.ttf",
                 "_internal/assets/ui/icons/chevron-down.svg",
@@ -67,10 +67,12 @@ def collect_app(dist: Path):
                 ('cublas', 'cudnn', 'cudart', 'cufft', 'nvrtc', 'nvjitlink', 'curand', 'cusolver', 'cusparse')):
             continue  # NVIDIA runtimes are installed by users, never released here.
         files.append((path, "ComiTrans/" + rel.as_posix()))
-    for path, name in ((ROOT / f"docs/RELEASE-v{__version__}.md", "README-release.md"),
-                       (ROOT / "CHANGELOG.md", "CHANGELOG.md"),
-                       (ROOT / "scripts/apply_patch.ps1", "Apply-Update.ps1"),
-                       (ROOT / "scripts/apply_patch.bat", "Update-ComiTrans.bat")):
+    documents = [(ROOT / f"docs/RELEASE-v{__version__}.md", "README-release.md"),
+                 (ROOT / "CHANGELOG.md", "CHANGELOG.md")]
+    if portable_tools:
+        documents.extend(((ROOT / "scripts/apply_patch.ps1", "Apply-Update.ps1"),
+                          (ROOT / "scripts/apply_patch.bat", "Update-ComiTrans.bat")))
+    for path, name in documents:
         if not path.is_file():
             raise FileNotFoundError(f"Missing release documentation: {path}")
         files.append((path, "ComiTrans/" + name))
@@ -150,14 +152,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dist", type=Path, default=ROOT / "dist" / "ComiTrans")
     parser.add_argument("--output", type=Path, default=ROOT / "release")
-    parser.add_argument('--app-only', action='store_true', help='Reuse an existing model archive')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--app-only', action='store_true', help='Reuse an existing model archive')
+    mode.add_argument('--models-only', action='store_true', help='Package audited models for the MSI release')
     parser.add_argument('--metadata-dir', type=Path,
                         default=ROOT / 'docs' / 'releases' / f'v{__version__}',
                         help='Repository directory for the baseline and checksums')
     args = parser.parse_args()
+    model_target = args.output / f'ComiTrans-v{__version__}-models.zip'
+    if args.models_only:
+        files = collect_models()
+        args.output.mkdir(parents=True, exist_ok=True)
+        write_archive(model_target, files)
+        return
     # Validate all inputs before creating either archive.
     app_files = collect_app(args.dist)
-    model_target = args.output / f'ComiTrans-v{__version__}-models.zip'
     if args.app_only and not model_target.is_file():
         raise FileNotFoundError(f'--app-only requires an existing model archive: {model_target}')
     if args.app_only:

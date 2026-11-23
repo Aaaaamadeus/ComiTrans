@@ -8,7 +8,7 @@ import pyclipper
 from PIL import Image
 
 from comic_translate_core.inference_control import run_inference
-from comic_translate_core.onnx_session import create_onnx_session
+from comic_translate_core.image_session import create_image_session
 from comic_translate_core.detector_paths import LINE_FILE
 from comic_text_detector.utils.textblock import TextBlock, sort_textblk_list
 
@@ -116,8 +116,8 @@ def seed_strokes(gray, seed, box, lines):
 
 class SplitTextDetector:
     def __init__(self, model_path, device, language):
-        self.session = create_onnx_session(model_path, device)
-        self.line_session = create_onnx_session(Path(model_path).with_name(LINE_FILE), device)
+        self.session = create_image_session(model_path, device)
+        self.line_session = create_image_session(Path(model_path).with_name(LINE_FILE), device)
         self.right_to_left = language == "ja"
 
     def __call__(self, image):
