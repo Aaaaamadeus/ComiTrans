@@ -18,6 +18,8 @@ from comic_translate_core.windows_install import installed_product, original_pac
 from .. import __version__, config
 from ..i18n import tr
 
+SERVICE_PIPE = 'ComiTrans.ReleaseCheck'
+
 
 class UpdateNotice(QObject):
     def __init__(self, window):
@@ -35,11 +37,13 @@ class UpdateNotice(QObject):
         self.requested_directly = False
         self.poll = QTimer(self, interval=100)
         self.poll.timeout.connect(self._download_finished)
+        self.available_update = None
+        self.window.update_button.clicked.connect(self._show_offer)
 
     def start(self):
         if self.product:
             self.timer.start()
-            self.pipe.connectToServer('ComiTrans.ReleaseCheck', QIODevice.OpenModeFlag.ReadOnly)
+            self.pipe.connectToServer(SERVICE_PIPE, QIODevice.OpenModeFlag.ReadOnly)
         else:
             self._request_github()
 
@@ -83,16 +87,35 @@ class UpdateNotice(QObject):
 
     def _github_finished(self, reply):
         try:
-            if reply.error() == QNetworkReply.NetworkError.NoError:
-                self._offer(json.loads(bytes(reply.readAll())))
+            if reply.error() != QNetworkReply.NetworkError.NoError:
+                self._check_failed(reply.errorString())
+                return
+            data = json.loads(bytes(reply.readAll()))
+            if isinstance(data, dict) and isinstance(data.get('tag_name'), str):
+                self._offer(data)
+            else:
+                self._check_failed(tr('发布信息格式无效'))
         except ValueError:
-            pass
+            self._check_failed(tr('发布信息格式无效'))
         finally:
             reply.deleteLater()
 
+    def _check_failed(self, reason):
+        self.window.diagnostics.append(tr('检查更新失败：{reason}', reason=reason), 'WARNING')
+
     def _offer(self, data):
         update = latest_stable(data, __version__, setup=bool(self.product and self.product.setup))
-        if update is None or not self.window.isVisible():
+        self.available_update = update
+        button = self.window.update_button
+        button.setVisible(update is not None)
+        if update is not None:
+            detail = tr('新版本 v{version} 可用，点击查看详情', version=update.version)
+            button.setToolTip(detail)
+            button.setAccessibleName(detail)
+
+    def _show_offer(self):
+        update = self.available_update
+        if update is None or self.poll.isActive():
             return
         notice = QMessageBox(QMessageBox.Icon.Information, tr('发现 ComiTrans 新版本'),
                              tr('当前版本 v{current}，GitHub 已发布 v{latest}。',
@@ -115,7 +138,12 @@ class UpdateNotice(QObject):
                 self._download(update)
 
         notice.buttonClicked.connect(clicked)
+        self.window.update_button.setEnabled(False)
+        notice.finished.connect(self._offer_finished)
         notice.show()
+
+    def _offer_finished(self):
+        self.window.update_button.setEnabled(not self.poll.isActive())
 
     def _download(self, update):
         cache = config.PROJECT_ROOT / 'updates'
@@ -147,6 +175,7 @@ class UpdateNotice(QObject):
         except Empty:
             return
         self.poll.stop()
+        self.window.update_button.setEnabled(True)
         progress.hide()
         progress.deleteLater()
         if canceled.is_set() or not self.window.isVisible():

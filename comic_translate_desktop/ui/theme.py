@@ -262,6 +262,7 @@ QLabel#barCaption { font-size: 12px; font-weight: 700; color: @secondary; }
 QLabel#cardTitle { font-size: 13px; font-weight: 700; color: @ink; }
 QLabel#fontChoiceName { color: @secondary; font-size: 12px; padding: 2px 0 2px 0; }
 QFrame#statusPill { background: transparent; border: none; }
+QPushButton#updateIndicator { font-size: 12px; font-weight: 700; min-height: 18px; padding: 2px 9px; border-radius: 8px; }
 QFrame#statusPill[active="true"] { background: @muted; border-radius: 10px; }
 QLabel#statusText { font-size: 12px; color: @secondary; background: transparent; }
 QLabel#statusText[state="running"], QLabel#statusText[state="warming"],

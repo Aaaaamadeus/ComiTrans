@@ -1,4 +1,8 @@
 {
+  "有更新": "Update",
+  "新版本 v{version} 可用，点击查看详情": "Version {version} is available. View update details.",
+  "检查更新失败：{reason}": "Update check failed: {reason}",
+  "发布信息格式无效": "Invalid release information",
   "发现 ComiTrans 新版本": "ComiTrans update available",
   "当前版本 v{current}，GitHub 已发布 v{latest}。": "Current version v{current}. Version v{latest} is available on GitHub.",
   "下载并更新": "Download and update",
