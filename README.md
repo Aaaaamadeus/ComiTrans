@@ -2,509 +2,346 @@
 
 <div align="center">
 
-**[简体中文](README.md)** ｜ **[English](README_en.md)**
+<h1>ComiTrans</h1>
 
-<br>
+<p><strong>本地 ONNX 视觉管线 × 大模型上下文翻译 × 专业级嵌字精修桌面工作台</strong></p>
 
-<img src="https://img.shields.io/github/v/release/Aaaaamadeus/ComiTrans?color=76bad9" alt="release">
-<img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="python">
-<img src="https://img.shields.io/badge/UI-PySide6-green.svg" alt="PySide6">
-<img src="https://img.shields.io/badge/Inference-ONNX%20Runtime-orange.svg" alt="ONNX Runtime">
-<img src="https://img.shields.io/github/stars/Aaaaamadeus/ComiTrans?color=76bad9" alt="stars">
+<p>
+  <strong>简体中文</strong> ｜ <a href="README_en.md"><strong>English</strong></a>
+</p>
+
+<p>
+  <img src="https://img.shields.io/github/v/release/Aaaaamadeus/ComiTrans?style=flat-square&color=1f2328&labelColor=e6edf3" alt="Release">
+  <img src="https://img.shields.io/badge/Platform-Windows%20x64-0969da?style=flat-square" alt="Windows x64">
+  <img src="https://img.shields.io/badge/Python-3.12%2B-3776ab?style=flat-square" alt="Python 3.12+">
+  <img src="https://img.shields.io/badge/UI-PySide6-2da44e?style=flat-square" alt="PySide6">
+  <img src="https://img.shields.io/badge/Inference-ONNX%20Runtime-d97706?style=flat-square" alt="ONNX Runtime">
+  <img src="https://img.shields.io/badge/License-GPL--3.0-6e7781?style=flat-square" alt="GPL-3.0">
+  <img src="https://img.shields.io/github/stars/Aaaaamadeus/ComiTrans?style=flat-square&color=1f2328&labelColor=e6edf3" alt="GitHub Stars">
+</p>
+
+<p>
+  <a href="#-v260-核心亮点">v2.6.0 亮点</a> ·
+  <a href="#-界面预览">界面预览</a> ·
+  <a href="#-翻译前后对比">翻译效果</a> ·
+  <a href="#-快速开始">快速开始</a> ·
+  <a href="#-核心特性">核心特性</a> ·
+  <a href="#-翻译流水线">工作流</a> ·
+  <a href="#-模型与文档导航">模型与文档</a> ·
+  <a href="#-常见问题">常见问题</a>
+</p>
 
 </div>
 
-ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测、日语/韩语/英语 OCR、背景修复和中文排版，通过配置的大模型 API 翻译。支持接入自定义 OCR，不依赖 Web 前端。
+ComiTrans 是一款面向漫迷与嵌字协作者的纯本地桌面漫画汉化客户端。软件在本地通过 **ONNX Runtime** 完成漫画文本检测、日/韩/英 OCR、原分辨率擦字修补与中文排版（完全脱离 PyTorch 与 Web 前端），并结合大语言模型 API 实现上下文感知翻译，内置可实时热预览的专业级嵌字精修工作台。
 
-从 v2.2.1 开始，检测、OCR 和修复均使用 **ONNX Runtime**，无需 PyTorch / torchvision / transformers。
+---
 
-> [!NOTE]
-> **v2.6.0 Windows x64 版**将程序和模型放进一个安装包。模型在独立进程预热，翻译前可用作品术语库统一译名、先试译几页查看用量。[发布说明与升级步骤](docs/RELEASE-v2.6.0.md)
+## ✨ v2.6.0 核心亮点
 
-> [!NOTE]
-> **v2.5.2 更新**：滚动上下文记忆与可选缓存保留、OCR 后“按序翻译 ∥ 后台修补”Fork-Join 并行流水线、实时工作流拓扑可视化，以及精修画框、取色与自定义 RGB 填色、9 槽收藏字体、文字拉伸/旋转/描边和 PDF 边缘修复。已有 v2.5.1 模型可复用。[v2.5.2 发布说明](docs/RELEASE-v2.5.2.md) · [更新日志](CHANGELOG.md)。
+> [!TIP]
+> **v2.6.0 现已发布！** 首次提供包含桌面客户端、默认模型与中文字体的单文件 Windows x64 安装向导，并全面升级全书翻译工作流、精修批量排版与 60fps 墨韵动效。
+> 👉 [查看完整 v2.6.0 发布说明与迁移指南](docs/RELEASE-v2.6.0.md) · [前往下载安装包](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.6.0) · [完整更新日志](CHANGELOG.md)
 
-## v2.5.2 重要更新
+| 升级维度 | v2.6.0 核心改进 |
+| --- | --- |
+| **📦 Windows 一体化安装与更新提示** | 单文件 NSIS Setup（固实 LZMA 压缩），内置程序、字体与默认 ONNX 模型，CPU 开箱即用；启动时后台检查 GitHub 正式版，仅发现更高版本时在顶栏「模型已就绪」左侧显示「有更新」提醒。 |
+| **📚 作品术语库、试译估价与 CBZ** | 新增「作品术语库」统一角色/地点译名（仅纳入当前生效术语指纹）；批前支持「试译」1–3 页并统计真实 Token 消耗与整本费用预估；支持 CBZ 按页翻译与「导出 CBZ」。 |
+| **🎨 精修单层菜单、多选与样式刷** | 顶部工具栏重整为无嵌套单层菜单，释放画布空间；支持列表/画布多选气泡、「取样式 / 样式刷 / 撤销样式」、跨页「全书译稿」查找替换与「重译气泡」。 |
+| **⚡ 60fps 墨韵动效与独立进程预热** | 引入统一 60fps 黑白交互动效与纸白/夜墨双主题打磨；图像模型会话隔离至独立进程预热，脱离 Qt 主事件循环，启动加载期间界面依然流畅可操作。 |
 
-- **上下文记忆与 Fork-Join 并行流水线**：单批按阅读顺序延续跨页上下文（最多 12 页 / 24,000 字符），原子持久化在 `.cache/translation-context.json`；偏好新增「保留上下文缓存」（联动锁定断点续传）。OCR 完成后按序 API 翻译与后台 `repair_comic_page` 擦字并发执行，汇合时自动按译文结果对账掩码。[上下文与并行说明](docs/CONTEXT_TRANSLATION.md)。
-- **工作流拓扑实时可视化**：自动处理页取消旧版线性 7 步条，改为对应真实管道的有向工作流图（`读取 → 检测 → OCR → [翻译 ∥ 修补] → 排版 → 保存 / PDF`），直观呈现并发在途页角标、待汇合状态、上下文计数、续传复用与底部逐页矩阵。
-- **嵌字精修增强**：新增画布手工添加气泡框、图片取色（避开辅助线并支持长条）、自定义 RGB/Hex 填色、9 槽常用字体快捷栏（数字键 `1–9`）、文字颜色持久化、横向/纵向拉伸（`10%–400%`）、旋转（`±180°`）、描边（`0–30 px`）与「白字黑边竖排」预设，补充页面移除/清空、气泡 `1 / N` 计数及单页滚动隔离。
-- **冷启动与导出修复**：ONNX 模型预热延后至首帧绘制后触发；修复小数尺寸 PDF 页面边缘背景铺底覆盖不完整的问题。
+---
 
-## v2.5.0 重要更新
+## 📷 界面预览
 
-- **长篇 PDF 工作流**：页图按需生成；精修保存和切页不合成整本 PDF，完成后显式后台导出。连续长条按可见范围加载，支持打开 `project.json`。[PDF 使用说明](docs/PDF_EDITING.md)。
-- **翻译速度与续传**：当前页修补时，后续页继续检测、OCR 和 API 翻译；默认最多 4 页在途。GPU 日志报告实际设备。失败、停止或重启后跳过完成页，复用合法译文。[续传](docs/RESUMABLE_TRANSLATION.md) · [性能实测](docs/TRANSLATION_PERFORMANCE.md)。
-- **保留清晰度的擦字**：LaMa 按原尺寸分块，内存不足时缩小块而非缩图。改善黑底白字、头发交叠、白描边、网点和渐变背景；掩膜可独立测试或替换。[掩膜组件](docs/TEXT_MASK_COMPONENT.md)。
-- **更完整的精修**：自选区域后台修补、按块文字颜色与描边、中文按词换行；“还原此气泡”同时撤销该块修补和嵌字，保存重开后仍可切回处理结果。[气泡还原](docs/BUBBLE_RESTORATION.md)。
-- **大项目操作**：后台索引、切页和保存；只保留最新加载请求，保存时继续编辑不丢草稿。折叠栏、侧栏和专注模式保留手动偏好。[精修性能与边界](docs/EDITOR_PERFORMANCE.md)。
-- **API 与架构**：严格 JSON Schema 优先，降级后仍校验译文类型和数量；页面文件事务、模型共享、掩膜和调度拆成独立组件。[接口约定](docs/TRANSLATION_JSON_CONTRACT.md) · [架构图](docs/ARCHITECTURE.md)。
+采用黑白漫画杂志风设计：开放式分区标题、局部网点、Skribble 字标与 60fps 克制动效；支持 **跟随系统 / 纸白 / 夜墨** 三种外观即时切换，夜间模式仅作用于界面与画布周边，不改变漫画像素与导出结果。
 
-三页离线调度对照为 **42.43 → 37.85 秒**，输出像素一致；其中 API 等待模拟为 2 秒，不代表整本 PDF 或实时服务的速度保证。复杂背景仍可能需要人工修图。独立修图插件目前只有接口设计，宿主加载尚未实现。
+| v2.6.0 纸白主题 · 精修单层菜单与重译入口 | v2.6.0 夜墨主题 · 深色工作台与护眼画布 |
+| --- | --- |
+| ![v2.6.0 纸白主题精修界面](docs/ui-review/release-260-light.png) | ![v2.6.0 夜墨主题精修界面](docs/ui-review/release-260-dark.png) |
 
-## 漫画工作台
+| Fork-Join 实时并行工作流拓扑（自动处理页） | 9 槽收藏字体、取色填色与排版控制 |
+| --- | --- |
+| ![ComiTrans 自动处理并行工作流](docs/ui-review/automatic-workflow-v252.png) | ![ComiTrans 嵌字精修界面](docs/ui-review/editor-fill-fonts-1440-style-review.png) |
 
-黑白漫画工作台：开放式分区标题、局部网点、Skribble 字标和柔和控件，工作页直接进入操作区。翻译页可直接导入字体、固定 9 个常用字体快捷槽并查看实际字形；底部并行工作流拓扑图按真实后台流水线实时显示并发在途页、`AI 翻译 ∥ 背景修复`分叉并行、上下文累计与逐页状态矩阵。精修画布保留作品原色。
+<details>
+<summary>展开更多界面细节截图与逐字日志动图（夜墨工作流、上下文缓存偏好、取色描边、字体库与设置页）</summary>
 
-**自动处理工作台 · Fork-Join 并行工作流**
+<br>
 
-![ComiTrans 自动处理并行工作流](docs/ui-review/automatic-workflow-v252.png)
-
-**嵌字精修工作区 · 常用字体 / 填色与排版**
-
-![ComiTrans 嵌字精修界面](docs/ui-review/editor-fill-fonts-1440-style-review.png)
-
-**夜间模式（夜墨）**
-
-设置 → 运行与输出 → 外观 可切换「跟随系统 / 纸白 / 夜墨」，切换即时生效，Windows 标题栏同步换色；夜墨只改变界面与画布周围，漫画像素与导出结果保持不变。
-
-| 自动处理与并行工作流 | 嵌字精修 |
+| 夜墨下的并行工作流 | 夜墨下的嵌字精修 |
 | --- | --- |
 | ![夜墨下的并行工作流](docs/ui-review/dark-workflow-v252.png) | ![夜墨下的嵌字精修](docs/ui-review/dark-editor.png) |
 
-<details>
-<summary>展开更多 v2.5.2 界面截图（上下文缓存偏好、画布取色、拉伸描边、字体库与设置）</summary>
-
-| 翻译偏好与上下文缓存保留 | 批处理完成与工作流状态 |
+| 翻译偏好与上下文缓存保留 | 批处理完成与逐页状态矩阵 |
 | --- | --- |
 | ![翻译偏好与上下文缓存](docs/ui-review/context-1440-retained-style-review.png) | ![批处理完成工作流](docs/ui-review/automatic-complete-style-review.png) |
 
-| 画布图片取色 | 文字拉伸 / 旋转 / 描边预设 |
+| 画布图片取色与自定义填色 | 文字拉伸 / 旋转 / 白字黑边竖排预设 |
 | --- | --- |
 | ![画布图片取色与自定义填色](docs/ui-review/editor-color-pick-1440-style-review.png) | ![文字拉伸、旋转与白字黑边竖排预设](docs/ui-review/editor-outline-1440-style-review.png) |
 
-| 离线字体库检索 | 设置与翻译服务配置 |
+| 离线字体库检索（2,056 族） | 设置与翻译服务配置 |
 | --- | --- |
 | ![字体库检索](docs/ui-review/font-library-search-style-review.png) | ![设置页](docs/ui-review/settings-style-review.png) |
 
-</details>
-
-**快速逐字日志（实际 Qt 录屏，v2.5.2 界面测试文本）**
-
-日志正文使用 Aa今日花晴 春懒猫困，以约每秒 250 字快速展开，积压时自动加速；复制、导出与任务结束时补齐全文。支持级别筛选、搜索、字号调整、暂停跟随和选区保留，显示最近 5,000 条记录，完整日志保存在磁盘。
+**快速逐字日志（实际 Qt 录屏）**：日志正文采用「Aa今日花晴 春懒猫困」，以约每秒 250 字速度展开并在积压时自动加速；支持级别筛选、搜索、字号调节、暂停跟随与选区保留，界面保留最近 5,000 条记录，完整日志同步写入磁盘。
 
 ![快速逐字日志输出](docs/ui-review/log-reveal-v252.gif)
 
-## 翻译前后对比
+</details>
+
+---
+
+## 🎨 翻译前后对比
 
 > [!NOTE]
-> 以下为用户提供的第 6、7 页对比：左列为日文原图，右列为对应的简体中文译图。
+> 以下为用户提供的漫画第 6、7 页实际汉化对比：左列为日文原图，右列为自动擦字与中文嵌字后的成品效果。
 
-| 翻译前 | 翻译后 |
+| 日文原图 | 简体中文译图 |
 | --- | --- |
-| ![日文原图](docs/images/20.1.png) | ![中文译图](docs/images/20.11.png) |
-| ![日文原图](docs/images/20.2.png) | ![中文译图](docs/images/20.21.png) |
+| ![第 6 页日文原图](docs/images/20.1.png) | ![第 6 页中文译图](docs/images/20.11.png) |
+| ![第 7 页日文原图](docs/images/20.2.png) | ![第 7 页中文译图](docs/images/20.21.png) |
 
-## 目录
+---
 
-[漫画工作台与日志动画](#漫画工作台) · [OCR 接口](#ocr-接口) · [精修工具插件接口设计](docs/RETOUCH_PLUGIN_API.md) · [完整更新日志](CHANGELOG.md)
+## 🚀 快速开始
 
-1. [核心特性](#核心特性)
-2. [快速开始](#快速开始)
-3. [使用说明](#使用说明)
-4. [翻译流程](#翻译流程)
-5. [模型说明](#模型说明)
-6. [打包与发布](#打包与发布)
-7. [项目结构](#项目结构)
-8. [更新日志](#更新日志)
-9. [常见问题](#常见问题)
-10. [反馈与支持](#反馈与支持)
-11. [开源协议](#开源协议)
+### Windows 一体化安装包（推荐）
 
-## 核心特性
+无需提前安装 Python、PyTorch 或手动拼接模型目录：
 
-- **多语言源文与自定义 OCR**：选择日语、韩语、英语或“自定义 OCR”，可翻译成简体或繁体中文；支持独立 HTTP OCR 与兼容视觉模型接口。[接入说明与混合语言策略](docs/MULTILINGUAL_OCR.md)。
-- **纯本地桌面客户端**：PySide6 桌面应用，抛弃 Web 页面，启动后即可使用。
-- **全 ONNX 推理**：漫画文本检测、日/韩/英本地 OCR、LaMa 修复全部为 ONNX 模型，不再依赖 PyTorch。
-- **Windows 一体化安装**：v2.6.0 将程序和本地模型放进一个 Setup。
-- **延迟后台预热**：打开客户端先显示界面，模型在低优先级后台准备，开始翻译时直接复用。
-- **GPU 推理**：新安装默认优先 NVIDIA CUDA；软件内提供 CUDA/cuDNN 官方安装链接，需兼容的 NVIDIA 驱动，日志明确实际设备。保留旧配置中的 CPU 选择。
-- **多模态翻译开关**：勾选后发送整页图片给 AI，结合画面翻译；不勾选则发送 OCR 文本。字体、字号与横竖方向默认由本地算法决定，实验性字体比对需单独启用。
-- **PDF 整本翻译**：可与图片混合导入 PDF，逐页翻译后按原页序和原页面尺寸生成一个 `*_translated.pdf`。
-- **15 类字体风格**：提供对白、强调、手写、内心、旁白、拟声、标题等风格，本地自动分类并支持编辑器手动选择，对缺字逐字回退。
-- **自选译文字体与开源字体库**：翻译页和精修页均可检索字体；Google Fonts 快照收录 2,056 个字体族，目录约 1 MB，字体按需下载并离线使用。也可导入 TTF / OTF / TTC / OTC。翻译默认字体自动保存，精修手动字体只作用于当前块并优先生效，缺字逐字回退。[字体库说明](docs/FONT_LIBRARY.md)。
-- **掩膜擦除与掩膜嵌字**：擦除只按检测文字掩膜执行；嵌字可用面积与排版中心按掩膜计算。
-- **嵌字人工编辑与热预览**：翻译后可微调字体风格、实际字号、横竖方向、X/Y 偏移与排版蒙版宽高；画布可直接拖拽蒙版边角缩放、框内拖动位置，修改自动预览，保存直接输出当前结果。
-- **报错日志与 AI 诊断**：日志写入 `Log/app.log`，自动生成诊断提示词，支持 AI 多轮诊断。
-- **文件夹批量选择**：支持选择整个文件夹并递归添加图片和 PDF。
-- **安全停止**：点击停止后显示“正在停止”，等待当前推理或请求收尾后确认终态，不继续调度剩余页面。
-- **Issue 反馈**：右上角可跳转到自填的 GitHub Issue 链接。
-- **可调整布局**：左右主区域、预览与日志区域均可拖拽调整大小。
+1. **下载与校验**：前往 [v2.6.0 发布页](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.6.0) 下载 `ComiTrans-v2.6.0-x64-Setup.exe` 与 `SHA256SUMS.txt`，在 PowerShell 中校验哈希一致：
 
-## 快速开始
+   ```powershell
+   Get-FileHash -Algorithm SHA256 .\ComiTrans-v2.6.0-x64-Setup.exe
+   Get-Content .\SHA256SUMS.txt
+   ```
 
-界面支持 **中文 / English / 日本語**，默认中文。首次启动时选择界面语言；之后可在“设置 → 翻译服务 → 界面语言”修改并保存，下次启动生效。此选项不改变漫画译文语言。[界面语言说明](docs/UI_LANGUAGES.md)。
+2. **运行安装向导**：关闭正在运行的旧版 ComiTrans，双击 Setup 完成安装。
+   - 本版安装包**未签名**，Windows 可能显示「未知发布者」，核对哈希后手动运行即可。
+   - 用户配置、字体与默认输出均独立保存在 `%LOCALAPPDATA%\ComiTrans`，卸载或覆盖升级不会丢失用户数据。
+   - 从 `v2.6.0-pre.1` 升级可直接覆盖安装；从旧 MSI/WiX 版迁移请先在系统「已安装的应用」卸载旧版；从 `v2.5.2` 等历史 ZIP 版迁移请参阅 [安装与升级指南](docs/RELEASE-v2.6.0.md#从历史版本升级--迁移)。
+3. **填写翻译服务与可选 GPU**：安装后 CPU 模式即可直接加载模型。打开「设置」填写翻译 API 密钥与模型即可开始翻译；如需 NVIDIA GPU 加速，可在「设置 → 运行与输出 → GPU 安装说明与下载」按指引配置兼容驱动、CUDA 12 与 cuDNN 9（[GPU 配置指南](docs/GPU_SETUP.md)）。
 
-翻译批次全部成功后，有 15% 概率在右下角显示仓库 Star 提示，8 秒无操作自动关闭，也可点 X 关闭。点击按钮才打开 GitHub 仓库。
+> [!NOTE]
+> 界面支持 **简体中文 / English / 日本語**（首次启动可选，或在「设置 → 翻译服务 → 界面语言」修改，[语言说明](docs/UI_LANGUAGES.md)）。整批翻译全部成功时有 15% 概率在右下角展示轻量 Star 提示，8 秒无操作自动收起。
 
-### Release 用户（推荐）
-
-下载 `ComiTrans-v2.6.0-x64-Setup.exe` 和 `SHA256SUMS.txt`，核对 SHA-256 后关闭 ComiTrans 并运行 Setup。首次使用请在设置中填写翻译 API 密钥和模型。[下载 v2.6.0](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.6.0)
-
-本版安装包未签名，Windows 可能显示「未知发布者」，请从发布页手动下载安装。应用启动时会检查更高的正式版本，点击模型状态左侧的「有更新」可查看版本详情并前往发布页。[安装与迁移说明](docs/WINDOWS_INSTALLER.md)
-
-#### 历史 ZIP 版（v2.5.2）
-
-1. 在[发布页](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.5.2)下载 `ComiTrans-v2.5.2-app.zip`（程序包）；首次安装或从 v2.5.0 及更早版本升级请同时下载 `ComiTrans-v2.5.2-models.zip`（模型包，与 v2.5.1 一致，已有 v2.5.1 模型可直接复用）。
-2. 所需压缩包解压到同一个父目录，合并顶层同名 `ComiTrans` 文件夹，保留子目录结构。最终模型路径为 `ComiTrans\comic-translate-ai\models\`。
-3. 双击合并后的 `ComiTrans.exe`，在“设置”页填写翻译 API Key 和模型。
-
-从 v2.5.1 升级可直接复用已有模型；从 v2.3.0 / v2.5.0 升级若仍使用旧模型包，建议合并 v2.5.1+ 模型包以使用更轻量的 CharSpot Small 日语 OCR 和双检测器切换。保留原有 `config.yaml`、整个 `user_fonts` 文件夹与输出文件。
-
-Release 用户不需要安装 Python、PyTorch 或 pip。GPU 加速需要兼容的 NVIDIA 驱动、CUDA 12 和 cuDNN 9；软件“设置 → 运行与输出 → GPU 安装说明与下载”提供官方链接。已有兼容环境可复用，CPU 用户无需安装这些 GPU 库。[GPU 安装指南](docs/GPU_SETUP.md)。
-
-升级到 v2.5.2：关闭程序，将 `ComiTrans-v2.5.2-app.zip` 解压到新目录，把旧目录的 `config.yaml`、`user_fonts/` 和 `comic-translate-ai/models/` 复制到对应位置。漫画输出及其 `_cleaned`、`_layout` 目录保持相对位置；确认新程序正常后再整理旧目录。GPU 用户可从软件设置打开官方运行库安装链接；本项目不打包上传 CUDA/cuDNN。本版使用完整程序包，详见[v2.5.2 更新说明](docs/RELEASE-v2.5.2.md)。
-
-### 源码运行（开发者）
-
-推荐 Python 3.12+，支持 CUDA 的 NVIDIA GPU 可选。
+<details>
+<summary>源码运行（开发者 · Python 3.12+，NVIDIA GPU 可选）</summary>
 
 ```powershell
 cd D:\ComiTrans
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r comic-translate-ai/requirements.txt
-```
 
-复制示例配置：
+# 如需本地韩语 / 英语 PP-OCRv5 模型：
+.\.venv\Scripts\python scripts/download_ocr_models.py
 
-```powershell
+# 复制示例配置并启动客户端
 Copy-Item comic-translate-ai/main/config.example.yaml comic-translate-ai/main/config.yaml
-```
-
-启动客户端：
-
-```powershell
 .\.venv\Scripts\python run.py
 ```
 
-也可以直接双击 `start.bat`。客户端启动后会立即显示界面，模型随后在低优先级后台准备。
+也可以直接双击 `start.bat` 启动。客户端会立即渲染主界面，模型随后在独立进程后台预热。
 
-## 使用说明
+</details>
 
-1. 点击“添加文件”或“添加文件夹”，也可以直接拖拽图片、PDF 或文件夹到窗口。
-2. 在“设置”页填写翻译 API，并在工作台选择“原文语言”。日语自动使用 CharSpot Small，旧包可沿用 Baberu / manga-ocr，韩语、英语使用 PP-OCRv5；其它语言配置“自定义 OCR”。缺少韩英模型时运行 `.\.venv\Scripts\python scripts/download_ocr_models.py`，详见[接入文档](docs/MULTILINGUAL_OCR.md)。
-3. 勾选“多模态翻译”后，翻译会发送整页图片给 AI；不勾选则使用纯文本翻译。两种模式默认都由本地算法选择字体和排版。
-4. 在翻译页顶部展开“翻译偏好”，设置背景提示词、中文人名对照，以及可选的「保留上下文缓存」（跨任务复用并自动保持「断点续传」）。
-5. 点击“开始翻译”，在底部并行工作流拓扑图中实时查看各页所处的检测、并发翻译/修补、汇合排版与逐页状态。
-6. 翻译失败时可在“诊断”页查看诊断提示词，或点击顶部“反馈”按钮提交反馈。
-7. 需要微调时，切换到“嵌字精修”页，选择已翻译图片和文本块；直接拖动蒙版四角或边缘调整大小，框内拖动位置。右侧可输入字号、X/Y 偏移和蒙版宽高，画布自动更新。点击“保存图片”或 Ctrl+S 直接输出当前结果。[精修热预览说明](docs/EDITOR_LIVE_PREVIEW.md)。
+---
 
-### 译文字体
+## 🧩 核心特性
 
-竖排各列可在精修页“排版与位置 → 竖排列对齐”选择上对齐、居中对齐或下对齐，按最长列统一起点/终点，整组文字保持居中。设置按文本块保存，实时预览并随布局恢复。
+### 1. 本地全 ONNX 视觉与推理管线
+- **轻量无 PyTorch**：检测、日/韩/英本地 OCR、LaMa 背景修补全部基于 **ONNX Runtime**，无需安装 PyTorch / torchvision / transformers。
+- **多源语言与自定义 OCR**：原生支持日语（CharSpot Small，兼容旧包 Baberu / manga-ocr）、韩语与英语（PP-OCRv5），并可配置独立 HTTP OCR 或兼容视觉模型接口。[多语言接入指南](docs/MULTILINGUAL_OCR.md)
+- **原分辨率保真擦字**：只针对检测文字掩膜执行擦除；LaMa 显存紧张时自适应缩小分块而不缩图，结合纯色背景回填、网点/渐变重建与白气泡整框涂白兜底。
+- **独立进程预热与 GPU 优先**：图像模型会话隔离在独立进程中预热，不卡顿界面；新安装默认优先 NVIDIA CUDA 并明确汇报实际推理设备，同时保留已有 CPU 偏好。
 
-精修译文可按 **Enter** 或点击“插入换行”手动分行，横排换行、竖排向左换列，连续回车保留空行/空列。修改立即预览，保存图片与布局后可继续恢复编辑。“排版与位置 → 文字效果”可选黑字白边或白字黑边（空心）。[操作说明](docs/EDITOR_LIVE_PREVIEW.md)。
+### 2. 上下文感知翻译与全书项目管理
+- **Fork-Join 并行流水线**：OCR 完成后自动分叉并发执行「按阅读顺序带上下文的 API 翻译」与「后台线程背景修复」，汇合时自动按译文结果对账掩膜并跳过空译文气泡。[上下文与并行架构](docs/CONTEXT_TRANSLATION.md)
+- **跨页上下文与断点续传**：单批最多延续 12 页 / 24,000 字符阅读上下文并原子持久化至 `.cache/translation-context.json`；默认启用断点续传，失败或中断后可复用已付费译文。[断点续传说明](docs/RESUMABLE_TRANSLATION.md)
+- **作品术语库与批前试译**：在 `任务 → 作品术语库` 统一角色、地点译名（支持仅填目标译名）；整批前点击「试译」先跑开头 1–3 页，查看真实 Token 用量与自定义单价预估整本费用。
+- **PDF 与 CBZ 整本工作流**：支持图片、文件夹递归、PDF 与 CBZ 导入。PDF 按需渲染并保留 `.comitrans` 项目索引与独立精修目录，完成编辑后后台无损导出 `*_translated.pdf`；CBZ 支持保存后直接「导出 CBZ」。[PDF 精修指南](docs/PDF_EDITING.md)
+- **多模态可选 & 简繁一键切换**：支持发送整页图片辅助翻译（字体/字号/方向默认仍由本地智能决策），顶部「译文」选择器支持即时切换简体/繁体中文输出。[简繁输出说明](docs/CHINESE_OUTPUT.md)
 
-竖排连续省略号、破折号整体换列，兼容常见标点变体；省略号点间距一致，破折号连成竖线，保留手动指定的换列位置。
+### 3. 专业级嵌字精修与排版体系
+- **精简单层菜单与高效画布**：单层收纳「视图」「文件」「填色」「字体管理」，配合连续长条视图、单页滚轮隔离、`F2` 全屏编辑与 `Z` 缩放工具，专注修图与嵌字。
+- **多选气泡与连续样式刷**：列表 `Ctrl`/`Shift` 或画布 `Ctrl` 点击/`Shift` 框选批量改样式；支持「取样式」「应用样式到所选气泡」「样式刷」（跨页共享剪贴板、`Esc` 退出）及逐次「撤销样式」，严格保护译文与已还原气泡。
+- **全书译稿与单气泡重译**：通过「全书译稿」跨页查找替换全书文本；右侧「重译气泡」可对单个气泡单独重新请求翻译。
+- **全能画布修图工具**：支持手工添加气泡框、图片取色（避开辅助线）、自定义 RGB/Hex 框选填色、自选区域修补、逐气泡「还原此气泡」（保存重开后仍可切换还原），以及撤回修补。
+- **15 类字体风格 & 离线字体库**：本地自动匹配对白、强调、手写、内心、旁白、拟声、标题等 15 类风格，支持 `3×` 超采样 Lanczos 渲染、拉伸（`10%–400%`）、旋转（`±180°`）、描边（`0–30 px`）与白字黑边竖排预设；内置 9 槽收藏字体快捷栏（`1–9` 键）、10 套繁体漫画字体、4 款特黑漫画字体与 **2,056 族 Google Fonts** 按需下载离线目录。[字体库说明](docs/FONT_LIBRARY.md) · [自定义字体](docs/CUSTOM_FONTS.md)
 
-内置“狮尾B2黑体”和“狮尾牙膏圆体”的独立简体/繁体特黑版本，共 4 个字体、约 58.6 MiB，可离线检索使用；用于粗重强调字和圆润空心字的风格替代。[字体、搭配与授权](comic-translate-ai/font_file/Manga/README.md)。
+### 4. 诊断、安全控制与交付
+- **逐字日志与 AI 多轮诊断**：运行日志写入 `Log/app.log`，诊断页自动汇集环境、模型路径与堆栈，支持一键生成诊断提示词并与 AI 进行多轮排障对话。
+- **安全停止与更新提醒**：点击停止后等待在途请求与推理平稳收尾，不调度新页；启动时静默核对 GitHub 正式版，发现新版时在顶栏显示「有更新」提示。
 
-翻译页顶部的“译文”可切换 **简体中文／繁體中文**，选择后自动保存，重启后恢复。翻译请求、续传和本地输出规范化均使用所选字形，适用于图片和 PDF；当前字体选择、已有结果和精修草稿保持原样。[简繁切换说明](docs/CHINESE_OUTPUT.md)。
+---
 
-展开翻译页的“翻译偏好”，即可选择“译文字体”和默认“竖排列对齐”，无需进入设置；默认折叠，自动保存选择。选中具体字体后，全部译文使用该字体；选择“自动匹配漫画风格”恢复各类原有风格字体。“＋ 导入字体”支持多选 TTF、OTF、TTC、OTC，导入完成后自动选中最后一款，字体集合使用第一个款式。默认对齐写入新译文的精修布局，已有草稿保留各自选择。
+## 🔄 翻译流水线
 
-两个页面的字体选择框均可输入名称检索；点击“字体库”还可按名称、语言和风格筛选 Google Fonts，选择款式后点击“下载并使用”。完整目录可离线检索，下载一次后可断网使用。当前快照中 10 个缺少许可证附件的字体族仅展示，暂不提供下载。详见[字体库说明](docs/FONT_LIBRARY.md)。
-
-另随应用内置 **10 个繁体漫画字体系列、12 个字重**，含源泉圆体、粉圆、芫荽、霞鹜文楷 TC、内海、清松手写体，以及思源黑体/宋体 TC、狮尾加糖宋体和大波浪圆体，首次使用即可离线选择。原始字体约 183.4 MiB，授权与来源一并分发。[完整清单](docs/TRADITIONAL_MANGA_FONTS.md)。字体选择优先显示中文名和粗细，保留英文名检索；精修页字体框独占一行，下方完整名称可换行，下拉列表自动加宽。
-
-选择自动保存，下次翻译生效；精修中的页面会更新预览并保留草稿，手动指定字体的文本块保持原选择，点击“保存图片”才写入输出。精修选择“跟随翻译默认字体”可恢复默认。导入和下载的字体保存在应用目录的 `user_fonts`，不安装到系统；重复文件复用已有字体，缺字逐字回退。搬迁或更新应用时保留整个 `user_fonts` 文件夹。详见[字体使用说明](docs/CUSTOM_FONTS.md)。
-
-默认在输出页右下角添加小号半透明 Skribble `@ComiTrans` 字标，可在“设置 → 第一页（翻译服务）→ 添加 @ComiTrans 水印”取消勾选并保存以关闭。已保存的关闭选择会保留。后续翻译图片和 PDF 每页按开关添加水印；精修中的页面也会更新预览，点击“保存图片”写入。重复保存不会叠加水印，清理底图保持无水印。
-
-默认启用按页断点续传。网络失败或停止后，使用相同原文件、输出目录和翻译设置再次开始，即可跳过已完成页面并复用已保存译文；重启程序后同样有效。需要全部重译时，取消“翻译偏好 → 断点续传”勾选。[断点续传说明](docs/RESUMABLE_TRANSLATION.md)。
-
-PDF 会以一个文件任务显示，内部按在途页数上限连续处理，成功后输出 `<原文件名>_translated.pdf`，并保留同名 `.comitrans` 索引和独立精修资料目录。点击结果页的精修入口，或在“嵌字精修”导入译文 PDF，即可逐页改字、排版与修补背景；开启“连续长条”可纵向滚动浏览并点击页面原位编辑。精修始终操作逐页图片，“保存图片”和切页不会合成 PDF；需要成书时点击“导出 PDF”，选择文件名后在后台无损合成，支持进度与取消。也可直接导入资料目录中的 `project.json`，不依赖 PDF 本身。输出保留页数、顺序和页面尺寸，页面内容会栅格化；加密或需要密码的 PDF 暂不支持。移动项目时请一起保留 PDF、索引和资料目录。详见 [PDF 精修说明](docs/PDF_EDITING.md)。
-
-### OCR 接口
-
-在“设置”中选择源语言和 OCR 引擎；OCR 与翻译服务分别配置地址、密钥和模型。
-
-| 引擎 | 使用方式 |
-| --- | --- |
-| 日语本地 OCR | 自动模式优先 CharSpot Small；使用旧模型包时兼容 Baberu 和 manga-ocr |
-| 韩语 / 英语本地 OCR | PP-OCRv5 ONNX，模型随 v2.3.0 模型包提供 |
-| 标准 HTTP OCR | 对完整 POST 地址发送文本区域 PNG 的 Base64，返回原文字符串 |
-| 兼容视觉模型接口 | 填写兼容 OpenAI 的 Base URL、独立 Key 和支持图片输入的模型，调用 `chat.completions` 识别原文 |
-
-标准 HTTP 请求体（`model` 选填）：
-
-```json
-{"image_base64": "<PNG Base64，不含 data: 前缀>", "mime_type": "image/png", "language": "fr", "model": "my-ocr"}
+```text
+读取图片 / PDF / CBZ ──▶ 气泡与文字检测 ──▶ 源语言 OCR
+                                               │
+            ┌──────────────────────────────────┴──────────────────────────────────┐
+            ▼                                                                     ▼
+   [ 分支 A：按阅读顺序翻译 ]                                             [ 分支 B：后台线程擦字修补 ]
+   携带最多 12 页上下文请求 API                                             纯色回填 / 网点渐变 / 原尺寸分块 LaMa
+            └──────────────────────────────────┬──────────────────────────────────┘
+                                               ▼
+                         汇合对账（空译文自动还原掩膜）──▶ 3× 超采样中文排版 ──▶ 保存输出 / 导出 PDF·CBZ
 ```
 
-响应体（`confidence` 可省略；有值时为 0–1）：
+1. **气泡与文本检测**：ONNX 检测器输出气泡框、文字掩膜与文本行。
+2. **源语言 OCR**：日语使用 CharSpot Small，韩/英使用 PP-OCRv5，或接入自定义 OCR；无原文/无译文区域保持原图。
+3. **分支 A · 顺序上下文翻译**：结合作品术语库与滚动上下文（最多 12 页 / 24,000 字符）发起翻译；多模态模式附带整页图像。
+4. **分支 B · 并行背景修复**：与翻译请求等待并发执行擦字；汇合时根据最终译文动态对账，清除空译文气泡的涂抹掩膜。
+5. **中文排版**：按掩膜有效面积估算字号、按掩膜质心定位，横竖自动适配，长文本自动收紧并处理竖排省略号/破折号。
+6. **保存与可逆精修**：输出成图、`<输出目录>_cleaned/` 无字底图与 `<输出目录>_layout/` 布局 JSON，随时可在精修页继续微调。
+7. **整书汇编**：PDF 全部页面成功后按原页面尺寸无损汇编并重新打开校验（覆盖小数尺寸边缘）；CBZ 可在精修保存后导出为新压缩包。
 
-```json
-{"text": "Bonjour le monde !", "confidence": 0.96}
-```
+> 服务返回 HTTP `401/403`（鉴权失败）、`402`（余额不足）或 `404`（接口/模型不存在）时，客户端会立即汇报具体原因并停止后续页面调度。
 
-配置密钥时附带 `Authorization: Bearer <key>`。无文字返回 `{"text":""}`；接口失败时该页停止，不继续擦除原文。默认超时 60 秒，可设 1–300 秒。自定义 OCR 会把文本区域图片发送到填写的服务；多模态翻译还会发送整页图片到翻译服务。
+---
 
-Python 扩展通过 `OcrEngine.recognize(image, language) -> OcrResult` 接入。一次任务使用一种源语言，自动混合语言路由尚未启用。完整协议、配置字段、模型下载和 Python 示例见 [多语言 OCR 接入文档](docs/MULTILINGUAL_OCR.md)。
+## 📦 模型与文档导航
 
-### 字体风格
+### 内置 ONNX 模型清单
 
+| 用途 | 默认模型 | 说明与文档 |
+| --- | --- | --- |
+| **漫画文字块与文字行** | ogkalu Small INT8 + PP-OCRv6 manga | [固定来源、许可证与 SHA256](docs/models/split-detector.json) |
+| **日文 OCR** | CharSpot Small | [模型卡、词表及许可证](docs/models/charspot-small.json) · [v2.5.1 评测](docs/MODEL_UPGRADE-v2.5.1.md) |
+| **韩语 / 英语 OCR** | `korean_PP-OCRv5_rec_mobile.onnx` / `en_PP-OCRv5_rec_mobile.onnx` | [固定模型来源与校验值](docs/MULTILINGUAL_OCR.md#韩语和英语模型) |
+| **LaMa 背景修复** | `lama-manga-dynamic.onnx` | [来源核验](docs/MODEL_UPGRADE-v2.5.1.md) · [更多候选模型](docs/ONNX_MODELS.md) |
+
+### 专题文档速查
+
+| 主题 | 文档 | 主题 | 文档 |
+| --- | --- | --- | --- |
+| **v2.6.0 发布与迁移** | [RELEASE-v2.6.0.md](docs/RELEASE-v2.6.0.md) | **Windows 打包与签名** | [WINDOWS_INSTALLER.md](docs/WINDOWS_INSTALLER.md) |
+| **上下文与并行流水线** | [CONTEXT_TRANSLATION.md](docs/CONTEXT_TRANSLATION.md) | **多语言与自定义 OCR** | [MULTILINGUAL_OCR.md](docs/MULTILINGUAL_OCR.md) |
+| **PDF 精修与项目导出** | [PDF_EDITING.md](docs/PDF_EDITING.md) | **字体库与自定义字体** | [FONT_LIBRARY.md](docs/FONT_LIBRARY.md) · [CUSTOM_FONTS.md](docs/CUSTOM_FONTS.md) |
+| **精修热预览与性能** | [EDITOR_LIVE_PREVIEW.md](docs/EDITOR_LIVE_PREVIEW.md) · [EDITOR_PERFORMANCE.md](docs/EDITOR_PERFORMANCE.md) | **整体架构与完整日志** | [ARCHITECTURE.md](docs/ARCHITECTURE.md) · [CHANGELOG.md](CHANGELOG.md) |
+
+---
+
+## 🔧 进阶说明与开发打包
+
+<details>
+<summary>使用进阶：译文字体、自定义 OCR 协议、15 类字体风格与 AI 诊断</summary>
+
+#### 译文字体、繁简与水印控制
+- **字体导入与离线字体库**：支持导入多选 `TTF / OTF / TTC / OTC`（保存于 `user_fonts/`，不污染系统字体），也可在「字体库」按名称、语言和风格检索并下载 **2,056 个 Google Fonts 字体族**；另内置 **10 个繁体漫画字体系列（12 字重）**（[清单](docs/TRADITIONAL_MANGA_FONTS.md)）与狮尾 B2/牙膏圆体特黑字重（[授权](comic-translate-ai/font_file/Manga/README.md)）。缺字按字符自动回退。
+- **竖排对齐与手动换行**：在「排版与位置」选择竖排列上/中/下对齐；译文框支持按 `Enter` 或「插入换行」保留空行/空列；支持黑字白边与白字黑边预设。
+- **文字水印开关**：默认在输出右下角添加半透明 Skribble `@ComiTrans` 字标，可在「设置 → 翻译服务 → 添加 @ComiTrans 水印」关闭并持久化记忆；清理底图始终保持无水印。
+
+#### 自定义 OCR 接口协议
+在「设置」中配置与翻译服务独立的 OCR 地址、密钥与超时（默认 60 秒，支持 1–300 秒）：
+- **标准 HTTP OCR**：POST 发送文本区域 PNG Base64，请求体 `{"image_base64": "...", "mime_type": "image/png", "language": "fr", "model": "my-ocr"}`，返回 `{"text": "...", "confidence": 0.96}`；配置密钥时附带 `Authorization: Bearer <key>`。
+- **兼容视觉模型接口**：填写 OpenAI 兼容 Base URL、独立 Key 与支持视觉输入的模型名称，调用 `chat.completions` 识别原文。
+- **Python 扩展**：实现 `OcrEngine.recognize(image, language) -> OcrResult`。详见 [docs/MULTILINGUAL_OCR.md](docs/MULTILINGUAL_OCR.md)。
+
+#### 15 类字体风格映射
 | 风格 | 用途 | 默认字体 |
 | --- | --- | --- |
 | `dialogue` / `bold_dialogue` | 普通 / 粗体对话 | 霞鹜文楷 / 思源黑体 Heavy |
 | `radiating` / `sfx` | 强调放射 / 拟声词 | 得意黑 Smiley Sans 斜体 |
-| `handwriting` | 手写注记 | setofont |
-| `seto` | 濑户手写（可选手动指定） | SetoFont 濑户字体 |
-| `tegaki_851` | 851 随性手写（可选手动指定） | 851tegakizatsu 851手写杂书体（缺字回退手写/正文） |
+| `handwriting` / `seto` / `tegaki_851` | 手写 / 濑户 / 851 随性手写（后两项支持手动指定） | setofont / 851手写杂书体 |
 | `thought` / `serious` | 内心 / 严肃正式 | 思源宋体 |
-| `whisper` / `cute` | 低语 / 可爱活泼 | Klee One（缺字自动回退思源字体） |
-| `narration` | 横向长条旁白 | 霞鹜文楷 LXGW WenKai |
-| `sfx` | 拟声词 | 得意黑 Smiley Sans 斜体 |
-| `lxgw_marker` | 漫黑/马克笔强调（可选手动指定） | 霞鹜漫黑 LXGW Marker Gothic |
-| `next_preview` | 下回预告 | Klee One |
-| `title` | 章节标题 | 思源黑体 Heavy |
+| `whisper` / `cute` / `next_preview` | 低语 / 可爱 / 下回预告 | Klee One（缺字回退思源） |
+| `narration` / `lxgw_marker` / `title` | 旁白 / 漫黑强调（手动）/ 章节标题 | 霞鹜文楷 / 霞鹜漫黑 / 思源黑体 Heavy |
 
-普通气泡默认 `dialogue`，再根据 OCR 内容、检测类别、原字笔画强度和文本框比例选择其它风格。方向以检测器结果为主，仅在长宽比明显矛盾时纠偏；编辑器提供自动、明确竖排和明确横排三种选择。
+> `multimodal_font_probe`（实验性多模态字体比对）默认关闭，策略与测试见 [docs/FONT_STYLE_STRATEGY.md](docs/FONT_STYLE_STRATEGY.md)。
 
-`seto`、`tegaki_851`、`lxgw_marker` 可在嵌字精修页的「字体风格」中手动指定，本地自动判断暂不主动选择这三种风格。实验性字体比对仅在同时启用 `multimodal` 与 `multimodal_font_probe` 时运行，后者默认关闭：AI 从本地生成的黑体、宋体、手写三组候选中判断字体族，再经过本地门控和许可表应用；正文的黑体结果可映射到 `lxgw_marker`。策略与实测数据见 [docs/FONT_STYLE_STRATEGY.md](docs/FONT_STYLE_STRATEGY.md)。
+#### 报错日志与 AI 诊断
+- 所有运行日志写入 `Log/app.log`；「诊断」页自动汇总环境信息、模型路径、最近日志与错误堆栈，支持一键复制诊断提示词并与 AI 进行多轮对话排障（点击「清空上下文」重置）。
 
-嵌字使用局部 3 倍超采样后以 Lanczos 缩回原尺寸，小字号对白不再直接落在低分辨率画布上；普通气泡同时取消强制白描边，使笔画边缘更自然，复杂背景上的非气泡文字仍会保留描边以保证可读性。
+</details>
 
-### 报错日志与 AI 诊断
+<details>
+<summary>本地构建主程序与生成 Windows 安装包命令</summary>
 
-- 所有运行日志写入 `Log/app.log`。
-- “诊断”页自动整理环境信息、模型路径、最近日志和报错堆栈。
-- 支持复制诊断提示词、复制原始日志、打开日志文件。
-- AI 诊断会携带当前日志上下文，并保留多轮对话记忆，只有点击“清空上下文”才会重置。
+1. 安装固定版本的构建依赖（构建脚本不再自动升级工具）：
 
-## 翻译流程
+   ```powershell
+   .\.venv\Scripts\python -m pip install -r requirements-build.txt
+   .\build_app.ps1
+   ```
 
-每张图片或 PDF 页面按以下 Fork-Join 流水线处理：不同页面的准备与检测按并发上限重叠推进，OCR 完成后分叉并发执行“按阅读顺序带上下文翻译”与“后台线程背景修复”，汇合对账后按输入顺序排版并保存结果：
+   如需本地联调模型，可附带 `-IncludeModels`：`.\build_app.ps1 -IncludeModels`。
 
-1. **气泡与文本检测**：ONNX 文本检测器输出气泡、文字掩膜和文本行。
-2. **源语言 OCR**：日语使用 CharSpot Small（兼容旧包 Baberu / manga-ocr），韩语和英语按文本行使用 PP-OCRv5，也可使用自定义 OCR。仅日语本地模式保留原有英文跳过规则；其它模式可正常识别、翻译英文。无原文或无译文的区域保留原图。
-3. **分叉分支 A · 顺序上下文翻译**：纯文本模式发送 OCR 结果，多模态模式发送整页图片，并自动拼接近期上下文（最多 12 页 / 24,000 字符）；字体默认由本地按角色、字形和文本框选择，字号与排版方向由本地决定。
-4. **分叉分支 B · 并行背景修复**：与翻译 API 等待并发在独立后台线程执行整页擦字（纯色回填、规则网点/渐变重建或原尺寸分块 LaMa 修复）；译文返回后汇合对账，自动移除空译文气泡的掩膜。
-5. **中文排版**：按掩膜有效面积估算字号、按掩膜质心定位，横竖方向自适应，长文本自动收紧字号。
-6. **保存与编辑**：输出翻译图，清理底图单独保存到 `<输出目录>_cleaned/`，布局 JSON 保存到 `<输出目录>_layout/`，可在嵌字精修页继续人工微调（含手动添加气泡、取色填色、收藏字体与拉伸旋转描边）。
-7. **PDF 重组**：PDF 的全部页面成功后，按原页面尺寸重组并重新打开校验（覆盖小数尺寸边界）；任一页失败时不生成半成品 PDF。
+2. 安装 [NSIS 3.13](https://nsis.sourceforge.io/Download) 后，生成包含默认模型的 Windows 安装包（版本号自动读取自 `comic_translate_desktop/__init__.py`）：
 
-翻译服务返回 401/403（鉴权）、402（余额不足）或 404（接口/模型不存在）时，客户端会显示实际原因并停止请求剩余页面。HTTP 402 需要为对应 API 账户充值，或更换有额度的 API Key，代码本身无法绕过服务商额度限制。
+   ```powershell
+   .\.venv\Scripts\python.exe installer/build.py --include-models
+   ```
 
-## 模型说明
+   完整构建、签名与 CI 验证流程见 [docs/WINDOWS_INSTALLER.md](docs/WINDOWS_INSTALLER.md)。历史 ZIP 发布版的 `baseline.json` 与 `SHA256SUMS.txt` 保留在 `docs/releases/`（如 [v2.5.2](docs/releases/v2.5.2/SHA256SUMS.txt)、[v2.5.1](docs/releases/v2.5.1/SHA256SUMS.txt)、[v2.4.0](docs/releases/v2.4.0/SHA256SUMS.txt)）。
 
-| 用途 | 模型 | 来源 |
-| --- | --- | --- |
-| 漫画文字块与文字行 | ogkalu Small INT8 ＋ PP-OCRv6 manga | [固定来源、许可证与 SHA256](docs/models/split-detector.json) |
-| 日文 OCR | CharSpot Small | [模型卡、词表及许可证](docs/models/charspot-small.json) |
-| 韩语 / 英语 OCR | `korean_PP-OCRv5_rec_mobile.onnx` / `en_PP-OCRv5_rec_mobile.onnx` | [固定模型来源与校验值](docs/MULTILINGUAL_OCR.md#韩语和英语模型) |
-| LaMa 背景修复 | `lama-manga-dynamic.onnx` | [固定来源与许可证核验](docs/MODEL_UPGRADE-v2.5.1.md) |
+</details>
 
-v2.5.1 本地预览只随包提供 CharSpot Small 日语 OCR，默认使用 Small＋文字行半幅修框，全套模型 284.712 MB（v2.5.0 的 48.71%）。旧日语模型包仍可使用。3 页漫画的 22 框测试中，字符错误从 12 减至 5。[评测](docs/MODEL_UPGRADE-v2.5.1.md) · [安装与回退](docs/RELEASE-v2.5.1.md)
-
-模型来源、可替换的其它 ONNX 版本以及效果更好的漫画文本检测模型候选见 [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md)。
-
-## 打包与发布
-
-### 打包主程序
-
-先安装固定版本的构建依赖；构建脚本不再自动升级工具：
-
-```powershell
-.\.venv\Scripts\python -m pip install -r requirements-build.txt
-.\build_app.ps1
-```
-
-默认只打包主程序，不复制模型；本地联调模型时使用：
-
-```powershell
-.\build_app.ps1 -IncludeModels
-```
-
-### 生成发布包
-
-构建桌面程序并安装 NSIS 后，运行以下命令生成包含默认模型的 Windows 安装包。打包脚本从客户端读取版本号。[Windows 打包说明](docs/WINDOWS_INSTALLER.md)
-
-```powershell
-.\.venv\Scripts\python.exe installer/build.py --include-models
-```
-
-历史 ZIP 版的校验文件
-
-- [docs/releases/v2.5.2/baseline.json](docs/releases/v2.5.2/baseline.json)：2.5.2 目标构建基线
-- [docs/releases/v2.5.2/SHA256SUMS.txt](docs/releases/v2.5.2/SHA256SUMS.txt)：2.5.2 程序包、模型包及目标基线的 SHA256
-- [docs/releases/v2.5.1/baseline.json](docs/releases/v2.5.1/baseline.json)：2.5.1 构建基线
-- [docs/releases/v2.5.1/SHA256SUMS.txt](docs/releases/v2.5.1/SHA256SUMS.txt)：2.5.1 校验清单
-- [docs/releases/v2.4.0/baseline.json](docs/releases/v2.4.0/baseline.json)：程序文件 SHA256 清单与构建指纹，供后续生成补丁
-- [docs/releases/v2.4.0/SHA256SUMS.txt](docs/releases/v2.4.0/SHA256SUMS.txt)：程序包、模型包和基线清单的 SHA256
-
-模型包解压到 `ComiTrans\comic-translate-ai\models\`。
-
-## 项目结构
+<details>
+<summary>项目目录结构</summary>
 
 ```text
 ComiTrans
 ├── run.py                         # 桌面客户端入口
-├── comic-translate-ai/            # AI 核心
-│   ├── main/
-│   │   ├── comic_translator_pipeline.py
-│   │   ├── onnx_text_detector.py  # ONNX 文本检测
-│   │   ├── onnx_manga_ocr.py      # ONNX 日文 OCR
-│   │   ├── onnx_baberu_ocr.py     # Baberu ONNX OCR（旧模型包）
-│   │   ├── manga_lama.py          # ONNX 背景修复
-│   │   └── vertical_typesetter.py # 中文排版
-│   ├── models/                    # 模型权重（Release 中位于 exe 旁）
-│   └── font_file/                 # 中文字体
-├── comic_translate_core/          # 源语言、OCR 协议及 PP-OCR 适配
-├── comic_translate_desktop/       # PySide6 桌面客户端
-├── assets/ui/                     # SVG、界面字体与空状态插画
-├── assets/font_catalog.json       # Google Fonts 目录快照，字体按需下载
-├── user_fonts/                    # 用户导入/下载字体与许可证（本地，不提交）
-├── scripts/update_font_catalog.py # 维护字体目录快照
-├── scripts/download_ocr_models.py # 韩英模型下载
-├── docs/ui-review/                # 新 UI 截图与逐字日志录屏
-├── docs/ONNX_MODELS.md            # 模型来源与可选模型
-├── requirements-build.txt         # 固定版本的构建依赖
-├── build_app.ps1                  # 打包脚本
-└── package_release.py             # Release 拆包脚本
+├── comic-translate-ai/            # AI 核心管线、ONNX 检测/OCR/LaMa 与中文排版
+├── comic_translate_core/          # 源语言路由、OCR 协议、图像隔离会话与更新校验
+├── comic_translate_desktop/       # PySide6 桌面客户端（主窗口、精修页、工作流对话框与动效）
+├── assets/
+│   ├── i18n/                      # 英文 / 日文界面翻译词典
+│   ├── ui/                        # SVG 图标、UI 字体与空状态插画
+│   └── font_catalog.json          # Google Fonts 目录快照（2,056 族按需下载）
+├── installer/                     # NSIS 安装脚本、更新查询服务与打包验收脚本
+├── scripts/                       # 字体目录维护、韩英 OCR 模型下载与 UI 截图审查
+├── docs/                          # 架构、模型清单、性能基准与版本发布文档
+├── tests/                         # 自动化单元测试与桌面 UI 回归套件
+├── build_app.ps1                  # PyInstaller 主程序打包脚本
+└── package_release.py             # Release 文件清单与校验生成脚本
 ```
-## 更新日志
 
-### v2.6.0（2026-11-23）
+</details>
 
-Windows 安装包附带默认模型。桌面端支持后台模型预热、作品术语库、试译和顶栏更新提醒。[发布说明](docs/RELEASE-v2.6.0.md)
+<details>
+<summary>近期版本摘要（v2.6.0 / v2.5.2 / v2.5.1 / v2.5.0）</summary>
 
-### v2.5.2（2026-11-17）
+- **v2.6.0（2026-11-23）**：单文件 Windows x64 NSIS Setup（含默认模型）、独立进程模型预热、后台正式版更新提醒、作品术语库、1–3 页试译与 Token 消耗估算、CBZ 导入与导出、精修单层菜单重构、气泡多选与连续样式刷、全书译稿跨页查找替换、单气泡重译，以及 60fps 黑白墨韵动效与双主题统一。[发布说明](docs/RELEASE-v2.6.0.md)
+- **v2.5.2（2026-11-17）**：滚动翻译上下文与缓存保留、OCR 后按序翻译 ∥ 后台修补 Fork-Join 并行流水线、实时工作流拓扑图与逐页状态矩阵、手动画框/图片取色/RGB 填色/9 槽收藏字体/拉伸旋转描边预设、冷启动首帧优化与 PDF 边缘覆盖修复。[发布说明](docs/RELEASE-v2.5.2.md)
+- **v2.5.1（2026-11-10）**：夜墨深色主题、画布点选、右栏拖拽分隔、F2 全屏编辑、Z 缩放工具、CUDA 开关提示、CharSpot Small 默认日语 OCR 与白气泡涂白兜底。[发布说明](docs/RELEASE-v2.5.1.md)
+- **v2.5.0（2026-11-02）**：大 PDF 图片工作流与显式无损导出、原分辨率分块修补、有上限连续流水线、按页断点续传与气泡原图还原。[发布说明](docs/RELEASE-v2.5.0.md)
 
-- 新增滚动上下文记忆与 `.cache/translation-context.json` 原子缓存；偏好新增「保留上下文缓存」（联动锁定断点续传）。
-- OCR 后分叉并发执行按序翻译与后台 `repair_comic_page` 擦字修补，汇合对账空译文掩码；重绘翻译页工作流拓扑可视化面板与逐页状态矩阵。
-- 精修编辑器支持手工添加气泡框、图片取色与自定义 RGB 填色、9 槽收藏字体快捷切换（`1–9`）、拉伸（`10%–400%`）、旋转（`±180°`）、描边（`0–30 px`）与白字黑边竖排预设、列表清理控制及单页滚动隔离。
-- 推迟模型预热至首帧绘制后执行，修复小数尺寸 PDF 页面边缘覆盖问题。
-- [v2.5.2 发布说明](docs/RELEASE-v2.5.2.md) · [完整开发日志](CHANGELOG.md)。
+完整演进记录（含 v2.4.x ～ v1.x）请查阅 [CHANGELOG.md](CHANGELOG.md)。
 
-### v2.5.1（2026-11-10）
+</details>
 
-- 新增「夜墨」深色主题、画布点击选区、右栏可拖拽分隔线、`F2` 全屏编辑、缩放 HUD 与 `Z` 缩放工具、详细配置页、一键精修与框选填白/填黑。
-- 新增 CUDA 加速开关及检测器说明，日语自动切换为 CharSpot Small，v2.5.1 模型包可由 v2.5.2 直接复用。[v2.5.1 说明](docs/RELEASE-v2.5.1.md)。
+---
 
-### v2.5.0（2026-11-02）
+## ❓ 常见问题
 
-- PDF 图片项目与显式无损导出；原尺寸分块修补、改进文字掩膜、网点/渐变重建和白描边处理。
-- 有上限的连续翻译流水线、GPU 实际设备检测、背景估计滤波加速、按页断点续传和付费译文缓存。
-- 连续长条、后台索引/切页/保存、局部合成；折叠栏与专注模式记住手动偏好。
-- 自选区域修补、逐气泡原图还原、默认和块级文字颜色、中文按词换行。
-- 独立翻译与文件服务，严格 JSON 输出及本地校验；诊断报告移除 PyTorch/CUDA 探测。
-- 新增 GPU 官方安装入口及已安装运行库目录识别；新安装默认优先 GPU，运行库不随发布包上传，旧模型可复用。
-- [详细更新、安装与已知边界](docs/RELEASE-v2.5.0.md) · [完整开发日志](CHANGELOG.md)。
+**1. 安装 Release 需要配置 Python 或 PyTorch 吗？**
+不需要。v2.6.0 Windows Setup 已内置运行环境、中文字体与默认 ONNX 模型，安装后即可用 CPU 推理。如需 NVIDIA GPU 加速，请按软件「设置 → 运行与输出」中的官方指引安装兼容的 NVIDIA 驱动、CUDA 12 和 cuDNN 9。
 
+**2. 模型存放在哪里？还需要单独下载模型包吗？**
+v2.6.0 Setup 会自动将默认模型安装到程序目录，无需再合并模型压缩包。韩语 / 英语 OCR 模型可通过源码脚本下载或在旧版模型包中复用；历史 ZIP 版请保持 `ComiTrans\comic-translate-ai\models\` 目录结构。
 
-### v2.4.0（2026-10-13）
+**3. 为什么日语模式下部分英文文本没有被翻译？**
+日语本地模式默认保留检测器标记的英文块以及拉丁字符占比较高的 OCR 结果。翻译纯英文页面时，请在工作台将「原文语言」切换为「英语」；韩语、英语及自定义 OCR 模式均会正常识别并翻译英文区域（自动混合语言路由尚未启用）。
 
-- 新增逐文件 SHA256 补丁基线、构建指纹和 Windows 更新入口；后续小版本可按文件生成补丁，校验原构建、备份修改文件并在失败时恢复。[补丁说明](docs/PATCH_UPDATES.md)。
-- 基线和 SHA256 校验信息保存在源码仓库；发布页提供程序包与模型包，程序内自带更新校验基线。
-- 漫画风界面改为开放式分区，移除大号章节横幅，柔化按钮与边框；增加局部网点和空状态漫画插画，补齐右上角日文字形。
-- 翻译页直接导入字体、设置默认译文字体；加入约 1 MB 的完整 Google Fonts 目录快照，支持名称检索、语言/风格筛选、后台下载、许可证保留及离线使用。
-- 精修支持八个拖拽点自由调整蒙版、拖动位置和 Esc 撤销本次拖动；字号、X/Y、文本与字体自动预览，保存直接输出当前结果并持久化布局。
-- 修复精修字体被全局默认字体覆盖、缺字时整段换字体的问题；手动字体只作用于当前块，逐字回退，保存和重新打开后保留。
-- 删除已确认的 82 个旧 Web、失效 CLI 和训练文件，简化 ONNX 后处理导入、预热与构建依赖，修复诊断 HTTP 客户端释放。
-- 多模态翻译与实验性字体比对使用独立开关，字体比对默认关闭；完善本地字体候选、投票和 API 思考开关，并记录后续翻译约束计划。
-- 验证：176 项自动化测试通过；正常与 200% 缩放各 33 张真实 Qt 截图检查通过；实际字体下载与断网选用、补丁校验及失败回滚验证通过。
+**4. 为什么打开安装包时 Windows 提示「未知发布者」？**
+当前发布的 Windows Setup 未购买商业代码签名证书。请务必从 [GitHub Releases](https://github.com/Aaaaamadeus/ComiTrans/releases) 下载，并使用本页提供的 `SHA256SUMS.txt` 核对文件哈希一致后再安装。
 
-主程序与模型继续拆包，v2.3.0 用户可复用已有模型。更多细节见[v2.4.0 发布说明](docs/RELEASE-v2.4.0.md)、[完整更新日志](CHANGELOG.md)、[项目瘦身记录](docs/PROJECT_CLEANUP.md)和[精修说明](docs/EDITOR_LIVE_PREVIEW.md)。
+---
 
-### v2.3.0（2026-09-16）
+## 💬 反馈与支持
 
-- 重构为黑白漫画杂志风 UI：通栏章节标题、边缘网点、Skribble 字标；自动处理与嵌字精修采用统一视觉。
-- 流程改为单行直线节点，紧凑显示原文语言和输出目录；按真实页面事件推进，保留并行页、跳过、失败与取消状态。
-- 日志使用 Aa 手写字体快速逐字展开，积压自动加速；支持回看、选区、搜索、筛选、复制与完整导出。
-- 新增韩语、英语 PP-OCRv5 ONNX，以及独立 HTTP OCR / 兼容视觉模型 OCR 接口；OCR 原文、语言和后端信息写入布局 JSON。
-- 统一源语言翻译路由：韩英与自定义模式不再套用日语模式的英文跳过规则；空原文、空译文和 OCR 失败时保护原图。
-- 发布资源包含两款 UI 字体、SVG 图标和韩英模型；README 更新真实 UI 截图、日志动画及 A/B 两组对比图。
+使用中遇到异常或有功能建议，欢迎在 [GitHub Issues](https://github.com/Aaaaamadeus/ComiTrans/issues) 提交，或直接点击客户端顶部的「反馈」按钮。建议附上「诊断」页自动生成的诊断提示词，以便快速定位问题。
 
-### v2.2.2（2026-09-14）
+---
 
-**新增与优化**
+## 📄 开源协议
 
-- 全面美化桌面端 UI 与操作反馈，加入克制的过渡动画、递归目录导入和拖放操作。
-- 支持整本 PDF 漫画导入、逐页翻译与重新导出。
-- 默认使用 Baberu ONNX OCR，并保留 manga-ocr-onnx 回退路径。
-- 优化漫画嵌字：采用更圆润的字体风格与 3 倍超采样渲染，降低文字像素感。
-- 竖排文本中的双破折号 `——` 改为连续长竖线，并扩展字体样式与标点布局规则。
-
-**修复**
-
-- 修复 Issue #19：翻译 API 请求日志引用未定义变量 `zhengzai`，导致请求发出前直接报错。
-- 改进 API 错误分类与提示，遇到鉴权、余额、模型、限流和服务端错误时给出明确原因；致命错误会停止剩余任务。
-
-### v2.2.1（2026-08-07）
-
-**新功能**
-
-- 翻译工作台新增“输出目录”设置，默认输出路径不变，与 API 配置页双向同步。
-- 主窗口与按钮补齐应用图标，统一 UI 样式与交互观感。
-- 多图翻译优化：检测/OCR 与修复/嵌字串行，各页翻译 API 请求并行发起（默认 4 并发），整体处理时间显著压缩。
-- 翻译 API 请求日志：记录请求模型、文本条数、返回条数、耗时、数量不匹配与失败原因；未嵌字时输出明确警告。
-- 翻译系统提示词严谨化：统一 JSON 对象输出格式，严格约束数量一致，拟声词强制翻译，减少空译文导致的漏嵌字。
-- 下回预告与画外音字号分档：章节预告识别扩展（第 N 话、后篇、预告、最终话等），两档字号独立调优。
-
-**调整**
-
-- 输出目录系列改为 `output_page_*`；测试素材统一放在 `page/test`，测试输出写入 `page/test_output`。
-- 测试与输出目录不再上传、不再打包。
-
-### v2.1.0（2026-08-06）
-
-**架构重构**
-
-- 抛弃 Web 架构（Spring Boot / FastAPI / PostgreSQL / Redis / Nginx），重构为纯本地 PySide6 桌面客户端。
-- 检测、OCR、修复全部切换为 ONNX Runtime 推理，彻底移除 PyTorch / torchvision / transformers 依赖。
-- 主程序与模型拆分发布：模型单独一个下载包，更新程序无需重新下载模型。
-
-**新增功能**
-
-- 延迟后台预热：打开客户端先显示界面，模型随后低优先级加载，翻译时直接复用。
-- 多模态翻译开关：勾选后发送整页图片，翻译后让 AI 配置字体、字号和横竖方向。
-- 嵌字人工编辑：调整字体风格、字号、横竖方向和位置，保存覆盖输出。
-- 报错日志与 AI 诊断：自动生成诊断提示词，支持多轮对话上下文。
-- 文件夹批量选择、即时停止任务、Issue 反馈、可拖拽调整布局。
-- 特殊字体分类：画外音、拟声词、下回预告、大标题使用不同开源字体。
-
-**优化与修复**
-
-- 修复打包版 exe 预热停滞问题（unittest 误排除、检测器动态导入、pyclipper / unidic / manga_ocr assets 缺失）。
-- 横竖方向判断与嵌字方向阈值调整，减少横排误判竖排。
-- 字号算法平衡：竖排放大、横排收紧，长文本自动收紧，按掩膜面积估算字号、按掩膜质心排版。
-- 擦除只按检测文字掩膜执行，不再擦除整个气泡。
-- 英文文本块完整跳过：不 OCR、不擦除、不嵌字；OCR 结果中拉丁/全角拉丁占比高时自动判定为英文并保留原文。
-- 清理底图移入独立的 `<输出目录>_cleaned/` 目录。
-- 移除训练/可视化依赖（matplotlib、wandb、pandas、torchsummary）。
-
-### v1.x（已归档）
-
-- 基于 Web 的漫画翻译平台：Spring Boot 后端、Vue 前端、PostgreSQL / Redis / Nginx，图像处理由 Python worker 完成。
-- 支持批量图片翻译、文字擦除、字体分类、横向排版、模型托管。
-- 旧 Web 源码和对应文档已从当前工作树移除，历史实现保留于 Git 历史；本轮清理见 [项目瘦身记录](docs/PROJECT_CLEANUP.md)。
-
-## 常见问题
-
-**Release 需要安装 Python 或 GPU 运行库吗？**
-
-不需要 Python。单文件 Setup 安装完成后即可用 CPU 加载本地模型。GPU 模式需要兼容的 NVIDIA 驱动、CUDA 12 和 cuDNN 9，软件内提供安装指引。
-
-**模型放哪里？**
-
-v2.6.0 Setup 会自动把模型装到程序目录。v2.5.2 等历史 ZIP 版仍按上方步骤将程序和模型解压到同一目录。
-
-**为什么英文文本没有被翻译？**
-
-日语本地模式会保留检测器标记的英文块，以及拉丁字符占比较高的 OCR 结果。处理英文页面时请选择“原文语言：英语”；韩语、英语和自定义 OCR 模式会正常识别并翻译这些区域。自动混合语言路由尚未启用。
-
-**为什么主程序包这么小？**
-
-v2.2.1 已全面 ONNX 化并移除 PyTorch。检测、OCR、修复均使用 ONNX Runtime；GPU 推理还需兼容的 CUDA/cuDNN，通过软件中的官方安装链接获取。
-
-## 反馈与支持
-
-使用中遇到问题，可以在 [GitHub Issues](https://github.com/Aaaaamadeus/ComiTrans/issues) 提交，或使用客户端顶部的“反馈”按钮。建议附上“诊断”页生成的诊断提示词，方便快速定位。
-
-## 开源协议
-
-- 项目源码采用 [GPL-3.0](LICENSE)。
-- 字体：得意黑 Smiley Sans、霞鹜文楷 LXGW WenKai、霞鹜漫黑 LXGW Marker Gothic（SIL OFL 1.1）、Klee One、思源黑体/宋体、setofont（濑户字体）、851手写杂书体 均为可免费商用的开源/免费字体，各自的授权见字体项目说明。
-- UI 字体 Skribble 与 Aa今日花晴 春懒猫困使用各自的内嵌版权信息，来源与用途见 [字体说明](assets/ui/fonts/README.md)。
-- 模型：CharSpot Small 权重为 CC BY-NC-SA 4.0，各模型的来源、署名与许可见 [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md)。
+- **项目源码**：采用 [GPL-3.0](LICENSE) 开源协议。
+- **内嵌中文字体**：得意黑 Smiley Sans、霞鹜文楷 LXGW WenKai、霞鹜漫黑 LXGW Marker Gothic（SIL OFL 1.1）、Klee One、思源黑体 / 宋体、setofont（濑户字体）、851手写杂书体 均为可免费商用的开源 / 免费字体，各自授权见对应字体说明；繁体漫画字体包见 [docs/TRADITIONAL_MANGA_FONTS.md](docs/TRADITIONAL_MANGA_FONTS.md)。
+- **UI 字体**：Skribble 与 Aa今日花晴 春懒猫困保留各自内嵌版权信息，来源与用途见 [assets/ui/fonts/README.md](assets/ui/fonts/README.md)。
+- **AI 模型**：CharSpot Small 权重采用 CC BY-NC-SA 4.0 协议；各模型的来源、署名与完整许可条款见 [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md)。
