@@ -4,57 +4,55 @@
 
 <h1>ComiTrans</h1>
 
-<p><strong>Local ONNX Vision Pipeline × Context-Aware LLM Translation × Professional Typesetting Workbench</strong></p>
+<p>Local ONNX Vision Pipeline · Context-Aware LLM Translation · Desktop Lettering Workbench</p>
 
 <p>
-  <a href="README.md"><strong>简体中文</strong></a> ｜ <strong>English</strong>
+  <a href="README.md">简体中文</a> ｜ <strong>English</strong>
 </p>
 
 <p>
-  <img src="https://img.shields.io/github/v/release/Aaaaamadeus/ComiTrans?style=flat-square&color=1f2328&labelColor=e6edf3" alt="Release">
-  <img src="https://img.shields.io/badge/Platform-Windows%20x64-0969da?style=flat-square" alt="Windows x64">
-  <img src="https://img.shields.io/badge/Python-3.12%2B-3776ab?style=flat-square" alt="Python 3.12+">
-  <img src="https://img.shields.io/badge/UI-PySide6-2da44e?style=flat-square" alt="PySide6">
-  <img src="https://img.shields.io/badge/Inference-ONNX%20Runtime-d97706?style=flat-square" alt="ONNX Runtime">
-  <img src="https://img.shields.io/badge/License-GPL--3.0-6e7781?style=flat-square" alt="GPL-3.0">
-  <img src="https://img.shields.io/github/stars/Aaaaamadeus/ComiTrans?style=flat-square&color=1f2328&labelColor=e6edf3" alt="GitHub Stars">
+  <img src="https://img.shields.io/github/v/release/Aaaaamadeus/ComiTrans?style=flat-square&color=111111&labelColor=f2f2f2" alt="Release">
+  <img src="https://img.shields.io/badge/Platform-Windows%20x64-111111?style=flat-square&labelColor=f2f2f2" alt="Windows x64">
+  <img src="https://img.shields.io/badge/Stack-PySide6%20%7C%20ONNX%20Runtime-111111?style=flat-square&labelColor=f2f2f2" alt="PySide6 and ONNX Runtime">
+  <img src="https://img.shields.io/badge/License-GPL--3.0-111111?style=flat-square&labelColor=f2f2f2" alt="GPL-3.0">
+  <img src="https://img.shields.io/github/stars/Aaaaamadeus/ComiTrans?style=flat-square&color=111111&labelColor=f2f2f2" alt="GitHub Stars">
 </p>
 
 <p>
-  <a href="#-v260-highlights">v2.6.0 Highlights</a> ·
-  <a href="#-interface-preview">Preview</a> ·
-  <a href="#-before--after">Before / After</a> ·
-  <a href="#-quick-start">Quick Start</a> ·
-  <a href="#-key-features">Features</a> ·
-  <a href="#-translation-pipeline">Pipeline</a> ·
-  <a href="#-models--documentation">Models & Docs</a> ·
-  <a href="#-faq">FAQ</a>
+  <a href="#v260-overview">v2.6.0</a> ·
+  <a href="#interface-preview">Preview</a> ·
+  <a href="#before--after">Before / After</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#key-features">Features</a> ·
+  <a href="#translation-pipeline">Pipeline</a> ·
+  <a href="#models--documentation">Models & Docs</a> ·
+  <a href="#faq">FAQ</a>
 </p>
 
 </div>
 
-ComiTrans is a pure-local PySide6 desktop client for manga translation and lettering. Text detection, Japanese/Korean/English OCR, native-resolution inpainting, and Chinese typesetting all run locally via **ONNX Runtime** (with zero PyTorch or web frontend dependencies), paired with your configured LLM API and a live-preview lettering studio.
+ComiTrans is a pure-local PySide6 desktop client for manga translation and Chinese typesetting. Text detection, Japanese/Korean/English local OCR, native-resolution inpainting, and layout rendering run locally through **ONNX Runtime** (with no PyTorch or web frontend dependencies), paired with your configured LLM API and a live-preview lettering workbench.
 
 ---
 
-## ✨ v2.6.0 Highlights
+## v2.6.0 Overview
 
-> [!TIP]
-> **ComiTrans v2.6.0 is out!** Now shipped as a single-file Windows x64 Setup installer bundling the app, fonts, and default ONNX models, alongside major workflow, editor, motion, and startup upgrades.
-> 👉 [Read v2.6.0 Release & Migration Guide](docs/RELEASE-v2.6.0.md) · [Download v2.6.0 Setup](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.6.0) · [Full Changelog](CHANGELOG.md)
+> [!NOTE]
+> v2.6.0 introduces a single-file Windows x64 Setup installer bundling the desktop app, Chinese fonts, and default ONNX models, alongside book-level translation workflows, flat editor menus with batch styling, 60fps monochrome motion, and isolated subprocess model warm-up.
+> [Release Notes & Migration Guide](docs/RELEASE-v2.6.0.md) · [Download v2.6.0 Setup](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.6.0) · [Full Changelog](CHANGELOG.md)
 
-| Area | What's New in v2.6.0 |
+| Area | Summary of Changes |
 | --- | --- |
-| **📦 All-in-One Windows Setup & Update Indicator** | Single-file solid-LZMA NSIS installer bundling app, fonts, and default ONNX models—CPU inference works out of the box. Background startup check surfaces an `Update` badge beside `Models ready` only when GitHub lists a newer stable release. |
-| **📚 Work Terminology, Trial Run & CBZ** | Maintain per-series glossaries (`Task → Work terminology`); test 1–3 pages with `Trial` and inspect token usage & estimated full-book cost under `Translation usage`; import `.cbz` archives and export edited pages via `File → Export CBZ`. |
-| **🎨 Flat Menus, Multi-Select & Style Brush** | Streamlined non-nested View, File, Fill, and Font menus free up canvas space; supports `Ctrl`/`Shift` multi-select, `Pick style` / `Style brush` / `Undo style`, cross-page `Book transcript` search/replace, and single-bubble `Retranslate`. |
-| **⚡ 60fps Monochrome Motion & Subprocess Warm-Up** | Unified 60fps motion system across Paper and Night Ink themes; detector, OCR, and LaMa sessions warm up in an isolated process off the Qt event loop so the UI stays responsive from launch. |
+| **Windows Installer & Update Check** | Single-file solid-LZMA NSIS Setup bundling app, fonts, and default models for out-of-the-box CPU inference. Startup checks GitHub in the background and shows an `Update` badge beside `Models ready` only when a newer stable release exists. |
+| **Terminology, Trial & CBZ** | Added `Work terminology` (requires only the target term and fingerprints active project terms into checkpoints); added `Trial` for the first 1–3 pages with token usage & estimated full-book cost under `Translation usage`; added CBZ import and `File → Export CBZ`. |
+| **Flat Editor Menus & Style Brush** | Reorganized View, File, Fill, and Font Management into flat, non-nested menus to keep the canvas unobstructed. Added `Ctrl`/`Shift` multi-select, `Pick style` / `Style brush` / `Undo style`, cross-page `Book transcript` search/replace, and single-bubble `Retranslate`. |
+| **Monochrome Motion & Warm-Up** | Added a 60fps monochrome motion system and refined controls across Paper and Night Ink themes. Moved detector, OCR, and LaMa image model sessions into an isolated subprocess off the Qt event loop so the UI stays responsive during startup. |
 
 ---
 
-## 📷 Interface Preview
+## Interface Preview
 
-Designed with a monochrome manga-magazine aesthetic—open section headings, halftone accents, the Skribble wordmark, and 60fps restrained motion. Switch instantly between **Follow system / Paper / Night ink** without affecting manga pixels or exported images.
+Built around a monochrome manga-magazine typography grid—clean black, white, and neutral grays, open section headings, local halftone accents, and the Skribble wordmark. Switch instantly between **Follow system / Paper / Night ink** without altering manga pixels or exported images.
 
 | v2.6.0 Paper Theme · Flat Menus & Retranslate | v2.6.0 Night Ink Theme · Dark Workbench |
 | --- | --- |
@@ -65,7 +63,7 @@ Designed with a monochrome manga-magazine aesthetic—open section headings, hal
 | ![ComiTrans live Fork-Join workflow visualizer](docs/ui-review/automatic-workflow-v252.png) | ![ComiTrans typesetting editor](docs/ui-review/editor-fill-fonts-1440-style-review.png) |
 
 <details>
-<summary>Expand more UI screenshots & log reveal animation (Night Ink workflow, context cache, eyedropper, outlines, font library & settings)</summary>
+<summary>More screenshots & log reveal animation (Night Ink workflow, context cache, eyedropper, outlines, font library & settings)</summary>
 
 <br>
 
@@ -85,7 +83,7 @@ Designed with a monochrome manga-magazine aesthetic—open section headings, hal
 | --- | --- |
 | ![Font library and name search](docs/ui-review/font-library-search-style-review.png) | ![Settings page](docs/ui-review/settings-style-review.png) |
 
-**Fast Character-Reveal Logs (captured from Qt)**: Log output renders in the Aa handwriting font at ~250 characters/second (auto-accelerating on backlog), retaining 5,000 in-view records with search, filtering, pause-follow, and full disk logging.
+**Fast Character-Reveal Logs (captured from Qt)**: Logs render in the Aa handwriting font at ~250 characters/second (auto-accelerating on backlog), keeping 5,000 in-view records with search, level filtering, pause-follow, and complete disk logs.
 
 ![Fast log output animation](docs/ui-review/log-reveal-v252.gif)
 
@@ -93,10 +91,10 @@ Designed with a monochrome manga-magazine aesthetic—open section headings, hal
 
 ---
 
-## 🎨 Before / After
+## Before / After
 
 > [!NOTE]
-> User-provided examples from pages 6 and 7: Japanese originals on the left, Simplified Chinese translated & lettered outputs on the right.
+> User-provided examples from pages 6 and 7: Japanese originals on the left, Simplified Chinese translated and lettered outputs on the right.
 
 | Before (Japanese) | After (Simplified Chinese) |
 | --- | --- |
@@ -105,27 +103,27 @@ Designed with a monochrome manga-magazine aesthetic—open section headings, hal
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Windows All-in-One Installer (Recommended)
 
-No Python, PyTorch, or manual model directory merging required:
+No Python installation, PyTorch, or manual model folder merging required:
 
-1. **Download & Verify:** Grab `ComiTrans-v2.6.0-x64-Setup.exe` and `SHA256SUMS.txt` from the [v2.6.0 Release Page](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.6.0), and verify the SHA-256 hash in PowerShell:
+1. **Download & Verify:** Download `ComiTrans-v2.6.0-x64-Setup.exe` and `SHA256SUMS.txt` from the [v2.6.0 Release Page](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.6.0), and verify the SHA-256 checksum in PowerShell:
 
    ```powershell
    Get-FileHash -Algorithm SHA256 .\ComiTrans-v2.6.0-x64-Setup.exe
    Get-Content .\SHA256SUMS.txt
    ```
 
-2. **Run Setup:** Close any running ComiTrans instance and launch Setup.
+2. **Run Setup:** Close any running ComiTrans instance and run Setup.
    - This build is **unsigned**; Windows may display "Unknown publisher"—verify the SHA-256 hash before running.
-   - User configuration, imported/downloaded fonts, logs, and default output stay in `%LOCALAPPDATA%\ComiTrans`, surviving upgrades and uninstalls.
-   - Upgrading from `v2.6.0-pre.1` works in place; legacy MSI/WiX users should uninstall the old entry in Windows *Installed Apps* first; ZIP users can follow the [Migration Guide](docs/RELEASE-v2.6.0.md#windows-installation-verification--migration).
+   - User configuration, imported/downloaded fonts, logs, and default output are stored in `%LOCALAPPDATA%\ComiTrans`, surviving upgrades and uninstalls.
+   - Upgrading from `v2.6.0-pre.1` works in place; legacy MSI/WiX users should uninstall the older entry via Windows *Installed Apps* first; ZIP users can follow the [Migration Guide](docs/RELEASE-v2.6.0.md#windows-installation-verification--migration).
 3. **Configure API & Optional GPU:** CPU inference is ready immediately. Open **Settings** to enter your LLM API key and model. For NVIDIA GPU acceleration, follow the official CUDA 12 / cuDNN 9 links under **Settings → Runtime & Output → GPU setup and downloads** ([GPU Setup Guide](docs/GPU_SETUP.md)).
 
 > [!NOTE]
-> UI languages include **中文 / English / 日本語** (first-launch prompt or **Settings → Translation service → Interface language**; see [UI Languages](docs/UI_LANGUAGES.md)). Completed batches have a 15% chance to show a quiet, auto-dismissing Star prompt in the bottom-right corner.
+> UI languages include **中文 / English / 日本語** (first-launch prompt or **Settings → Translation service → Interface language**; see [UI Languages](docs/UI_LANGUAGES.md)). Completed batches have a 15% chance of showing a subtle auto-dismissing Star prompt in the bottom-right corner.
 
 <details>
 <summary>Run from source (Developers · Python 3.12+, NVIDIA GPU optional)</summary>
@@ -143,41 +141,41 @@ Copy-Item comic-translate-ai/main/config.example.yaml comic-translate-ai/main/co
 .\.venv\Scripts\python run.py
 ```
 
-You can also double-click `start.bat`. The desktop window opens immediately while image models warm up in an isolated subprocess.
+You can also double-click `start.bat`. The desktop window paints immediately while image models warm up in an isolated subprocess.
 
 </details>
 
 ---
 
-## 🧩 Key Features
+## Key Features
 
 ### 1. Local All-ONNX Vision & Inference Pipeline
 - **Zero PyTorch Footprint:** Text detection, Japanese/Korean/English local OCR, and LaMa inpainting all run on **ONNX Runtime** with no PyTorch, torchvision, or transformers dependencies.
-- **Multi-Language Source & Custom OCR:** Supports Japanese (CharSpot Small; legacy Baberu / manga-ocr supported), Korean & English (PP-OCRv5), plus independent HTTP OCR or OpenAI-compatible vision endpoints. Automatic mixed-language routing is not yet enabled. [Multilingual OCR Guide](docs/MULTILINGUAL_OCR.md)
+- **Multi-Language Source & Custom OCR:** Supports Japanese (CharSpot Small; legacy Baberu / manga-ocr packs supported), Korean & English (PP-OCRv5), plus independent HTTP OCR or OpenAI-compatible vision endpoints. Automatic mixed-language routing is not yet enabled. [Multilingual OCR Guide](docs/MULTILINGUAL_OCR.md)
 - **Native-Resolution Erasing:** Erases strictly along detected text masks. LaMa tiles adaptively under memory pressure without downscaling, paired with paper-color fills, halftone/gradient reconstruction, and uniform white-bubble fallback.
-- **Subprocess Warm-Up & GPU Priority:** Model sessions warm up in an isolated process off the Qt event loop; new installations prefer NVIDIA CUDA and report the active execution provider in logs while honoring existing CPU settings.
+- **Subprocess Warm-Up & GPU Priority:** Image model sessions warm up in an isolated process off the Qt event loop; new installations prefer NVIDIA CUDA and log the active execution provider while preserving existing CPU settings.
 
 ### 2. Context-Aware Translation & Book Workflows
 - **Fork-Join Parallel Pipeline:** Immediately after OCR, sequential reading-order translation and dedicated-thread background inpainting (`repair_comic_page`) run concurrently, reconciling masks on join to skip empty translations. [Context & Parallel Guide](docs/CONTEXT_TRANSLATION.md)
 - **Rolling Context & Resumable Runs:** Carries up to 12 pages / 24,000 serialized chars of context in `.cache/translation-context.json`. Per-page resume is enabled by default to skip completed pages and reuse cached paid translations. [Resume Guide](docs/RESUMABLE_TRANSLATION.md)
-- **Work Terminology & Trial Estimates:** Register consistent series names in `Task → Work terminology` (only the target translation is required; checkpoints fingerprint only active project terms). Run `Trial` on the first 1–3 pages and review token usage & full-book cost estimates in `Translation usage`.
+- **Work Terminology & Trial Estimates:** Register consistent series names in `Task → Work terminology` (only the target translation is required; checkpoints fingerprint active project terms only). Run `Trial` on the first 1–3 pages and review token usage & estimated full-book cost in `Translation usage`.
 - **Whole-PDF & CBZ Support:** Import images, recursive folders, PDFs, or `.cbz` archives. PDFs render on demand with a `.comitrans` project index and background lossless export (`*_translated.pdf`); CBZ edits export cleanly back via `File → Export CBZ`. [PDF Editing Guide](docs/PDF_EDITING.md)
 - **Multimodal & SC/TC Switch:** Optional multimodal toggle sends the full page image for visual context (font/size/direction stay local by default); switch Simplified/Traditional Chinese output anytime from the top workbench selector. [Chinese Output Guide](docs/CHINESE_OUTPUT.md)
 
-### 3. Professional Typesetting & Retouching Studio
+### 3. Typesetting & Retouching Workbench
 - **Flat Menus & Focused Canvas:** Non-nested View, File, Fill, and Font menus keep the canvas clean alongside Continuous Strip mode, single-page wheel isolation, `F2` full-screen editing, and the `Z` zoom tool.
-- **Multi-Select & Cross-Page Style Brush:** Select blocks with `Ctrl`/`Shift` in the list or `Ctrl`-click/`Shift`-drag on the canvas. Use `Pick style`, `Apply style to selected`, `Style brush` (cross-page clipboard, hides drag handles, `Esc` to exit), and `Undo style` without touching text or restored bubbles.
+- **Multi-Select & Cross-Page Style Brush:** Select blocks with `Ctrl`/`Shift` in the list or `Ctrl`-click/`Shift`-drag on the canvas. Use `Pick style`, `Apply style to selected`, `Style brush` (cross-page clipboard, hides drag handles, `Esc` to exit), and `Undo style` without altering text or restored bubbles.
 - **Book Transcript & Single-Bubble Retranslation:** Find and replace text across the entire book in `Book transcript`, or re-translate any single block in place with `Retranslate`.
 - **Precision Canvas Tools:** Manual bubble box creation, canvas/strip eyedropper color picking, undoable custom RGB/Hex fills, background selection repair, and reversible per-bubble original restoration (`Restore bubble`).
-- **15 Font Categories & Offline Font Library:** Automatic classification across 15 manga styles with `3×` Lanczos supersampling, stretch (`10–400%`), rotation (`±180°`), manual outline stroke (`0–30 px`), 9 pinned favorite font slots (`1–9` shortcuts), 10 bundled TC manga font families, Swei B2/Toothpaste Black faces, and **2,056 Google Fonts families** downloadable on demand for offline use. [Font Library](docs/FONT_LIBRARY.md) · [Custom Fonts](docs/CUSTOM_FONTS.md)
+- **15 Font Categories & Offline Font Library:** Automatic classification across 15 manga styles with 3x Lanczos supersampling, stretch (`10–400%`), rotation (`±180°`), manual outline stroke (`0–30 px`), 9 pinned favorite font slots (`1–9` shortcuts), 10 bundled TC manga font families, Swei B2/Toothpaste Black faces, and **2,056 Google Fonts families** downloadable on demand for offline use. [Font Library](docs/FONT_LIBRARY.md) · [Custom Fonts](docs/CUSTOM_FONTS.md)
 
-### 4. Diagnostics, Safe Control & Delivery
+### 4. Diagnostics, Safe Control & Update Checks
 - **Character-Reveal Logs & AI Diagnostics:** Logs write to `Log/app.log`; Diagnostics gathers environment info, model paths, and stack traces with one-click diagnosis prompts and multi-turn AI troubleshooting.
-- **Safe Cancellation & Quiet Update Check:** Stopping waits gracefully for in-flight pages without scheduling new ones. Startup checks GitHub for newer stable releases and surfaces a subtle `Update` button beside `Models ready` when available.
+- **Safe Cancellation & Quiet Update Check:** Stopping waits gracefully for in-flight pages without scheduling new ones. Startup checks GitHub for newer stable releases and surfaces a compact `Update` button beside `Models ready` when available.
 
 ---
 
-## 🔄 Translation Pipeline
+## Translation Pipeline
 
 ```text
 Load Images / PDF / CBZ ──▶ Bubble & Text Detection ──▶ Source OCR
@@ -188,7 +186,7 @@ Load Images / PDF / CBZ ──▶ Bubble & Text Detection ──▶ Source OCR
    Rolling context (up to 12 pages) + Work Terminology                                           Solid fill / halftone / tiled LaMa
             └───────────────────────────────────────────────┬───────────────────────────────────────────────┘
                                                             ▼
-                     Join & Mask Reconciliation ──▶ 3× Supersampled Chinese Typesetting ──▶ Save / Export PDF · CBZ
+                     Join & Mask Reconciliation ──▶ 3x Supersampled Chinese Typesetting ──▶ Save / Export PDF · CBZ
 ```
 
 1. **Detection:** ONNX detector extracts bubbles, text masks, and text lines.
@@ -203,7 +201,7 @@ Load Images / PDF / CBZ ──▶ Bubble & Text Detection ──▶ Source OCR
 
 ---
 
-## 📦 Models & Documentation
+## Models & Documentation
 
 ### Bundled ONNX Models
 
@@ -225,7 +223,7 @@ Load Images / PDF / CBZ ──▶ Bubble & Text Detection ──▶ Source OCR
 
 ---
 
-## 🔧 Advanced Usage & Packaging
+## Advanced Usage & Packaging
 
 <details>
 <summary>Advanced guides: fonts, custom OCR protocol, 15 font styles & AI diagnostics</summary>
@@ -317,7 +315,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version history back to v1.x.
 
 ---
 
-## ❓ FAQ
+## FAQ
 
 **1. Do releases require Python or PyTorch?**
 No. The v2.6.0 Windows Setup bundles the runtime, fonts, and default ONNX models for out-of-the-box CPU inference. For NVIDIA GPU acceleration, follow the in-app links under Settings → Runtime & Output to install a compatible NVIDIA driver, CUDA 12, and cuDNN 9.
@@ -333,13 +331,13 @@ This release is currently unsigned. Always download from [GitHub Releases](https
 
 ---
 
-## 💬 Feedback & Support
+## Feedback
 
 Report bugs or request features via [GitHub Issues](https://github.com/Aaaaamadeus/ComiTrans/issues) or the **Issue** button in the top-right corner of the app. Attaching the diagnosis prompt generated on the **Diagnostics** page helps pinpoint issues quickly.
 
 ---
 
-## 📄 License
+## License
 
 - **Source Code:** Licensed under [GPL-3.0](LICENSE).
 - **Bundled Chinese Fonts:** Smiley Sans, LXGW WenKai, LXGW Marker Gothic (SIL OFL 1.1), Klee One, Source Han Sans/Serif, SetoFont, and 851tegakizatsu are free for commercial use under their respective licenses; see [docs/TRADITIONAL_MANGA_FONTS.md](docs/TRADITIONAL_MANGA_FONTS.md) for the TC manga bundle.
