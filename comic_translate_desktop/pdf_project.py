@@ -20,11 +20,13 @@ class PdfProject:
     page_sizes: list[tuple[float, float]]
 
 
-def project_link_path(output: str | Path) -> Path:
-    path = Path(output)
-    if path.suffix.lower() == '.cbz':
-        return path.with_name(path.name + '.comitrans.json')
-    return path.with_suffix('.comitrans.json')
+def project_link_path(pdf_path: str | Path) -> Path:
+    pdf = Path(pdf_path)
+    if pdf.suffix.lower() == '.cbz':
+        return pdf.with_name(pdf.name + '.comitrans.json')
+    link = pdf.with_suffix('.comitrans')
+    legacy = pdf.with_suffix('.comitrans.json')
+    return legacy if not link.exists() and legacy.is_file() else link
 
 
 def create_pdf_project(pdf_path: Path) -> Path:
@@ -83,7 +85,7 @@ def load_pdf_project(pdf_path: str | Path) -> PdfProject:
             raise ValueError('漫画精修目录必须位于译稿所在文件夹内')
         return read_project(directory)
     except (OSError, ValueError, TypeError, KeyError) as exc:
-        raise PdfProcessingError(f'无法打开漫画精修资料（请保留 .comitrans.json 索引和配套目录）：{exc}') from exc
+        raise PdfProcessingError(f'无法打开 漫画精修资料（请保留项目索引和配套目录）：{exc}') from exc
 
 
 def publish_pdf_project(pdf_path: Path, directory: Path) -> None:

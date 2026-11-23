@@ -35,7 +35,7 @@ class MangaLama:
             raise ValueError("LaMa 仅支持 ONNX 模型: " + str(model_path))
 
     def _load_onnx(self, model_path):
-        from comic_translate_core.onnx_session import create_onnx_session
+        from comic_translate_core.image_session import create_image_session
 
         path = Path(model_path).resolve()
         stamp = path.stat()
@@ -45,7 +45,7 @@ class MangaLama:
         with _sessions_lock:
             resource = _sessions.get(key)
             if resource is None:
-                session = create_onnx_session(path, self.device)
+                session = create_image_session(path, self.device)
                 resource = _SharedSession(session)
                 _sessions[key] = resource
             self._session_resource = resource

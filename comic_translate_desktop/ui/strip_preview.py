@@ -104,6 +104,8 @@ class StripPreview(ImagePreview):
             label.region_edited.connect(self.region_edited)
             label.region_edit_finished.connect(self.region_edit_finished)
             label.region_clicked.connect(self.region_clicked)
+            label.regions_selected.connect(self.regions_selected)
+            label.region_context_menu.connect(self.region_context_menu)
             label.bubble_created.connect(self.bubble_created)
         label.setToolTip(Path(key).name)
         self._pages[key][0] = label
@@ -184,6 +186,7 @@ class StripPreview(ImagePreview):
         regions, visible = getattr(self, '_regions', ([], True))
         if self._label is not None:
             self._label.set_regions(regions, visible)
+            self._label.selected_indices = getattr(self, '_selected_regions', set())
 
     def set_image(self, path):
         self.activate_page(path)

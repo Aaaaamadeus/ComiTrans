@@ -6,6 +6,10 @@ from pathlib import Path
 import PySide6
 import shiboken6
 from PyInstaller.utils.hooks import collect_data_files, copy_metadata
+from PyInstaller.utils.win32.versioninfo import (
+    FixedFileInfo, StringFileInfo, StringStruct, StringTable, VarFileInfo, VarStruct, VSVersionInfo,
+)
+from comic_translate_desktop import __version__
 
 # Resolve DLLs from this Python/Qt installation and Windows, not unrelated
 # tools on PATH (e.g. Poppler's ICU exports do not match Qt's Windows ICU ABI).
@@ -108,6 +112,18 @@ a.binaries = [entry for entry in a.binaries
 
 pyz = PYZ(a.pure)
 
+version_tuple = (*map(int, __version__.split('.')), 0)
+version_info = VSVersionInfo(
+    ffi=FixedFileInfo(filevers=version_tuple, prodvers=version_tuple, mask=0x3f,
+                      flags=0, OS=0x40004, fileType=1, subtype=0, date=(0, 0)),
+    kids=[StringFileInfo([StringTable('040904B0', [
+        StringStruct('FileDescription', 'ComiTrans'),
+        StringStruct('FileVersion', __version__),
+        StringStruct('ProductName', 'ComiTrans'),
+        StringStruct('ProductVersion', __version__),
+    ])]), VarFileInfo([VarStruct('Translation', [1033, 1200])])],
+)
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -115,6 +131,7 @@ exe = EXE(
     exclude_binaries=True,
     name="ComiTrans",
     icon="assets/ComiTrans.ico",
+    version=version_info,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

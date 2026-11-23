@@ -5,11 +5,11 @@ import sys
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
-from PySide6.QtCore import Qt, QRect, QSize, QSettings, QTimer, QEvent, QPoint, QVariantAnimation
-from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QIcon, QImageReader, QShortcut, QKeySequence
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView, QStyledItemDelegate, QStyle)
+from PySide6.QtCore import Qt, QRect, QSize, QSettings, QTimer, QEvent, QPoint, QVariantAnimation, QItemSelectionModel, QUrl
+from PySide6.QtGui import QAction, QDesktopServices, QColor, QFont, QPainter, QPixmap, QIcon, QImageReader, QShortcut, QKeySequence
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel, QListWidget, QListWidgetItem, QMenu, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView, QStyledItemDelegate, QStyle)
 from ..config import load_ai_config, MAIN_DIR
-from ..font_library import available_fonts, font_description, font_display_name, font_reference, inspect_font, resolve_font_reference
+from ..font_library import available_fonts, font_description, font_display_name, font_reference, import_font, inspect_font, resolve_font_reference
 from comic_translate_core.page_compositor import compose_page, intersection, layer_bounds
 from comic_translate_core.restoration import (
     find_original, save_original, original_snapshot_path, legacy_region, protected_region,
@@ -22,6 +22,7 @@ from ..pdf_export import PdfExportWorker
 from ..pdf_utils import PdfProcessingError
 from ..editor_jobs import LatestJobQueue, read_page, read_project_pages, read_transcript, SaveRequest
 from ..lettering_transform import text_transform, transform_layer, outline_width
+from ..productivity import STYLE_DEFAULTS, lettering_style, apply_lettering_style
 from .color_picker import TextColorPicker
 from .strip_preview import StripPreview
 from .thumbnail_loader import ThumbnailLoader
@@ -127,6 +128,13 @@ class EditorPage(QWidget):
         self.cleaned_path = self.output_path = None
         self._source_expanded = QSettings().value('ui/editorSourceExpanded', True, type=bool)
         self._source_compact_override = False
+        raw_fav_pref = QSettings().value('ui/editorFavoriteBarVisible', None)
+        if isinstance(raw_fav_pref, bool):
+            self._favorite_bar_pref = raw_fav_pref
+        elif isinstance(raw_fav_pref, str) and raw_fav_pref.lower() in ('true', 'false'):
+            self._favorite_bar_pref = raw_fav_pref.lower() == 'true'
+        else:
+            self._favorite_bar_pref = None
         self._desired_panels = [True, True]
         self._panel_priority = 1
         self._wide_splitter_state = None
@@ -156,6 +164,10 @@ class EditorPage(QWidget):
         self._last_available_width = None
         self._row_dirty = False
         self._font_choice_dirty = False
+        self._pending_style_keys = set()
+        self._pending_style_rows = []
+        self._style_clipboard = None
+        self._style_history = []
         self._cleaned_image = None
         self._original_image = None
         self._repair_history = []
@@ -310,20 +322,73 @@ class EditorPage(QWidget):
         toolbar.setContentsMargins(0, 0, 0, 8)
         toolbar.setSpacing(6)
         self._toolbar_layout = toolbar
-        self._pages_toggle = QPushButton(tr('页面'))
-        self._properties_toggle = QPushButton(tr('编辑面板'))
+
+        self._pages_toggle = QPushButton(tr('页面'), self)
+        self._properties_toggle = QPushButton(tr('编辑面板'), self)
         for button in (self._pages_toggle, self._properties_toggle):
             button.setCheckable(True)
             button.setChecked(True)
             button.setProperty('compact', True)
             button.setProperty('role', 'utility')
-            toolbar.addWidget(button)
-        self._focus_btn = QPushButton(tr('专注画布'))
+            button.hide()
+
+        self._zoom_tool_btn = QPushButton(tr('缩放工具'), self)
+        self._zoom_tool_btn.setCheckable(True)
+        self._zoom_tool_btn.setProperty('role', 'utility')
+        self._zoom_tool_btn.setProperty('compact', True)
+        self._zoom_tool_btn.hide()
+
+        self._strip_toggle = QPushButton(tr('连续长条'), self)
+        self._strip_toggle.setCheckable(True)
+        self._strip_toggle.setProperty('role', 'utility')
+        self._strip_toggle.setProperty('compact', True)
+        self._strip_toggle.hide()
+
+        self._view_menu_btn = QToolButton()
+        self._view_menu_btn.setText(tr('视图'))
+        self._view_menu_btn.setProperty('role', 'utility')
+        self._view_menu_btn.setProperty('compact', True)
+        self._view_menu_btn.setProperty('menuButton', True)
+        self._view_menu_btn.setPopupMode(QToolButton.InstantPopup)
+        self._view_menu_btn.setToolTip(tr('视图与面板选项'))
+        self._view_menu = QMenu(self._view_menu_btn)
+        self._view_menu.setToolTipsVisible(True)
+        self._pages_action = self._view_menu.addAction(tr('页面栏'))
+        self._pages_action.setCheckable(True)
+        self._pages_action.setChecked(True)
+        self._properties_action = self._view_menu.addAction(tr('编辑面板'))
+        self._properties_action.setCheckable(True)
+        self._properties_action.setChecked(True)
+        self._focus_action = self._view_menu.addAction(tr('专注画布') + '\tCtrl+Shift+F')
+        self._focus_action.setCheckable(True)
+        self._focus_action.setToolTip(tr('收起侧栏与辅助信息，专注查看作品 · Ctrl+Shift+F'))
+        self._view_menu.addSeparator()
+        self._strip_action = self._view_menu.addAction(tr('连续长条'))
+        self._strip_action.setCheckable(True)
+        self._strip_action.setToolTip(tr('纵向滚动浏览所有页面，点击页面后原位精修。'))
+        self._zoom_tool_action = self._view_menu.addAction(tr('缩放工具') + '\tZ')
+        self._zoom_tool_action.setCheckable(True)
+        self._zoom_tool_action.setToolTip(tr('点击放大，Alt+点击缩小 · Z'))
+        self._view_menu.addSeparator()
+        self._favorite_bar_action = self._view_menu.addAction(tr('快捷字体栏'))
+        self._favorite_bar_action.setCheckable(True)
+        self._favorite_bar_action.setToolTip(tr('显示或隐藏画布上方的 1–9 快捷字体栏'))
+        self._view_menu.addSeparator()
+        self._view_menu.addAction(tr('适应页面') + '\tCtrl+0', lambda: self.preview.set_zoom(None))
+        self._view_menu.addAction(tr('实际大小 (100%)') + '\tCtrl+1', lambda: self.preview.set_zoom(1.0))
+        self._view_menu.addAction(tr('适应宽度') + '\tCtrl+2', lambda: self.preview.set_fit_width())
+        self._view_menu_btn.setMenu(self._view_menu)
+        toolbar.addWidget(self._view_menu_btn)
+
+        self._focus_btn = QPushButton(tr('退出专注'))
         self._focus_btn.setCheckable(True)
         self._focus_btn.setProperty('role', 'utility')
         self._focus_btn.setProperty('compact', True)
+        self._focus_btn.setAccessibleName(tr('专注画布'))
         self._focus_btn.setToolTip(tr('收起侧栏与辅助信息，专注查看作品 · Ctrl+Shift+F'))
+        self._focus_btn.hide()
         toolbar.addWidget(self._focus_btn)
+
         toolbar_div = QFrame()
         toolbar_div.setObjectName('toolbarDivider')
         toolbar_div.setFrameShape(QFrame.VLine)
@@ -360,33 +425,40 @@ class EditorPage(QWidget):
         self._zoom_in_btn.setToolTip(tr('放大 · Ctrl+='))
         self._zoom_in_btn.clicked.connect(lambda: self.preview.zoom_by(1.25))
         toolbar.addWidget(self._zoom_in_btn)
-        self._zoom_tool_btn = QPushButton(tr('缩放工具'))
-        self._zoom_tool_btn.setCheckable(True)
-        self._zoom_tool_btn.setProperty('role', 'utility')
-        self._zoom_tool_btn.setProperty('compact', True)
-        self._zoom_tool_btn.setToolTip(tr('点击放大，Alt+点击缩小 · Z'))
-        toolbar.addWidget(self._zoom_tool_btn)
-        self._strip_toggle = QPushButton(tr('连续长条'))
-        self._strip_toggle.setCheckable(True)
-        self._strip_toggle.setProperty('role', 'utility')
-        self._strip_toggle.setProperty('compact', True)
-        self._strip_toggle.setToolTip(tr('纵向滚动浏览所有页面，点击页面后原位精修。'))
-        toolbar.addWidget(self._strip_toggle)
         toolbar.addStretch()
-        self._export_pdf_btn = QPushButton(tr('导出 PDF'))
+
+        self._export_pdf_btn = QPushButton(tr('导出 PDF'), self)
         self._export_pdf_btn.setProperty('role', 'chip')
         self._export_pdf_btn.setProperty('compact', True)
         self._export_pdf_btn.setToolTip(tr('将已保存的图片按页面顺序导出为 PDF；编辑时不会合成 PDF。'))
         self._export_pdf_btn.setEnabled(False)
         self._export_pdf_btn.clicked.connect(self._export_action)
-        toolbar.addWidget(self._export_pdf_btn)
-        self._export_cbz_btn = QPushButton(tr('导出 CBZ'))
-        self._export_cbz_btn.setProperty('role', 'chip')
-        self._export_cbz_btn.setProperty('compact', True)
-        self._export_cbz_btn.setToolTip(tr('将已保存的图片按页面顺序打包为 CBZ。'))
-        self._export_cbz_btn.setEnabled(False)
-        self._export_cbz_btn.clicked.connect(lambda: self._export_action('cbz'))
-        toolbar.addWidget(self._export_cbz_btn)
+        self._export_pdf_btn.hide()
+
+        self._file_menu_btn = QToolButton()
+        self._file_menu_btn.setText(tr('文件'))
+        self._file_menu_btn.setProperty('role', 'utility')
+        self._file_menu_btn.setProperty('compact', True)
+        self._file_menu_btn.setProperty('menuButton', True)
+        self._file_menu_btn.setPopupMode(QToolButton.InstantPopup)
+        self._file_menu_btn.setToolTip(tr('文件与导出操作'))
+        self._file_menu = QMenu(self._file_menu_btn)
+        self._file_menu.setToolTipsVisible(True)
+        self._import_pages_action = self._file_menu.addAction(tr('导入译图 / PDF'), self._import_pages)
+        self._export_pdf_action = self._file_menu.addAction(tr('导出 PDF'), self._export_action)
+        self._export_pdf_action.setToolTip(tr('将已保存的图片按页面顺序导出为 PDF；编辑时不会合成 PDF。'))
+        self._export_pdf_action.setEnabled(False)
+        self._export_cbz_action = self._file_menu.addAction(tr('导出 CBZ'), lambda: self._export_action('cbz'))
+        self._export_cbz_action.setToolTip(tr('将已保存的图片按页面顺序打包为 CBZ。'))
+        self._export_cbz_action.setEnabled(False)
+        self._file_menu.addSeparator()
+        self._open_output_action = self._file_menu.addAction(tr('打开输出目录'), self._open_output_dir)
+        self._link_original_action = self._file_menu.addAction(tr('关联原图…'), self.link_original)
+        self._link_original_action.setToolTip(tr('旧结果缺少原图时，选择该页处理前的同尺寸原图。'))
+        self._link_original_action.setEnabled(False)
+        self._file_menu_btn.setMenu(self._file_menu)
+        toolbar.addWidget(self._file_menu_btn)
+
         self._save_btn = QPushButton(tr('保存图片'))
         self._save_btn.setProperty('role', 'primary')
         toolbar.addWidget(self._save_btn)
@@ -395,6 +467,8 @@ class EditorPage(QWidget):
         self._favorite_fonts = FavoriteFontBar(self.config)
         self._favorite_fonts.font_selected.connect(self._apply_favorite_font)
         self._favorite_fonts.add_current_requested.connect(self._add_favorite_font)
+        self._favorite_fonts.hide_requested.connect(lambda: self._set_favorite_bar_visible(False))
+        self._favorite_fonts.slots_changed.connect(self._on_favorite_slots_changed)
         root.addWidget(self._favorite_fonts)
 
         self._status = QLabel(tr('导入带布局数据的译稿，或从自动处理结果进入精修。'))
@@ -483,6 +557,7 @@ class EditorPage(QWidget):
         self.preview.region_edited.connect(self._resize_region_from_canvas)
         self.preview.region_edit_finished.connect(self.apply_changes)
         self.preview.region_clicked.connect(self._select_block)
+        self.preview.region_context_menu.connect(self._show_canvas_bubble_context_menu)
         self.preview.bubble_created.connect(self._add_bubble_from_canvas)
         self.preview.color_picked.connect(self._accept_fill_color)
         self.preview.color_pick_canceled.connect(lambda: self._pick_fill_btn.setChecked(False))
@@ -512,7 +587,7 @@ class EditorPage(QWidget):
         self._repair_btn = QPushButton(tr('修补选区'))
         self._repair_undo = QPushButton(tr('撤回修补'))
         self._repair_undo.setToolTip(tr('优先撤回手动修补；没有手动记录时，还原选中气泡的自动修补与嵌字。旧结果请先关联原图。'))
-        for button in (self._repair_mode, self._add_bubble_btn, self._repair_btn, self._repair_undo):
+        for button in (self._repair_mode, self._add_bubble_btn):
             button.setProperty('compact', True)
             button.setProperty('role', 'chip')
             canvas_tools.addWidget(button)
@@ -528,19 +603,61 @@ class EditorPage(QWidget):
         tools_div.setFixedSize(1, 18)
         canvas_tools.addWidget(tools_div)
 
-        self._fill_white_btn = QPushButton(tr('填白'))
+        self._repair_btn.setProperty('compact', True)
+        self._repair_btn.setProperty('role', 'chip')
+        canvas_tools.addWidget(self._repair_btn)
+
+        self._fill_menu_btn = QToolButton()
+        self._fill_menu_btn.setText(tr('填色'))
+        self._fill_menu_btn.setProperty('compact', True)
+        self._fill_menu_btn.setProperty('role', 'chip')
+        self._fill_menu_btn.setProperty('menuButton', True)
+        self._fill_menu_btn.setPopupMode(QToolButton.InstantPopup)
+        self._fill_menu_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self._fill_menu_btn.setToolTip(tr('背景填色与取色选项'))
+        self._fill_menu = QMenu(self._fill_menu_btn)
+        self._fill_menu.setToolTipsVisible(True)
+        self._fill_white_action = self._fill_menu.addAction(
+            tr('填白'), lambda: self._fill_repair_region((255, 255, 255)))
+        self._fill_black_action = self._fill_menu.addAction(
+            tr('填黑'), lambda: self._fill_repair_region((0, 0, 0)))
+        self._fill_custom_action = self._fill_menu.addAction(
+            tr('填色'), lambda: self._fill_repair_region(self._fill_color.getRgb()[:3]))
+        self._fill_menu.addSeparator()
+        self._fill_color_action = self._fill_menu.addAction(
+            tr('选择填充颜色…'), self._choose_fill_color)
+        self._fill_color_action.setToolTip(tr('点击选择颜色，支持 RGB 与十六进制色值。'))
+        self._pick_fill_action = self._fill_menu.addAction(tr('图片取色'))
+        self._pick_fill_action.setCheckable(True)
+        self._pick_fill_action.setToolTip(tr('点击图片取色；Esc 或右键取消，不会修改图片。'))
+        self._fill_menu_btn.setMenu(self._fill_menu)
+        canvas_tools.addWidget(self._fill_menu_btn)
+
+        self._pick_cancel_btn = QPushButton(tr('取色中 · 取消'))
+        self._pick_cancel_btn.setProperty('compact', True)
+        self._pick_cancel_btn.setProperty('role', 'utility')
+        self._pick_cancel_btn.setToolTip(tr('点击退出图片取色，或按 Esc / 右键取消。'))
+        self._pick_cancel_btn.clicked.connect(lambda: self._pick_fill_btn.setChecked(False))
+        self._pick_cancel_btn.hide()
+        canvas_tools.addWidget(self._pick_cancel_btn)
+
+        self._repair_undo.setProperty('compact', True)
+        self._repair_undo.setProperty('role', 'chip')
+        canvas_tools.addWidget(self._repair_undo)
+
+        self._fill_white_btn = QPushButton(tr('填白'), self)
         self._fill_white_btn.setToolTip(tr('把框选区域整块填成白色（可撤回）。'))
-        self._fill_black_btn = QPushButton(tr('填黑'))
+        self._fill_black_btn = QPushButton(tr('填黑'), self)
         self._fill_black_btn.setToolTip(tr('把框选区域整块填成黑色（可撤回）。'))
-        self._fill_color_btn = QPushButton()
+        self._fill_color_btn = QPushButton(self)
         self._fill_color_btn.setAccessibleName(tr('选择填充颜色'))
         self._fill_color_btn.setToolTip(tr('点击选择颜色，支持 RGB 与十六进制色值。'))
         self._fill_color_btn.clicked.connect(self._choose_fill_color)
-        self._pick_fill_btn = QPushButton(tr('图片取色'))
+        self._pick_fill_btn = QPushButton(tr('图片取色'), self)
         self._pick_fill_btn.setCheckable(True)
         self._pick_fill_btn.setToolTip(tr('点击图片取色；Esc 或右键取消，不会修改图片。'))
         self._pick_fill_btn.toggled.connect(self._toggle_fill_color_pick)
-        self._fill_custom_btn = QPushButton(tr('填色'))
+        self._fill_custom_btn = QPushButton(tr('填色'), self)
         self._fill_white_btn.clicked.connect(lambda: self._fill_repair_region((255, 255, 255)))
         self._fill_black_btn.clicked.connect(lambda: self._fill_repair_region((0, 0, 0)))
         self._fill_custom_btn.clicked.connect(lambda: self._fill_repair_region(self._fill_color.getRgb()[:3]))
@@ -548,7 +665,7 @@ class EditorPage(QWidget):
                        self._pick_fill_btn, self._fill_custom_btn):
             button.setProperty('compact', True)
             button.setProperty('role', 'chip')
-            canvas_tools.addWidget(button)
+            button.hide()
         self._refresh_fill_color()
         canvas_layout.addWidget(canvas_tools_frame)
         canvas_layout.addWidget(self.preview, 1)
@@ -604,12 +721,30 @@ class EditorPage(QWidget):
         self._restore_bubble_btn.setToolTip(tr('撤销所选气泡的修补与嵌字，恢复处理前的原始像素；可再次恢复处理结果。'))
         self._restore_bubble_btn.clicked.connect(self.toggle_bubble_original)
         bubble_bar.addWidget(self._restore_bubble_btn)
-        self._link_original_btn = QPushButton(tr('关联原图'))
+        self._brush_cancel_btn = QPushButton(tr('退出样式刷'))
+        self._brush_cancel_btn.setProperty('compact', True)
+        self._brush_cancel_btn.setProperty('role', 'chip')
+        self._brush_cancel_btn.clicked.connect(self._stop_style_brush)
+        self._brush_cancel_btn.hide()
+        bubble_bar.addWidget(self._brush_cancel_btn)
+        self._bubble_menu_btn = QToolButton()
+        self._bubble_menu_btn.setText('⋯')
+        self._bubble_menu_btn.setProperty('compact', True)
+        self._bubble_menu_btn.setProperty('role', 'chip')
+        self._bubble_menu_btn.setPopupMode(QToolButton.InstantPopup)
+        self._bubble_menu_btn.setAccessibleName(tr('当前气泡更多操作'))
+        self._bubble_menu_btn.setToolTip(tr('当前气泡更多操作'))
+        self._bubble_menu = QMenu(self._bubble_menu_btn)
+        self._bubble_menu.setToolTipsVisible(True)
+        self._bubble_menu.aboutToShow.connect(lambda: self._populate_bubble_menu(self._bubble_menu))
+        self._bubble_menu_btn.setMenu(self._bubble_menu)
+        bubble_bar.addWidget(self._bubble_menu_btn)
+        self._link_original_btn = QPushButton(tr('关联原图'), self)
         self._link_original_btn.setProperty('compact', True)
         self._link_original_btn.setProperty('role', 'chip')
         self._link_original_btn.setToolTip(tr('旧结果缺少原图时，选择该页处理前的同尺寸原图。'))
         self._link_original_btn.clicked.connect(self.link_original)
-        bubble_bar.addWidget(self._link_original_btn)
+        self._link_original_btn.hide()
         header_layout.addLayout(bubble_bar)
         inspector_layout.addWidget(inspector_header)
 
@@ -624,8 +759,34 @@ class EditorPage(QWidget):
         self.block_list.setMinimumHeight(40)
         self.block_list.setUniformItemSizes(True)
         self.block_list.setMouseTracking(True)
+        self.block_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.block_list.customContextMenuRequested.connect(self._show_block_list_context_menu)
         self.block_list.setItemDelegate(_BlockItemDelegate(self.block_list))
+        self.block_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.block_list.currentRowChanged.connect(self._load_properties)
+        self.block_list.itemSelectionChanged.connect(self._selection_changed)
+        self.block_list.itemClicked.connect(self._brush_list_clicked)
+        self.preview.regions_selected.connect(self._select_blocks)
+        self._copy_style_btn = QPushButton(tr('取样式'), self)
+        self._copy_style_btn.setToolTip(tr('复制当前气泡的字体与排版样式，然后点击或框选目标气泡。'))
+        self._copy_style_btn.clicked.connect(self.copy_style)
+        self._style_brush_btn = QPushButton(tr('样式刷'), self)
+        self._style_brush_btn.setCheckable(True)
+        self._style_brush_btn.setToolTip(tr('点击目标应用样式；Shift 拖动框选，Ctrl 点击多选；Esc 退出。不会复制译文或气泡位置。'))
+        self._undo_style_btn = QPushButton(tr('撤销样式'), self)
+        self._undo_style_btn.clicked.connect(self.undo_style)
+        for button in (self._copy_style_btn, self._style_brush_btn, self._undo_style_btn):
+            button.setProperty('compact', True)
+            button.setProperty('role', 'chip')
+            button.hide()
+        self._brush_escape = QShortcut(QKeySequence('Escape'), self)
+        self._brush_escape.setContext(Qt.WidgetWithChildrenShortcut)
+        self._brush_escape.setEnabled(False)
+        self._brush_escape.activated.connect(self._stop_style_brush)
+        self._style_brush_btn.toggled.connect(self._brush_escape.setEnabled)
+        self._style_brush_btn.toggled.connect(self._sync_style_brush_ui)
+        for button in (self._repair_mode, self._add_bubble_btn, self._pick_fill_btn):
+            button.toggled.connect(self._stop_style_brush_for_tool)
         install_list_motion(self.block_list)
         self._inspector_tabs = QTabWidget()
         self._inspector_tabs.setDocumentMode(True)
@@ -649,6 +810,9 @@ class EditorPage(QWidget):
         self._text_props_layout = text_props
         self._inspector_tabs.addTab(text_panel, tr('译文编辑'))
 
+        source_row = QHBoxLayout()
+        source_row.setContentsMargins(0, 0, 0, 0)
+        source_row.setSpacing(6)
         self._source_toggle = QToolButton()
         self._source_toggle.setText(tr('原文'))
         self._source_toggle.setCheckable(True)
@@ -656,14 +820,26 @@ class EditorPage(QWidget):
         self._source_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self._source_toggle.setProperty('role', 'quiet')
         self._source_toggle.setProperty('compact', True)
-        source_row = QHBoxLayout()
-        source_row.addWidget(self._source_toggle, 1)
+        source_row.addWidget(self._source_toggle)
         self._retranslate_btn = QPushButton(tr('重译气泡'))
         self._retranslate_btn.setProperty('compact', True)
         self._retranslate_btn.setProperty('role', 'chip')
         self._retranslate_btn.setEnabled(False)
         self._retranslate_btn.clicked.connect(self.open_retranslation)
         source_row.addWidget(self._retranslate_btn)
+        source_row.addStretch(1)
+        quick_size_label = QLabel(tr('字号'))
+        quick_size_label.setProperty('muted', True)
+        source_row.addWidget(quick_size_label)
+        self._quick_size_spin = QSpinBox()
+        self._quick_size_spin.setObjectName('quickSizeSpin')
+        self._quick_size_spin.setRange(0, 200)
+        self._quick_size_spin.setSpecialValueText(tr('自动'))
+        self._quick_size_spin.setToolTip(tr('手动字号按实际像素绘制；0 为自动适配蒙版'))
+        self._quick_size_spin.setAccessibleName(tr('字号'))
+        self._quick_size_spin.setMinimumWidth(72)
+        self._quick_size_spin.setMaximumWidth(86)
+        source_row.addWidget(self._quick_size_spin)
         text_props.addLayout(source_row)
         self._source_text = QPlainTextEdit()
         self._source_text.setObjectName('textSource')
@@ -723,7 +899,7 @@ class EditorPage(QWidget):
         layout_tab_root.addWidget(self._properties_scroll, 1)
 
         props = QVBoxLayout(scroll_content)
-        props.setContentsMargins(0, 2, 4, 6)
+        props.setContentsMargins(0, 2, 2, 6)
         props.setSpacing(10)
 
         self._style_combo = SearchableFontCombo()
@@ -770,64 +946,6 @@ class EditorPage(QWidget):
         self._text_color = TextColorPicker()
         self._text_color.setAccessibleName(tr('当前文本块文字颜色'))
         self._text_color.setToolTip(tr('只修改当前文本块；默认黑字，空心效果默认白字。自选颜色保留描边效果。'))
-
-        type_card = QFrame()
-        type_card.setObjectName('inspectorCard')
-        type_layout = QVBoxLayout(type_card)
-        type_layout.setContentsMargins(10, 8, 10, 8)
-        type_layout.setSpacing(6)
-        type_title = QLabel(tr('字体与排版'))
-        type_title.setObjectName('cardTitle')
-        type_layout.addWidget(type_title)
-        font_row = QHBoxLayout()
-        font_row.setSpacing(6)
-        font_label = QLabel(tr('字体'))
-        font_label.setProperty('muted', True)
-        font_row.addWidget(font_label)
-        font_row.addStretch(1)
-        self._font_library_btn = QPushButton(tr('字体库'))
-        self._font_library_btn.setProperty('compact', True)
-        self._font_library_btn.setProperty('role', 'chip')
-        self._font_library_btn.clicked.connect(self._open_font_library)
-        font_row.addWidget(self._font_library_btn)
-        type_layout.addLayout(font_row)
-        type_layout.addWidget(self._style_combo)
-        type_layout.addWidget(self._font_name_label)
-        type_grid = QGridLayout()
-        type_grid.setContentsMargins(0, 1, 0, 1)
-        type_grid.setHorizontalSpacing(10)
-        type_grid.setVerticalSpacing(5)
-        type_grid.setColumnStretch(0, 1)
-        type_grid.setColumnStretch(1, 1)
-        type_grid.addWidget(self._field_cell('字号', self._size_spin), 0, 0)
-        type_grid.addWidget(self._field_cell('排版方向', self._direction_combo), 0, 1)
-        type_layout.addLayout(type_grid)
-        type_layout.addWidget(self._field_cell('文字效果', self._effect_combo))
-        type_layout.addWidget(self._field_cell('文字颜色', self._text_color))
-        outline_grid = QGridLayout()
-        outline_grid.setContentsMargins(0, 1, 0, 1)
-        outline_grid.setHorizontalSpacing(10)
-        outline_grid.setVerticalSpacing(5)
-        outline_grid.setColumnStretch(0, 1)
-        outline_grid.setColumnStretch(1, 1)
-        outline_grid.addWidget(self._field_cell('竖排列对齐', self._vertical_alignment_combo), 0, 0)
-        outline_grid.addWidget(self._field_cell('描边大小', self._outline_width), 0, 1)
-        type_layout.addLayout(outline_grid)
-        preset_row = QHBoxLayout()
-        preset_row.addWidget(self._hollow_preset_btn)
-        preset_row.addStretch(1)
-        type_layout.addLayout(preset_row)
-        props.addWidget(type_card)
-
-        self._offset_x, self._offset_y = QSpinBox(), QSpinBox()
-        for spin in (self._offset_x, self._offset_y):
-            spin.setRange(-100000, 100000)
-            spin.setSuffix(' px')
-        self._mask_width, self._mask_height = QSpinBox(), QSpinBox()
-        for spin in (self._mask_width, self._mask_height):
-            spin.setRange(1, 100000)
-            spin.setSuffix(' px')
-            spin.setToolTip(tr('调整译文排版蒙版，以当前中心向两侧改变大小'))
         self._text_scale_x, self._text_scale_y = QSpinBox(), QSpinBox()
         for spin in (self._text_scale_x, self._text_scale_y):
             spin.setRange(10, 400)
@@ -843,6 +961,117 @@ class EditorPage(QWidget):
         self._reset_transform_btn.setProperty('compact', True)
         self._reset_transform_btn.setProperty('role', 'chip')
         self._reset_transform_btn.clicked.connect(self._reset_text_transform)
+
+        type_card = QFrame()
+        type_card.setObjectName('inspectorCard')
+        type_layout = QVBoxLayout(type_card)
+        type_layout.setContentsMargins(8, 8, 8, 8)
+        type_layout.setSpacing(6)
+        type_title = QLabel(tr('字体与排版'))
+        type_title.setObjectName('cardTitle')
+        type_layout.addWidget(type_title)
+        font_row = QHBoxLayout()
+        font_row.setSpacing(6)
+        font_label = QLabel(tr('字体'))
+        font_label.setProperty('muted', True)
+        font_row.addWidget(font_label)
+        font_row.addStretch(1)
+        self._font_menu_btn = QToolButton()
+        self._font_menu_btn.setText(tr('字体管理'))
+        self._font_menu_btn.setProperty('compact', True)
+        self._font_menu_btn.setProperty('role', 'chip')
+        self._font_menu_btn.setProperty('menuButton', True)
+        self._font_menu_btn.setPopupMode(QToolButton.InstantPopup)
+        self._font_menu_btn.setToolTip(tr('字体库、导入与快捷字体管理'))
+        self._font_menu = QMenu(self._font_menu_btn)
+        self._font_menu.setToolTipsVisible(True)
+        self._font_library_action = self._font_menu.addAction(tr('字体库…'), self._open_font_library)
+        self._import_font_action = self._font_menu.addAction(tr('导入本地字体…'), self._import_local_fonts)
+        self._font_menu.addSeparator()
+        self._add_favorite_action = self._font_menu.addAction(tr('将当前字体加入快捷字体'), self._add_favorite_font)
+        self._configure_favorites_action = self._font_menu.addAction(tr('设置快捷字体…'), self._favorite_fonts.configure)
+        self._font_menu_show_bar_action = self._font_menu.addAction(tr('快捷字体栏'))
+        self._font_menu_show_bar_action.setCheckable(True)
+        self._font_menu_btn.setMenu(self._font_menu)
+        font_row.addWidget(self._font_menu_btn)
+        self._font_library_btn = QPushButton(tr('字体库'), self)
+        self._font_library_btn.setProperty('compact', True)
+        self._font_library_btn.setProperty('role', 'chip')
+        self._font_library_btn.clicked.connect(self._open_font_library)
+        self._font_library_btn.hide()
+        type_layout.addLayout(font_row)
+        type_layout.addWidget(self._style_combo)
+        type_layout.addWidget(self._font_name_label)
+        type_grid = QGridLayout()
+        type_grid.setContentsMargins(0, 1, 0, 1)
+        type_grid.setHorizontalSpacing(10)
+        type_grid.setVerticalSpacing(5)
+        type_grid.setColumnStretch(0, 1)
+        type_grid.setColumnStretch(1, 1)
+        type_grid.addWidget(self._field_cell('字号', self._size_spin), 0, 0)
+        type_grid.addWidget(self._field_cell('排版方向', self._direction_combo), 0, 1)
+        type_layout.addLayout(type_grid)
+        type_layout.addWidget(self._field_cell('文字颜色', self._text_color))
+
+        self._advanced_style_toggle = QToolButton()
+        self._advanced_style_toggle.setText(tr('高级样式（描边 · 变形）'))
+        self._advanced_style_toggle.setCheckable(True)
+        self._advanced_style_toggle.setChecked(False)
+        self._advanced_style_toggle.setArrowType(Qt.RightArrow)
+        self._advanced_style_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self._advanced_style_toggle.setProperty('role', 'quiet')
+        self._advanced_style_toggle.setProperty('compact', True)
+        self._advanced_style_toggle.toggled.connect(self._toggle_advanced_style)
+        type_layout.addWidget(self._advanced_style_toggle)
+
+        self._advanced_style_panel = QWidget()
+        adv_layout = QVBoxLayout(self._advanced_style_panel)
+        adv_layout.setContentsMargins(0, 2, 0, 0)
+        adv_layout.setSpacing(6)
+        adv_layout.addWidget(self._field_cell('文字效果', self._effect_combo))
+        outline_grid = QGridLayout()
+        outline_grid.setContentsMargins(0, 1, 0, 1)
+        outline_grid.setHorizontalSpacing(10)
+        outline_grid.setVerticalSpacing(5)
+        outline_grid.setColumnStretch(0, 1)
+        outline_grid.setColumnStretch(1, 1)
+        outline_grid.addWidget(self._field_cell('竖排列对齐', self._vertical_alignment_combo), 0, 0)
+        outline_grid.addWidget(self._field_cell('描边大小', self._outline_width), 0, 1)
+        adv_layout.addLayout(outline_grid)
+        preset_row = QHBoxLayout()
+        preset_row.addWidget(self._hollow_preset_btn)
+        preset_row.addStretch(1)
+        adv_layout.addLayout(preset_row)
+        transform_grid = QGridLayout()
+        transform_grid.setContentsMargins(0, 1, 0, 1)
+        transform_grid.setHorizontalSpacing(10)
+        transform_grid.setVerticalSpacing(4)
+        transform_grid.setColumnStretch(0, 1)
+        transform_grid.setColumnStretch(1, 1)
+        transform_grid.addWidget(self._field_cell('横向拉伸', self._text_scale_x), 0, 0)
+        transform_grid.addWidget(self._field_cell('纵向拉伸', self._text_scale_y), 0, 1)
+        transform_grid.addWidget(self._field_cell('文字旋转', self._text_rotation), 1, 0)
+        reset_cell = QWidget()
+        reset_cell_layout = QVBoxLayout(reset_cell)
+        reset_cell_layout.setContentsMargins(0, 0, 0, 0)
+        reset_cell_layout.setSpacing(3)
+        reset_cell_layout.addStretch(1)
+        reset_cell_layout.addWidget(self._reset_transform_btn)
+        transform_grid.addWidget(reset_cell, 1, 1)
+        adv_layout.addLayout(transform_grid)
+        self._advanced_style_panel.setVisible(False)
+        type_layout.addWidget(self._advanced_style_panel)
+        props.addWidget(type_card)
+
+        self._offset_x, self._offset_y = QSpinBox(), QSpinBox()
+        for spin in (self._offset_x, self._offset_y):
+            spin.setRange(-100000, 100000)
+            spin.setSuffix(' px')
+        self._mask_width, self._mask_height = QSpinBox(), QSpinBox()
+        for spin in (self._mask_width, self._mask_height):
+            spin.setRange(1, 100000)
+            spin.setSuffix(' px')
+            spin.setToolTip(tr('调整译文排版蒙版，以当前中心向两侧改变大小'))
         self._show_mask = QCheckBox(tr('显示蒙版范围'))
         self._show_mask.setChecked(True)
         self._show_mask.setToolTip(tr('画布辅助线仅用于精修，不写入导出图片'))
@@ -853,7 +1082,7 @@ class EditorPage(QWidget):
         geo_card = QFrame()
         geo_card.setObjectName('inspectorCard')
         geo_layout = QVBoxLayout(geo_card)
-        geo_layout.setContentsMargins(10, 8, 10, 8)
+        geo_layout.setContentsMargins(8, 8, 8, 8)
         geo_layout.setSpacing(5)
         geo_title = QLabel(tr('位置与蒙版'))
         geo_title.setObjectName('cardTitle')
@@ -868,16 +1097,17 @@ class EditorPage(QWidget):
         geo_grid.addWidget(self._field_cell('Y 偏移', self._offset_y), 0, 1)
         geo_grid.addWidget(self._field_cell('蒙版宽度', self._mask_width), 1, 0)
         geo_grid.addWidget(self._field_cell('蒙版高度', self._mask_height), 1, 1)
-        geo_grid.addWidget(self._field_cell('横向拉伸', self._text_scale_x), 2, 0)
-        geo_grid.addWidget(self._field_cell('纵向拉伸', self._text_scale_y), 2, 1)
-        geo_grid.addWidget(self._field_cell('文字旋转', self._text_rotation), 3, 0)
-        reset_cell = QWidget()
-        reset_cell_layout = QVBoxLayout(reset_cell)
-        reset_cell_layout.setContentsMargins(0, 0, 0, 0)
-        reset_cell_layout.setSpacing(3)
-        reset_cell_layout.addStretch(1)
-        reset_cell_layout.addWidget(self._reset_transform_btn)
-        geo_grid.addWidget(reset_cell, 3, 1)
+        for spin in (self._size_spin, self._offset_x, self._offset_y, self._mask_width, self._mask_height,
+                     self._text_scale_x, self._text_scale_y, self._text_rotation, self._outline_width):
+            spin.setMinimumWidth(64)
+            spin.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        for combo in (self._direction_combo, self._vertical_alignment_combo, self._effect_combo):
+            combo.setMinimumWidth(64)
+            combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        type_grid.setHorizontalSpacing(6)
+        outline_grid.setHorizontalSpacing(6)
+        transform_grid.setHorizontalSpacing(6)
+        geo_grid.setHorizontalSpacing(6)
         geo_layout.addLayout(geo_grid)
         geo_layout.addWidget(self._show_mask)
         geo_layout.addWidget(self._box_label)
@@ -916,21 +1146,53 @@ class EditorPage(QWidget):
         root.addWidget(self._status)
         self._pages_toggle.toggled.connect(lambda checked: self._choose_panel(0, checked))
         self._properties_toggle.toggled.connect(lambda checked: self._choose_panel(1, checked))
+        self._pages_action.toggled.connect(self._pages_toggle.setChecked)
+        self._properties_action.toggled.connect(self._properties_toggle.setChecked)
         self._focus_btn.toggled.connect(self._toggle_canvas_focus)
+        self._focus_action.toggled.connect(self._focus_btn.setChecked)
+        self._strip_toggle.toggled.connect(self._sync_strip_action)
+        self._strip_action.toggled.connect(self._strip_toggle.setChecked)
+        self._zoom_tool_btn.toggled.connect(self._sync_zoom_tool_action)
+        self._zoom_tool_action.toggled.connect(self._zoom_tool_btn.setChecked)
+        self._favorite_bar_action.toggled.connect(self._set_favorite_bar_visible)
+        self._font_menu_show_bar_action.toggled.connect(self._set_favorite_bar_visible)
+        self._pick_fill_btn.toggled.connect(self._sync_pick_fill_ui)
+        self._pick_fill_action.toggled.connect(self._pick_fill_btn.setChecked)
         self._zoom.currentIndexChanged.connect(self._zoom_selected)
         self.preview.zoom_changed.connect(self._sync_zoom_display)
         self._apply_btn.clicked.connect(self.apply_changes)
         self._save_btn.clicked.connect(self.request_save)
         self._text_input.textChanged.connect(self._schedule_preview)
         self._style_combo.currentIndexChanged.connect(self._font_selection_changed)
+        self._size_spin.valueChanged.connect(self._sync_quick_size)
+        self._quick_size_spin.valueChanged.connect(self._size_spin.setValue)
         self._direction_combo.currentIndexChanged.connect(self._schedule_preview)
         self._direction_combo.currentIndexChanged.connect(self._update_vertical_alignment_enabled)
         self._vertical_alignment_combo.currentIndexChanged.connect(self._schedule_preview)
+        self._vertical_alignment_combo.currentIndexChanged.connect(self._update_advanced_style_badge)
         self._effect_combo.currentIndexChanged.connect(self._schedule_preview)
         self._effect_combo.currentIndexChanged.connect(self._update_color_default)
+        self._effect_combo.currentIndexChanged.connect(self._update_advanced_style_badge)
         self._text_color.color_changed.connect(self._schedule_preview)
         for spin in self._layout_spins():
             spin.valueChanged.connect(self._schedule_preview)
+        style_controls = (
+            (self._style_combo, self._style_combo.currentIndexChanged, ('style', 'font_reference')),
+            (self._size_spin, self._size_spin.valueChanged, ('font_size',)),
+            (self._direction_combo, self._direction_combo.currentIndexChanged, ('direction',)),
+            (self._effect_combo, self._effect_combo.currentIndexChanged, ('text_effect',)),
+            (self._vertical_alignment_combo, self._vertical_alignment_combo.currentIndexChanged, ('vertical_alignment',)),
+            (self._text_color, self._text_color.color_changed, ('text_color',)),
+            (self._text_scale_x, self._text_scale_x.valueChanged, ('text_scale_x',)),
+            (self._text_scale_y, self._text_scale_y.valueChanged, ('text_scale_y',)),
+            (self._text_rotation, self._text_rotation.valueChanged, ('text_rotation',)),
+            (self._outline_width, self._outline_width.valueChanged, ('outline_width',)),
+        )
+        self._style_control_fields = {widget: keys for widget, signal, keys in style_controls}
+        for widget, signal, keys in style_controls:
+            signal.connect(self._note_style_control_changed)
+        for widget in (self._outline_width, self._text_scale_x, self._text_scale_y, self._text_rotation):
+            widget.valueChanged.connect(self._update_advanced_style_badge)
         self._show_mask.toggled.connect(self._update_region_guide)
         self._save_shortcut = QShortcut(QKeySequence.Save, self)
         self._save_shortcut.setContext(Qt.WidgetWithChildrenShortcut)
@@ -976,6 +1238,7 @@ class EditorPage(QWidget):
         self._desired_panels = [settings.value('ui/editorPages', True, type=bool),
                                 settings.value('ui/editorProperties', True, type=bool)]
         self._apply_panel_layout()
+        self._sync_favorite_bar_visibility()
         self._zoom.setCurrentIndex(max(0, min(self._zoom.count() - 1, int(settings.value('ui/editorZoom', 0)))))
         self._strip_toggle.setChecked(settings.value('ui/editorContinuous', False, type=bool))
 
@@ -1021,9 +1284,166 @@ class EditorPage(QWidget):
             return
         self._zoom_tool_btn.toggle()
 
+    def _sync_strip_action(self, checked):
+        self._strip_action.blockSignals(True)
+        self._strip_action.setChecked(checked)
+        self._strip_action.blockSignals(False)
+
+    def _sync_zoom_tool_action(self, checked):
+        self._zoom_tool_action.blockSignals(True)
+        self._zoom_tool_action.setChecked(checked)
+        self._zoom_tool_action.blockSignals(False)
+
+    def _sync_pick_fill_ui(self, checked):
+        self._pick_fill_action.blockSignals(True)
+        self._pick_fill_action.setChecked(checked)
+        self._pick_fill_action.blockSignals(False)
+        self._pick_cancel_btn.setVisible(bool(checked))
+
+    def _sync_quick_size(self, value):
+        self._quick_size_spin.blockSignals(True)
+        self._quick_size_spin.setValue(value)
+        self._quick_size_spin.blockSignals(False)
+
+    def _set_favorite_bar_visible(self, visible):
+        self._favorite_bar_pref = bool(visible)
+        QSettings().setValue('ui/editorFavoriteBarVisible', self._favorite_bar_pref)
+        self._sync_favorite_bar_visibility()
+
+    def _on_favorite_slots_changed(self, has_active):
+        if has_active and self._favorite_bar_pref is False:
+            return
+        self._sync_favorite_bar_visibility()
+
+    def _sync_favorite_bar_visibility(self):
+        focused = self._focus_btn.isChecked()
+        preferred = (
+            self._favorite_bar_pref
+            if self._favorite_bar_pref is not None
+            else self._favorite_fonts.has_active_slots()
+        )
+        self._favorite_fonts.setVisible(bool(preferred) and not focused)
+        for action in (self._favorite_bar_action, self._font_menu_show_bar_action):
+            action.blockSignals(True)
+            action.setChecked(bool(preferred))
+            action.blockSignals(False)
+
+    def _toggle_advanced_style(self, expanded):
+        self._advanced_style_toggle.setArrowType(Qt.DownArrow if expanded else Qt.RightArrow)
+        self._advanced_style_panel.setVisible(bool(expanded))
+
+    def _update_advanced_style_badge(self):
+        customized = (
+            self._effect_combo.currentData() not in (None, 'auto')
+            or self._vertical_alignment_combo.currentData() not in (None, 'center')
+            or self._outline_width.value() >= 0
+            or self._text_scale_x.value() != 100
+            or self._text_scale_y.value() != 100
+            or abs(self._text_rotation.value()) > 1e-6
+        )
+        self._advanced_style_toggle.setText(
+            tr('高级样式 · 已自定义') if customized else tr('高级样式（描边 · 变形）')
+        )
+
+    def _sync_export_pdf_state(self, *, enabled=None, text=None, tooltip=None):
+        if enabled is not None:
+            self._export_pdf_btn.setEnabled(enabled)
+            self._export_pdf_action.setEnabled(enabled)
+        if text is not None:
+            self._export_pdf_btn.setText(text)
+            self._export_pdf_action.setText(text)
+        if tooltip is not None:
+            self._export_pdf_btn.setToolTip(tooltip)
+            self._export_pdf_action.setToolTip(tooltip)
+
+    def _open_output_dir(self):
+        target = None
+        if self.output_path is not None and self.output_path.parent.is_dir():
+            target = self.output_path.parent
+        else:
+            configured = Path(str(self.config.get('page_output_dir', '') or ''))
+            if str(configured) and configured.is_dir():
+                target = configured
+        if target is None:
+            self._status.setText(tr('输出目录不存在或尚未生成。'))
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(target)))
+
+    def _show_block_list_context_menu(self, pos):
+        item = self.block_list.itemAt(pos)
+        if item is not None:
+            row = self.block_list.row(item)
+            self._focus_context_bubble(row)
+        if 0 <= self._loaded_row < len(self.items):
+            self._show_bubble_context_menu(self.block_list.viewport().mapToGlobal(pos))
+
+    def _show_canvas_bubble_context_menu(self, index, global_pos):
+        if not 0 <= index < len(self.items):
+            return
+        self._focus_context_bubble(index)
+        self._show_bubble_context_menu(global_pos)
+
+    def _focus_context_bubble(self, index):
+        # Right-clicking an existing member keeps the batch selection and never paints.
+        if index in self.selected_blocks():
+            self.block_list.setCurrentRow(index, QItemSelectionModel.NoUpdate)
+        else:
+            self.block_list.setCurrentRow(index)
+
+    def _show_bubble_context_menu(self, global_pos):
+        if not 0 <= self._loaded_row < len(self.items):
+            return
+        menu = QMenu(self)
+        menu.setToolTipsVisible(True)
+        self._populate_bubble_menu(menu)
+        menu.exec(global_pos)
+
+    def _populate_bubble_menu(self, menu):
+        menu.clear()
+        busy = (self._repair_worker is not None or self._export_worker is not None
+                or self._save_jobs.busy or self.page_io_busy)
+        ready = self._cleaned_image is not None and not busy
+        selected = 0 <= self._loaded_row < len(self.items)
+        restored = selected and bool(self.items[self._loaded_row].get('restore_original'))
+        editable = ready and selected and not restored
+
+        edit_act = menu.addAction(tr('全屏编辑译文') + '\tF2', self.open_text_editor)
+        edit_act.setEnabled(editable)
+        restore_label = tr('恢复处理结果') if restored else tr('还原此气泡')
+        restore_act = menu.addAction(restore_label, self.toggle_bubble_original)
+        restore_act.setEnabled(ready and selected)
+        menu.addSeparator()
+        lib_act = menu.addAction(tr('字体库…'), self._open_font_library)
+        lib_act.setEnabled(editable)
+        fav_act = menu.addAction(tr('将当前字体加入快捷字体'), self._add_favorite_font)
+        fav_act.setEnabled(editable)
+        hollow_act = menu.addAction(tr('白字黑边竖排'), self._apply_hollow_preset)
+        hollow_act.setEnabled(editable)
+        reset_act = menu.addAction(tr('重置文字变形'), self._reset_text_transform)
+        reset_act.setEnabled(editable)
+        menu.addSeparator()
+        style_copy = menu.addAction(tr('取样式'), self.copy_style)
+        style_copy.setEnabled(editable)
+        rows = self.selected_blocks() or ([self._loaded_row] if selected else [])
+        paste_style = menu.addAction(tr('应用样式到所选气泡'), self._paste_selected_style)
+        paste_style.setEnabled(ready and self._style_clipboard is not None
+                               and any(not self.items[row].get('restore_original') for row in rows))
+        paste_style.setToolTip(tr('仅应用字体与排版；保留译文和位置，跳过已还原原图的气泡。'))
+        brush_style = menu.addAction(tr('样式刷'))
+        brush_style.setCheckable(True)
+        brush_style.setChecked(self._style_brush_btn.isChecked())
+        brush_style.setEnabled(ready and self._style_clipboard is not None)
+        brush_style.toggled.connect(self._style_brush_btn.setChecked)
+        undo_style = menu.addAction(tr('撤销样式'), self.undo_style)
+        undo_style.setEnabled(ready and bool(self._style_history))
+        menu.addSeparator()
+        link_act = menu.addAction(tr('关联原图…'), self.link_original)
+        link_act.setEnabled(ready)
+
     def save_ui_state(self):
         settings = QSettings()
-        settings.setValue('ui/editorSplitter', self._wide_splitter_state or (self._focus_splitter_state if self._focus_btn.isChecked() else self.splitter.saveState()))
+        focus_state = self._focus_splitter_state if (self._focus_btn.isChecked() and hasattr(self, '_focus_splitter_state')) else self.splitter.saveState()
+        settings.setValue('ui/editorSplitter', self._wide_splitter_state or focus_state)
         settings.setValue('ui/editorInspectorSplitter', self._inspector_splitter.saveState())
         panels = self._desired_panels
         settings.setValue('ui/editorPages', panels[0])
@@ -1039,7 +1459,7 @@ class EditorPage(QWidget):
         settings.setValue('ui/editorPages' if index == 0 else 'ui/editorProperties', checked)
         self._apply_panel_layout()
 
-    def _apply_panel_layout(self):
+    def _apply_panel_layout(self, *, animate=True):
         focused = self._focus_btn.isChecked()
         compact = self.isVisible() and self.width() < 1120
         if compact and not self._was_compact and not focused:
@@ -1049,14 +1469,19 @@ class EditorPage(QWidget):
             effective = [False, False]
         elif compact and all(effective):
             effective[1 - self._panel_priority] = False
-        for index, (button, panel) in enumerate(((self._pages_toggle, self._pages_panel),
-                                                (self._properties_toggle, self._properties_panel))):
+        for index, (button, action, panel) in enumerate((
+            (self._pages_toggle, self._pages_action, self._pages_panel),
+            (self._properties_toggle, self._properties_action, self._properties_panel),
+        )):
             button.blockSignals(True)
             button.setChecked(effective[index])
             button.blockSignals(False)
+            action.blockSignals(True)
+            action.setChecked(effective[index])
+            action.blockSignals(False)
             was_visible = panel.isVisible()
             want_visible = effective[index]
-            if self.isVisible() and was_visible != want_visible:
+            if animate and self.isVisible() and was_visible != want_visible:
                 edge = 'left' if index == 0 else 'right'
                 if want_visible:
                     panel.setVisible(True)
@@ -1066,9 +1491,17 @@ class EditorPage(QWidget):
                     panel.setVisible(False)
             else:
                 panel.setVisible(want_visible)
-            button.setToolTip(tr('窗口较窄时暂时收起；展开此栏会让出另一个侧栏的位置。')
-                              if self._desired_panels[index] and not effective[index] and not focused else '')
-        if not compact and self._was_compact and not focused and self._wide_splitter_state is not None:
+            tip = (tr('窗口较窄时暂时收起；展开此栏会让出另一个侧栏的位置。')
+                   if self._desired_panels[index] and not effective[index] and not focused else '')
+            button.setToolTip(tip)
+            action.setToolTip(tip)
+        if compact and not focused:
+            avail = max(400, self.width() - 36)
+            left_w = 210 if effective[0] else 0
+            right_w = min(328, max(310, avail // 3)) if effective[1] else 0
+            center_w = max(280, avail - left_w - right_w)
+            self.splitter.setSizes([left_w, center_w, right_w])
+        elif not compact and self._was_compact and not focused and self._wide_splitter_state is not None:
             self.splitter.restoreState(self._wide_splitter_state)
             self._wide_splitter_state = None
         self._was_compact = compact
@@ -1078,15 +1511,18 @@ class EditorPage(QWidget):
             self._focus_splitter_state = self.splitter.saveState()
             self._apply_panel_layout()
         else:
-            self.splitter.restoreState(self._focus_splitter_state)
+            if hasattr(self, '_focus_splitter_state'):
+                self.splitter.restoreState(self._focus_splitter_state)
             self._apply_panel_layout()
+        self._focus_action.blockSignals(True)
+        self._focus_action.setChecked(focused)
+        self._focus_action.blockSignals(False)
+        self._focus_btn.setVisible(focused)
         for widget, edge, slide_hide in (
             (self._canvas_heading, 'top', True),
             (self._status, 'bottom', True),
-            (self._pages_toggle, 'top', False),
-            (self._properties_toggle, 'top', False),
         ):
-            want_visible = not focused
+            want_visible = not focused and (widget is not self._canvas_heading or self.height() >= 680)
             was_visible = widget.isVisible()
             if self.isVisible() and was_visible != want_visible:
                 if want_visible:
@@ -1098,28 +1534,19 @@ class EditorPage(QWidget):
                     widget.setVisible(False)
             else:
                 widget.setVisible(want_visible)
+        self._sync_favorite_bar_visibility()
         self._update_toolbar_labels()
 
     def _update_toolbar_labels(self):
-        compact = self.width() < 1120
-        for button, full, short in (
-            (self._properties_toggle, tr('编辑面板'), tr('面板')),
-            (self._zoom_tool_btn, tr('缩放工具'), tr('缩放')),
-            (self._strip_toggle, tr('连续长条'), tr('长条')),
-            (self._export_pdf_btn, tr('导出 PDF'), 'PDF'),
-            (self._export_cbz_btn, tr('导出 CBZ'), 'CBZ'),
-            (self._save_btn, tr('保存图片'), tr('保存')),
-        ):
-            if self._export_worker is None or button not in (self._export_pdf_btn, self._export_cbz_btn):
-                button.setText(short if compact else full)
-            button.setAccessibleName(full)
-        self._focus_btn.setText(tr('退出专注') if self._focus_btn.isChecked()
-                                else tr('专注') if compact else tr('专注画布'))
+        narrow = self.width() < 920
+        self._save_btn.setText(tr('保存') if narrow else tr('保存图片'))
+        self._save_btn.setAccessibleName(tr('保存图片'))
+        self._focus_btn.setText(tr('退出专注'))
         self._focus_btn.setAccessibleName(tr('专注画布'))
 
     def _toggle_source_text(self, expanded):
         self._source_expanded = expanded
-        self._source_compact_override = expanded and self.height() < 700
+        self._source_compact_override = expanded and self.height() < 680
         QSettings().setValue('ui/editorSourceExpanded', expanded)
         self._apply_source_layout()
 
@@ -1131,35 +1558,39 @@ class EditorPage(QWidget):
         self._sync_inspector_split()
 
     def _sync_inspector_split(self):
-        short = self.height() < 560
+        compact_h = self.height() < 680
+        very_short = self.height() < 500
         if hasattr(self, '_canvas_heading'):
-            self._canvas_heading.setVisible(not short)
+            self._canvas_heading.setVisible(not compact_h and not self._focus_btn.isChecked())
         if hasattr(self, '_inspector_heading'):
-            self._inspector_heading.setVisible(not short)
+            self._inspector_heading.setVisible(not compact_h)
         if hasattr(self, '_root_layout'):
-            self._root_layout.setContentsMargins(10 if short else 14, 4 if short else 10, 10 if short else 14, 4 if short else 8)
-            self._root_layout.setSpacing(4 if short else 8)
-            self._toolbar_layout.setContentsMargins(0, 0, 0, 4 if short else 8)
-            self._header_layout.setContentsMargins(10 if short else 12, 3 if short else 6, 10 if short else 12, 3 if short else 6)
-            self._inspector_body_layout.setContentsMargins(8 if short else 10, 2 if short else 6, 8 if short else 10, 2 if short else 6)
-            self._text_props_layout.setContentsMargins(0, 4 if short else 8, 0, 0)
-            self._text_props_layout.setSpacing(4 if short else 6)
-            self._layout_tab_root.setContentsMargins(0, 2 if short else 6, 0, 0)
-            self._inspector_actions_layout.setContentsMargins(10 if short else 12, 3 if short else 8, 10 if short else 12, 3 if short else 8)
-            self._break_hint.setVisible(not short)
-            self._inspector_hint.setVisible(not short)
-            self._inspector_spacer.setVisible(short)
-            self._text_input.setMinimumHeight(42 if short else 80)
-        self._inspector_splitter.setHandleWidth(4 if short else 6)
-        self.block_list.setMinimumHeight(38 if short else 108)
+            self._root_layout.setContentsMargins(10 if compact_h else 14, 4 if compact_h else 10, 10 if compact_h else 14, 4 if compact_h else 8)
+            self._root_layout.setSpacing(4 if compact_h else 8)
+            self._toolbar_layout.setContentsMargins(0, 0, 0, 4 if compact_h else 8)
+            self._header_layout.setContentsMargins(10 if compact_h else 12, 3 if compact_h else 6, 10 if compact_h else 12, 3 if compact_h else 6)
+            self._inspector_body_layout.setContentsMargins(8 if compact_h else 10, 2 if compact_h else 6, 8 if compact_h else 10, 2 if compact_h else 6)
+            self._text_props_layout.setContentsMargins(0, 4 if compact_h else 8, 0, 0)
+            self._text_props_layout.setSpacing(4 if compact_h else 6)
+            self._layout_tab_root.setContentsMargins(0, 2 if compact_h else 6, 0, 0)
+            self._inspector_actions_layout.setContentsMargins(10 if compact_h else 12, 3 if compact_h else 8, 10 if compact_h else 12, 3 if compact_h else 8)
+            self._break_hint.setVisible(not compact_h)
+            self._inspector_hint.setVisible(not compact_h)
+            self._inspector_spacer.setVisible(compact_h)
+            self._text_input.setMinimumHeight(42 if very_short else 72 if compact_h else 88)
+        self._inspector_splitter.setHandleWidth(4 if very_short else 6)
+        self.block_list.setMinimumHeight(38 if very_short else 68 if compact_h else 104)
         total = sum(self._inspector_splitter.sizes())
         if total <= 0:
             return
-        if short:
-            list_h = 38 if self.height() < 520 else 42
+        if very_short:
+            list_h = 38 if self.height() < 460 else 42
             self._inspector_splitter.setSizes([list_h, max(120, total - list_h)])
-        elif self._inspector_splitter.sizes()[0] < 108:
-            list_h = min(150, max(108, total // 4))
+        elif compact_h:
+            list_h = min(92, max(68, total // 4))
+            self._inspector_splitter.setSizes([list_h, max(180, total - list_h)])
+        elif self._inspector_splitter.sizes()[0] < 104 or self._inspector_splitter.sizes()[0] > total // 2:
+            list_h = min(148, max(104, total // 4))
             self._inspector_splitter.setSizes([list_h, max(200, total - list_h)])
 
     def _step_block(self, delta):
@@ -1181,7 +1612,9 @@ class EditorPage(QWidget):
         if not hasattr(self, '_block_counter'):
             return
         total = len(self.items)
-        if total and 0 <= self._loaded_row < total:
+        if len(self.selected_blocks()) > 1:
+            self._block_counter.setText(tr('已选 {_0} / {_1}', _0=len(self.selected_blocks()), _1=total))
+        elif total and 0 <= self._loaded_row < total:
             self._block_counter.setText(tr('{_0} / {_1}', _0=self._loaded_row + 1, _1=total))
         elif total:
             self._block_counter.setText(tr('{_0} 块', _0=total))
@@ -1190,8 +1623,10 @@ class EditorPage(QWidget):
         self._prev_block_btn.setEnabled(total > 1 and self._loaded_row > 0)
         self._next_block_btn.setEnabled(total > 1 and 0 <= self._loaded_row < total - 1)
 
-    def _apply_source_layout(self):
-        expanded = self._source_expanded and (not self.isVisible() or self.height() >= 700 or self._source_compact_override)
+    def _apply_source_layout(self, *, animate=True):
+        compact_h = self.isVisible() and self.height() < 680
+        target_h = 52 if compact_h else 84
+        expanded = self._source_expanded and (not compact_h or self._source_compact_override)
         self._source_toggle.blockSignals(True)
         self._source_toggle.setChecked(expanded)
         self._source_toggle.blockSignals(False)
@@ -1203,18 +1638,18 @@ class EditorPage(QWidget):
         self._source_anim_gen += 1
         gen = self._source_anim_gen
 
-        if not self.isVisible() or reduced_motion():
+        if not animate or not self.isVisible() or reduced_motion():
             self._source_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-            self._source_text.setFixedHeight(92 if expanded else 0)
+            self._source_text.setFixedHeight(target_h if expanded else 0)
             self._source_text.setVisible(expanded)
             return
 
         was_visible = self._source_text.isVisible()
-        if was_visible == expanded and self._source_text.height() == (92 if expanded else 0):
+        if was_visible == expanded and self._source_text.height() == (target_h if expanded else 0):
             return
 
         start_h = self._source_text.height() if was_visible else 0
-        end_h = 92 if expanded else 0
+        end_h = target_h if expanded else 0
         self._source_text.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._source_text.setVisible(True)
         self._source_text.setFixedHeight(start_h)
@@ -1236,7 +1671,7 @@ class EditorPage(QWidget):
             self._source_anim = None
             self._source_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
             if expanded:
-                self._source_text.setFixedHeight(92)
+                self._source_text.setFixedHeight(target_h)
                 self._source_text.setVisible(True)
             else:
                 self._source_text.setFixedHeight(0)
@@ -1249,9 +1684,19 @@ class EditorPage(QWidget):
 
     def _set_editable(self, enabled):
         restored = 0 <= self._loaded_row < len(self.items) and self.items[self._loaded_row].get('restore_original', False)
-        for widget in (self._text_input, self._line_break_btn, self._style_combo, self._font_library_btn, self._direction_combo, self._vertical_alignment_combo, self._effect_combo, self._text_color, self._hollow_preset_btn, self._reset_transform_btn, *self._layout_spins(), self._show_mask, self._apply_btn, self._save_btn):
-            widget.setEnabled(enabled and not restored)
+        active = enabled and not restored
+        for widget in (self._text_input, self._line_break_btn, self._quick_size_spin, self._style_combo,
+                       self._font_menu_btn, self._font_library_btn, self._direction_combo,
+                       self._vertical_alignment_combo, self._effect_combo, self._text_color,
+                       self._hollow_preset_btn, self._reset_transform_btn, *self._layout_spins(),
+                       self._show_mask, self._apply_btn, self._save_btn):
+            widget.setEnabled(active)
+        for action in (self._font_library_action, self._import_font_action, self._add_favorite_action):
+            action.setEnabled(active)
         self._show_mask.setEnabled(enabled)
+        self._copy_style_btn.setEnabled(enabled and not restored)
+        self._style_brush_btn.setEnabled(enabled and self._style_clipboard is not None)
+        self._undo_style_btn.setEnabled(enabled and bool(self._style_history))
         self._update_vertical_alignment_enabled()
         self._update_repair_controls()
 
@@ -1273,9 +1718,31 @@ class EditorPage(QWidget):
         except Exception as exc:
             self._status.setText(tr('字体库未能打开：{_0}', _0=exc))
 
+    def _import_local_fonts(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, tr('导入漫画译文字体'), '', tr('字体 (*.ttf *.otf *.ttc *.otc)'))
+        if not paths:
+            return []
+        imported, failures = [], []
+        for path in paths:
+            try:
+                imported.append(import_font(path))
+            except Exception as exc:
+                failures.append(f'{Path(path).name}：{exc}')
+        if imported:
+            reference = font_reference(imported[-1].path)
+            self._refresh_font_choices()
+            index = self._style_combo.findData(reference)
+            if index >= 0:
+                self._style_combo.setCurrentIndex(index)
+            self._status.setText(tr('已导入或复用 {_0} 款字体。', _0=len({font.path for font in imported})))
+        elif failures:
+            self._status.setText(tr('未导入：{_0}', _0='；'.join(failures)))
+        return imported
+
     def _import_pages(self):
         paths, _ = QFileDialog.getOpenFileNames(self, tr('导入已翻译的漫画'),
-            str(self.config.get('page_output_dir', '')), tr('漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf *.cbz *.json)'))
+            str(self.config.get('page_output_dir', '')), tr('漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf *.cbz *.json *.comitrans)'))
         if paths:
             self.request_import(paths)
 
@@ -1297,6 +1764,8 @@ class EditorPage(QWidget):
                     raise RuntimeError('页面索引已取消')
                 try:
                     path = Path(raw).resolve()
+                    if path.suffix.lower() == '.comitrans':
+                        path = path.with_suffix('.pdf')
                     if path.suffix.lower() in PROJECT_EXTS or path.name == 'project.json':
                         result.append((path, read_project_pages(path, cancelled)))
                     else:
@@ -1445,6 +1914,8 @@ class EditorPage(QWidget):
             return
         if not self._favorite_fonts.add_font(reference):
             self._status.setText(tr('常用字体已满（9 个），请在“设置快捷字体”中替换。'))
+        elif self._favorite_bar_pref is False:
+            self._set_favorite_bar_visible(True)
 
     def _apply_favorite_font(self, reference):
         if (not self._style_combo.isEnabled() or self.page_io_busy or self._save_jobs.busy
@@ -1577,6 +2048,9 @@ class EditorPage(QWidget):
         self._repair_box = None
         self._repair_mode.setChecked(False)
         self._add_bubble_btn.setChecked(False)
+        self._style_history.clear()
+        self._pending_style_keys.clear()
+        self._style_brush_btn.setChecked(False)
         self.output_path = self.cleaned_path = self.layout_path = None
         self.items = []
         self._loaded_row = -1
@@ -1589,7 +2063,7 @@ class EditorPage(QWidget):
         self._layer_cache.clear()
         self.block_list.clear()
         self._refresh_block_counter()
-        self._export_pdf_btn.setEnabled(False)
+        self._sync_export_pdf_state(enabled=False)
         self.preview.clear(tr('选择一页，开始精修'))
         self._set_editable(False)
         self._status.setText(tr('已清空页面列表。'))
@@ -1623,7 +2097,7 @@ class EditorPage(QWidget):
         self._import_jobs.invalidate()
         self._page_jobs.invalidate()
         self._indexing = self._requesting_page = False
-        if path.suffix.lower() in PROJECT_EXTS or path.name == 'project.json':
+        if path.suffix.lower() in PROJECT_EXTS or path.suffix.lower() == '.comitrans' or path.name == 'project.json':
             return self.request_import([path])
         if path == self.output_path:
             self._page_jobs.invalidate()
@@ -1787,7 +2261,7 @@ class EditorPage(QWidget):
                 return False
             path = self.output_path if self.output_path in pages else pages[0]
         if self.output_path == path:
-            self._export_pdf_btn.setEnabled(True)
+            self._sync_export_pdf_state(enabled=True)
             return True
         if not _approved and not self.confirm_discard():
             return False
@@ -1803,6 +2277,9 @@ class EditorPage(QWidget):
         self._repair_box = None
         self._repair_mode.setChecked(False)
         self._edit_revision = 0
+        self._style_history.clear()
+        self._pending_style_keys.clear()
+        self._style_brush_btn.setChecked(False)
         self._loading = True
         self._loaded_row = -1
         self._row_dirty = False
@@ -1819,7 +2296,7 @@ class EditorPage(QWidget):
         self._text_input.clear()
         self._set_editable(False)
         self.output_path = path
-        self._export_pdf_btn.setEnabled(self._export_worker is None)
+        self._sync_export_pdf_state(enabled=self._export_worker is None)
         self.cleaned_path = path.parent.parent / f'{path.parent.name}_cleaned' / f'{path.stem}_cleaned.png'
         self.layout_path = path.parent.parent / f'{path.parent.name}_layout' / f'{path.stem}_layout.json'
         page_item = self._add_page(path, _payload.preview.size())
@@ -2131,6 +2608,7 @@ class EditorPage(QWidget):
         return [left, top, left + width, top + height]
 
     def _update_region_guide(self):
+        self.preview.set_selected_regions(self.selected_blocks())
         self.preview.set_regions(
             [(index, tuple(self._mask_box(item))) for index, item in enumerate(self.items)],
             visible=self._show_mask.isChecked() and not self._repair_mode.isChecked())
@@ -2147,16 +2625,150 @@ class EditorPage(QWidget):
         if restored:
             box = list(self.items[self._loaded_row]['box'][:4])
             self._box_label.setText(tr('原图区域：{_0}', _0=', '.join(map(str, box))))
-        self.preview.set_region(box if self._show_mask.isChecked() else None, editable=box is not None and not restored)
+        self.preview.set_region(box if self._show_mask.isChecked() else None,
+                                editable=box is not None and not restored and len(self.selected_blocks()) <= 1
+                                and not self._style_brush_btn.isChecked())
 
     def _select_block(self, index):
         """A click on a box in the canvas is the same as picking it in the list."""
-        if not 0 <= index < len(self.items) or index == self._loaded_row:
+        if not 0 <= index < len(self.items):
+            return
+        if self._style_brush_btn.isChecked():
+            self.block_list.setCurrentRow(index)
+            self.paste_style([index])
             return
         self.block_list.setCurrentRow(index)
         item = self.block_list.item(index)
         if item is not None:
             self.block_list.scrollToItem(item, QAbstractItemView.PositionAtCenter)
+
+    def selected_blocks(self):
+        return sorted(self.block_list.row(item) for item in self.block_list.selectedItems())
+
+    def _selection_changed(self):
+        if self._loading or not hasattr(self, '_show_mask'):
+            return
+        rows = self.selected_blocks()
+        if rows and self._loaded_row not in rows:
+            self.block_list.setCurrentRow(rows[0], QItemSelectionModel.NoUpdate)
+        self._refresh_block_counter()
+        self._update_region_guide()
+        if len(rows) > 1:
+            self._status.setText(tr('已选 {_0} 个气泡：排版修改应用到所选，译文和位置单独保留。', _0=len(rows)))
+
+    def _select_blocks(self, indices, mode='replace'):
+        self._store_properties()
+        rows = set(self.selected_blocks()) if mode in ('toggle', 'add') else set()
+        targets = {int(index) for index in indices if 0 <= int(index) < len(self.items)}
+        rows = rows ^ targets if mode == 'toggle' else rows | targets
+        blocked = self.block_list.blockSignals(True)
+        try:
+            for row in range(self.block_list.count()):
+                self.block_list.item(row).setSelected(row in rows)
+            if rows:
+                self.block_list.setCurrentRow(min(rows), QItemSelectionModel.NoUpdate)
+        finally:
+            self.block_list.blockSignals(blocked)
+        if rows:
+            self._load_properties(min(rows))
+        self._selection_changed()
+        if self._style_brush_btn.isChecked() and rows:
+            self.paste_style(sorted(rows))
+
+    def _note_style_change(self, keys):
+        if self._loading or self._loaded_row < 0:
+            return
+        if not self._pending_style_keys:
+            self._pending_style_rows = self.selected_blocks()
+        self._pending_style_keys.update(keys)
+
+    def _note_style_control_changed(self, *_args):
+        self._note_style_change(self._style_control_fields.get(self.sender(), ()))
+
+    def _stop_style_brush(self):
+        self._style_brush_btn.setChecked(False)
+        self.preview.cancel_region_drag()
+
+    def _sync_style_brush_ui(self, enabled):
+        self._brush_cancel_btn.setVisible(enabled)
+        self._restore_bubble_btn.setVisible(not enabled)
+        if enabled:
+            self._repair_mode.setChecked(False)
+            self._add_bubble_btn.setChecked(False)
+            self._pick_fill_btn.setChecked(False)
+        self._update_region_guide()
+
+    def _stop_style_brush_for_tool(self, enabled):
+        if enabled:
+            self._stop_style_brush()
+
+    def _paste_selected_style(self):
+        return self.paste_style(self.selected_blocks() or [self._loaded_row])
+
+    def _brush_list_clicked(self, *_args):
+        if self._style_brush_btn.isChecked():
+            self.paste_style()
+
+    def _remember_style_change(self, before):
+        changed = {row: item for row, item in before.items()
+                   if lettering_style(item) != lettering_style(self.items[row])}
+        if changed:
+            self._style_history.append(changed)
+            self._style_history = self._style_history[-20:]
+            self._undo_style_btn.setEnabled(True)
+
+    def copy_style(self):
+        if not 0 <= self._loaded_row < len(self.items) or self.items[self._loaded_row].get('restore_original'):
+            return False
+        self._store_properties()
+        self._style_clipboard = lettering_style(self.items[self._loaded_row])
+        self._style_brush_btn.setEnabled(True)
+        self._style_brush_btn.setChecked(True)
+        self._status.setText(tr('已取样式，点击或框选目标气泡；Esc 退出样式刷。'))
+        return True
+
+    def paste_style(self, rows=None):
+        if self._style_clipboard is None or self.page_io_busy or self._save_jobs.busy or self._repair_worker is not None or self._export_worker is not None:
+            return False
+        self._store_properties()
+        rows = self.selected_blocks() if rows is None else rows
+        before = {row: deepcopy(self.items[row]) for row in rows if 0 <= row < len(self.items)}
+        for row in before:
+            apply_lettering_style(self.items[row], self._style_clipboard)
+        self._remember_style_change(before)
+        if not any(lettering_style(self.items[row]) != lettering_style(item) for row, item in before.items()):
+            return False
+        self._finish_style_edit()
+        return True
+
+    def _finish_style_edit(self):
+        self._edit_revision += 1
+        self._dirty = self._preview_dirty = True
+        self._row_dirty = False
+        self._refresh_page_dirty_label()
+        for row in self.selected_blocks():
+            self._refresh_block_item(row)
+        if self._loaded_row >= 0:
+            self._load_properties(self._loaded_row)
+        self.apply_changes()
+
+    def undo_style(self):
+        self._store_properties()
+        if not self._style_history or self.page_io_busy or self._save_jobs.busy or self._repair_worker is not None or self._export_worker is not None:
+            return False
+        before = self._style_history.pop()
+        for row, previous in before.items():
+            if row >= len(self.items):
+                continue
+            for key in (*STYLE_DEFAULTS, 'manual_layout', 'rendered_font_size'):
+                if key in previous:
+                    self.items[row][key] = deepcopy(previous[key])
+                else:
+                    self.items[row].pop(key, None)
+            self._refresh_block_item(row)
+        self._finish_style_edit()
+        self._undo_style_btn.setEnabled(bool(self._style_history))
+        return True
 
     def _jump_to_block(self, index):
         if not 0 <= index < len(self.items):
@@ -2256,6 +2868,9 @@ class EditorPage(QWidget):
         if not self._row_dirty or self._loaded_row < 0 or self._loaded_row >= len(self.items):
             return
         item = self.items[self._loaded_row]
+        keys = set(self._pending_style_keys)
+        rows = list(self._pending_style_rows)
+        before = {row: deepcopy(self.items[row]) for row in set(rows + [self._loaded_row])} if keys else {}
         if self._font_choice_dirty:
             choice = self._style_combo.currentData()
             if choice in STYLE_LABELS:
@@ -2277,6 +2892,16 @@ class EditorPage(QWidget):
                     text_scale_y=self._text_scale_y.value() / 100,
                     text_rotation=self._text_rotation.value(),
                     outline_width=None if self._outline_width.value() < 0 else self._outline_width.value())
+        if keys:
+            old_style, new_style = lettering_style(before[self._loaded_row]), lettering_style(item)
+            patch = {key: new_style[key] for key in keys if old_style[key] != new_style[key]}
+            for row in rows:
+                if row != self._loaded_row:
+                    apply_lettering_style(self.items[row], patch)
+                    self._refresh_block_item(row)
+            self._remember_style_change(before)
+        self._pending_style_keys.clear()
+        self._pending_style_rows = []
         self._refresh_block_item(self._loaded_row)
         self._row_dirty = False
 
@@ -2296,6 +2921,7 @@ class EditorPage(QWidget):
             self._store_properties()
         self._loading = True
         self._loaded_row = row
+        self._pending_style_keys.clear()
         item = self.items[row]
         self._source_text.setFont(ui_font(japanese=item.get('source_language', 'ja') == 'ja'))
         self._source_text.setPlainText(str(item.get('source_text', '')))
@@ -2322,6 +2948,7 @@ class EditorPage(QWidget):
         self._mask_width.setValue(box[2] - box[0])
         self._mask_height.setValue(box[3] - box[1])
         self._update_region_guide()
+        self._update_advanced_style_badge()
         self._set_editable(True)
         if self._text_dialog is not None and self._text_dialog.isVisible():
             self._text_dialog.set_block(row + 1, item.get('source_text', ''),
@@ -2406,25 +3033,39 @@ class EditorPage(QWidget):
         self._fill_custom_btn.setEnabled(fills_enabled)
         self._fill_color_btn.setEnabled(ready)
         self._pick_fill_btn.setEnabled(ready)
+        self._fill_menu_btn.setEnabled(ready)
+        self._fill_white_action.setEnabled(fills_enabled)
+        self._fill_black_action.setEnabled(fills_enabled)
+        self._fill_custom_action.setEnabled(fills_enabled)
+        self._fill_color_action.setEnabled(ready)
+        self._pick_fill_action.setEnabled(ready)
         if not ready:
             self._pick_fill_btn.setChecked(False)
         fill_tip = tr('选区包含已还原气泡，请先恢复该气泡的处理结果再填色。') if protected else ''
-        self._fill_white_btn.setToolTip(fill_tip or tr('把框选区域整块填成白色（可撤回）。'))
-        self._fill_black_btn.setToolTip(fill_tip or tr('把框选区域整块填成黑色（可撤回）。'))
-        self._fill_custom_btn.setToolTip(fill_tip or tr('用当前颜色填充框选区域（可撤回）。'))
+        for target, default_tip in (
+            (self._fill_white_btn, tr('把框选区域整块填成白色（可撤回）。')),
+            (self._fill_white_action, tr('把框选区域整块填成白色（可撤回）。')),
+            (self._fill_black_btn, tr('把框选区域整块填成黑色（可撤回）。')),
+            (self._fill_black_action, tr('把框选区域整块填成黑色（可撤回）。')),
+            (self._fill_custom_btn, tr('用当前颜色填充框选区域（可撤回）。')),
+            (self._fill_custom_action, tr('用当前颜色填充框选区域（可撤回）。')),
+        ):
+            target.setToolTip(fill_tip or default_tip)
         selected = 0 <= self._loaded_row < len(self.items)
         self._retranslate_btn.setEnabled(ready and selected and not self.items[self._loaded_row].get('restore_original'))
         self._restore_bubble_btn.setEnabled(ready and selected)
         self._restore_bubble_btn.setText(tr('恢复处理结果') if selected and self.items[self._loaded_row].get('restore_original') else tr('还原此气泡'))
+        self._bubble_menu_btn.setEnabled(ready and selected)
         self._link_original_btn.setEnabled(ready)
+        self._link_original_action.setEnabled(ready)
         can_restore = (selected and not self.items[self._loaded_row].get('restore_original')
                        and (self._original_image is not None or find_original(self.output_path) is not None))
         self._repair_undo.setEnabled(ready and (bool(self._repair_history) or can_restore))
         self._save_btn.setEnabled(ready)
         if self._export_worker is None:
             can_export = self.output_path is not None and not busy and not self.page_io_busy
-            self._export_pdf_btn.setEnabled(can_export)
-            self._export_cbz_btn.setEnabled(can_export)
+            self._sync_export_pdf_state(enabled=can_export)
+            self._export_cbz_action.setEnabled(can_export)
         page_list_busy = (busy or self._export_worker is not None or self.page_io_busy)
         self._transcript_btn.setEnabled(not page_list_busy and not self._save_jobs.busy
                                         and self.page_list.count() > 0)
@@ -2455,8 +3096,13 @@ class EditorPage(QWidget):
         painter.setBrush(self._fill_color)
         painter.drawRoundedRect(1, 1, 16, 16, 3, 3)
         painter.end()
-        self._fill_color_btn.setIcon(QIcon(swatch))
-        self._fill_color_btn.setText(self._fill_color.name().upper())
+        icon = QIcon(swatch)
+        hex_color = self._fill_color.name().upper()
+        self._fill_color_btn.setIcon(icon)
+        self._fill_color_btn.setText(hex_color)
+        self._fill_menu_btn.setIcon(icon)
+        self._fill_custom_action.setIcon(icon)
+        self._fill_custom_action.setText(tr('用当前色填充 ({color})', color=hex_color))
 
     def _choose_fill_color(self):
         self._pick_fill_btn.setChecked(False)
@@ -2718,8 +3364,7 @@ class EditorPage(QWidget):
         output_path = Path(output_path).with_suffix(suffix)
         # Flush pending spin-box text even before it has marked the page dirty.
         # Plain images without editing metadata can be exported directly.
-        for spin in self._layout_spins():
-            spin.interpretText()
+        self._commit_spin_inputs()
         if self._dirty or self._save_jobs.busy:
             return self.request_save(after=lambda: self._export_comic(kind, output_path))
         worker = PdfExportWorker(images, sizes, output_path, self)
@@ -2730,10 +3375,13 @@ class EditorPage(QWidget):
         worker.cancelled.connect(self._pdf_export_cancelled)
         worker.finished.connect(self._pdf_export_finished)
         self._update_repair_controls()
-        button, other = (self._export_cbz_btn, self._export_pdf_btn) if kind == 'cbz' else (self._export_pdf_btn, self._export_cbz_btn)
-        other.setEnabled(False)
-        button.setText(tr('取消导出'))
-        button.setToolTip(tr('取消导出'))
+        self._sync_export_pdf_state(enabled=kind == 'pdf')
+        self._export_cbz_action.setEnabled(kind == 'cbz')
+        if kind == 'pdf':
+            self._sync_export_pdf_state(text=tr('取消导出'), tooltip=tr('取消导出'))
+        else:
+            self._export_cbz_action.setText(tr('取消导出'))
+            self._export_cbz_action.setToolTip(tr('取消导出'))
         self._status.setText(tr('正在后台导出 {_0}…', _0=format_name))
         worker.start()
         return True
@@ -2755,14 +3403,24 @@ class EditorPage(QWidget):
         if self._export_worker is not None:
             self._export_worker.requestInterruption()
 
+    def _commit_spin_inputs(self):
+        if self._quick_size_spin.hasFocus():
+            self._quick_size_spin.interpretText()
+        for spin in self._layout_spins():
+            spin.interpretText()
+
     def _pdf_export_finished(self):
         worker = self._export_worker
         self._export_worker = None
         if worker is not None:
             worker.deleteLater()
-        self._update_toolbar_labels()
-        self._export_pdf_btn.setToolTip(tr('将已保存的图片按页面顺序导出为 PDF；编辑时不会合成 PDF。'))
-        self._export_cbz_btn.setToolTip(tr('将已保存的图片按页面顺序打包为 CBZ。'))
+        self._sync_export_pdf_state(
+            enabled=self.output_path is not None,
+            text=tr('导出 PDF'),
+            tooltip=tr('将已保存的图片按页面顺序导出为 PDF；编辑时不会合成 PDF。'),
+        )
+        self._export_cbz_action.setText(tr('导出 CBZ'))
+        self._export_cbz_action.setToolTip(tr('将已保存的图片按页面顺序打包为 CBZ。'))
         self._update_repair_controls()
 
     def _save_request(self):
@@ -2771,8 +3429,7 @@ class EditorPage(QWidget):
             return None
         if self.output_path is None or self._cleaned_image is None:
             return None
-        for spin in self._layout_spins():
-            spin.interpretText()
+        self._commit_spin_inputs()
         if not self.apply_changes() or self._rendered is None:
             return None
         output, layout, cleaned = self.output_path, self.layout_path, self.cleaned_path
@@ -2829,8 +3486,7 @@ class EditorPage(QWidget):
         if self._save_jobs.busy:
             self._save_again = True
             return True
-        for spin in self._layout_spins():
-            spin.interpretText()
+        self._commit_spin_inputs()
         if not self._dirty:
             self._save_failure_callback = None
             action, self._after_save = self._after_save, None
@@ -2867,8 +3523,7 @@ class EditorPage(QWidget):
         """Synchronous entry for scripts; interactive actions use request_save."""
         if self._save_jobs.busy or self._export_worker is not None or self._repair_worker is not None:
             return False
-        for spin in self._layout_spins():
-            spin.interpretText()
+        self._commit_spin_inputs()
         if not self._dirty:
             return self.output_path is not None and self._cleaned_image is not None
         try:
@@ -2920,18 +3575,18 @@ class EditorPage(QWidget):
         super().showEvent(event)
         self._store_properties()
         self._refresh_font_choices()
+        if self.width() > 0:
+            self._adapt_width(animate=False)
         self._adapt_timer.start(0)
 
     def hideEvent(self, event):
         self.preview.set_space_pan(False)
         super().hideEvent(event)
 
-    def _adapt_width(self):
+    def _adapt_width(self, *, animate=True):
         if self.isVisible():
             self._update_toolbar_labels()
-            compact_h = self.height() < 700
-            self._source_text.setFixedHeight(56 if compact_h else 92)
-            self._apply_source_layout()
-            self._apply_panel_layout()
+            self._apply_source_layout(animate=False)
+            self._apply_panel_layout(animate=animate)
             self._sync_inspector_split()
             self._reveal_timer.start(0)

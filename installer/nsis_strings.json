@@ -1,0 +1,54 @@
+{
+  "en": {
+    "Require64Bit": "ComiTrans requires 64-bit Windows.",
+    "LegacyInstaller": "An MSI installation of ComiTrans was found. Uninstall it from Windows Settings before installing this version. Your user data will be kept.",
+    "NewerInstalled": "A newer version of ComiTrans is already installed.",
+    "KeepDirectory": "To change the installation folder, uninstall the current version first. Your user data will be kept.",
+    "InvalidDirectory": "Choose an empty folder on a local drive, or the folder of the current NSIS installation. Do not select a drive root or a Windows system folder.",
+    "CloseApplication": "Close ComiTrans before installing or uninstalling, then try again.",
+    "ServiceError": "The ComiTrans update service could not be configured. See the installation log for details.",
+    "InstallError": "Installation did not complete. Check the available disk space and folder permissions, then try again.",
+    "AlreadyRunning": "Another ComiTrans installer or uninstaller is running.",
+    "InvalidUninstall": "This uninstaller does not match the registered ComiTrans installation. Open Windows Settings to uninstall ComiTrans.",
+    "DirectoryHelp": "Choose where to install ComiTrans. Setup creates a ComiTrans subfolder automatically. If the selected folder is already named ComiTrans, it is used directly."
+  },
+  "zh-CN": {
+    "Require64Bit": "ComiTrans 需要 64 位 Windows。",
+    "LegacyInstaller": "检测到 MSI 版 ComiTrans。请先在 Windows 设置中卸载旧版，再安装此版本。用户数据会保留。",
+    "NewerInstalled": "已安装更新版本的 ComiTrans。",
+    "KeepDirectory": "如需更换安装目录，请先卸载当前版本。用户数据会保留。",
+    "InvalidDirectory": "请选择本地磁盘上的空文件夹，或当前 NSIS 版的安装目录。不能选择磁盘根目录或 Windows 系统目录。",
+    "CloseApplication": "请先关闭 ComiTrans，再重试安装或卸载。",
+    "ServiceError": "无法配置 ComiTrans 更新检查服务，请查看安装日志。",
+    "InstallError": "安装未完成，请检查磁盘空间和目录权限后重试。",
+    "AlreadyRunning": "另一个 ComiTrans 安装或卸载程序正在运行。",
+    "InvalidUninstall": "此卸载程序与已注册的 ComiTrans 安装不匹配，请从 Windows 设置中卸载。",
+    "DirectoryHelp": "请选择安装位置。安装程序会自动创建 ComiTrans 子文件夹；已选择 ComiTrans 文件夹时直接使用。"
+  },
+  "zh-TW": {
+    "Require64Bit": "ComiTrans 需要 64 位元 Windows。",
+    "LegacyInstaller": "偵測到 MSI 版 ComiTrans。請先在 Windows 設定中解除安裝舊版，再安裝此版本。使用者資料會保留。",
+    "NewerInstalled": "已安裝較新版本的 ComiTrans。",
+    "KeepDirectory": "若要更換安裝目錄，請先解除安裝目前版本。使用者資料會保留。",
+    "InvalidDirectory": "請選擇本機磁碟上的空資料夾，或目前 NSIS 版的安裝目錄。不能選擇磁碟根目錄或 Windows 系統目錄。",
+    "CloseApplication": "請先關閉 ComiTrans，再重試安裝或解除安裝。",
+    "ServiceError": "無法設定 ComiTrans 更新檢查服務，請查看安裝記錄。",
+    "InstallError": "安裝未完成，請檢查磁碟空間和目錄權限後重試。",
+    "AlreadyRunning": "另一個 ComiTrans 安裝或解除安裝程式正在執行。",
+    "InvalidUninstall": "此解除安裝程式與已註冊的 ComiTrans 安裝不符，請從 Windows 設定中解除安裝。",
+    "DirectoryHelp": "請選擇安裝位置。安裝程式會自動建立 ComiTrans 子資料夾；已選擇 ComiTrans 資料夾時直接使用。"
+  },
+  "ja": {
+    "Require64Bit": "ComiTrans には 64 ビット版 Windows が必要です。",
+    "LegacyInstaller": "MSI 版の ComiTrans が見つかりました。Windows の設定から旧版をアンインストールしてから、このバージョンをインストールしてください。ユーザーデータは保持されます。",
+    "NewerInstalled": "新しいバージョンの ComiTrans が既にインストールされています。",
+    "KeepDirectory": "インストール先を変更するには、現在のバージョンを先にアンインストールしてください。ユーザーデータは保持されます。",
+    "InvalidDirectory": "ローカルドライブの空のフォルダー、または現在の NSIS 版のインストール先を選択してください。ドライブのルートや Windows のシステムフォルダーは選択できません。",
+    "CloseApplication": "ComiTrans を終了してから、インストールまたはアンインストールをやり直してください。",
+    "ServiceError": "ComiTrans 更新確認サービスを設定できませんでした。インストールログを確認してください。",
+    "InstallError": "インストールが完了しませんでした。空き容量とフォルダーのアクセス権を確認して、やり直してください。",
+    "AlreadyRunning": "別の ComiTrans インストーラーまたはアンインストーラーが実行中です。",
+    "InvalidUninstall": "このアンインストーラーは登録済みの ComiTrans と一致しません。Windows の設定からアンインストールしてください。",
+    "DirectoryHelp": "インストール先を選択してください。ComiTrans サブフォルダーは自動作成されます。選択したフォルダー名が ComiTrans の場合は、そのフォルダーを使用します。"
+  }
+}

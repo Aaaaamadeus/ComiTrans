@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -30,13 +31,14 @@ class AdvancedConfigSection(QWidget):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(14)
 
         performance = QGroupBox(tr('性能与渲染'))
+        performance.setProperty('card', True)
         performance_grid = QGridLayout(performance)
-        performance_grid.setContentsMargins(0, 0, 0, 0)
-        performance_grid.setHorizontalSpacing(24)
-        performance_grid.setVerticalSpacing(10)
+        performance_grid.setContentsMargins(0, 4, 0, 0)
+        performance_grid.setHorizontalSpacing(20)
+        performance_grid.setVerticalSpacing(12)
         self._workers = self._spin('max_workers')
         self._workers.setToolTip(tr(
             '同时在途准备、翻译与修补的页数（1–16，默认 4）。数值越大吞吐越高，'
@@ -71,9 +73,10 @@ class AdvancedConfigSection(QWidget):
         layout.addWidget(performance)
 
         models = QGroupBox(tr('模型文件'))
+        models.setProperty('card', True)
         models_form = QFormLayout(models)
         self._style_form(models_form)
-        models_form.setVerticalSpacing(8)
+        models_form.setVerticalSpacing(10)
         self._path_fields: dict[str, QLineEdit] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
         for key, label in (
@@ -88,25 +91,31 @@ class AdvancedConfigSection(QWidget):
             field.setAccessibleName(tr(label))
             field.editingFinished.connect(self._refresh_model_status)
             button = QPushButton(tr('浏览...'))
+            button.setProperty('role', 'utility')
             button.setProperty('compact', True)
             button.clicked.connect(
                 lambda _checked=False, target=field, name=key: self._browse_model(target, name))
             row = QHBoxLayout()
+            row.setSpacing(8)
             row.addWidget(field, 1)
             row.addWidget(button)
             models_form.addRow(tr(label), row)
             self._path_fields[key] = field
             self._browse_buttons[key] = button
         self._model_status = QLabel()
+        self._model_status.setObjectName('statusCallout')
         self._model_status.setWordWrap(True)
-        self._model_status.setProperty('muted', True)
         self._model_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
         models_form.addRow(tr('模型检查'), self._model_status)
         layout.addWidget(models)
 
-        defaults_row = QHBoxLayout()
-        defaults_row.setSpacing(12)
+        defaults_card = QFrame()
+        defaults_card.setObjectName('settingsCard')
+        defaults_row = QHBoxLayout(defaults_card)
+        defaults_row.setContentsMargins(20, 14, 20, 14)
+        defaults_row.setSpacing(14)
         self._reset_btn = QPushButton(tr('恢复推荐默认值'))
+        self._reset_btn.setProperty('role', 'utility')
         self._reset_btn.setProperty('compact', True)
         self._reset_btn.setToolTip(tr('只恢复本页字段，点击「保存配置」后才会写入。'))
         self._reset_btn.clicked.connect(self.reset_to_defaults)
@@ -118,7 +127,7 @@ class AdvancedConfigSection(QWidget):
         location.setTextInteractionFlags(Qt.TextSelectableByMouse)
         location.setToolTip(str(app_config.CONFIG_PATH))
         defaults_row.addWidget(location, 1)
-        layout.addLayout(defaults_row)
+        layout.addWidget(defaults_card)
         layout.addStretch(1)
         self.load_config(config)
 
@@ -127,8 +136,8 @@ class AdvancedConfigSection(QWidget):
         form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
-        form.setHorizontalSpacing(24)
-        form.setVerticalSpacing(14)
+        form.setHorizontalSpacing(22)
+        form.setVerticalSpacing(12)
 
     @staticmethod
     def _spin(key: str) -> QSpinBox:
@@ -197,7 +206,7 @@ class AdvancedConfigSection(QWidget):
     def _model_path(key, value):
         if key == 'detector_model':
             return app_config._detector_path(value)
-        return app_config._resolve_path(value, app_config.MODEL_DEFAULTS[key], app_config.MODELS_ROOT)
+        return app_config._resolve_model_path(value, app_config.MODEL_DEFAULTS[key])
 
     def _refresh_model_status(self) -> None:
         existing = 0

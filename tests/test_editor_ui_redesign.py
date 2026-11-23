@@ -3,13 +3,16 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from PIL import Image
-from PySide6.QtCore import QRect, QSettings, Qt
-from PySide6.QtGui import QTextCursor
+from PySide6.QtCore import QPoint, QPointF, QRect, QSettings, Qt
+from PySide6.QtGui import QContextMenuEvent, QTextCursor
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QCheckBox, QPushButton, QScrollArea
+from PySide6.QtWidgets import QApplication, QCheckBox, QMenu, QPushButton, QScrollArea
 
+from comic_translate_desktop import config
+from comic_translate_desktop.i18n import install_qt_language, set_ui_language
 from comic_translate_desktop.ui.editor_page import EditorPage
 from comic_translate_desktop.ui.main_window import MainWindow
 from comic_translate_desktop.ui.text_editor_dialog import TextEditorDialog
@@ -70,8 +73,13 @@ class EditorUiRedesignTests(unittest.TestCase):
         self.addCleanup(lambda: QSettings.setDefaultFormat(self._prev_fmt))
 
     def _make_window(self, width=1280, height=800) -> MainWindow:
-        window = MainWindow()
-        self.addCleanup(lambda: (window.close(), self.app.processEvents()))
+        with patch.object(MainWindow, '_start_warmup'):
+            window = MainWindow()
+        def _cleanup():
+            window.editor_page._dirty = False
+            window.close()
+            self.app.processEvents()
+        self.addCleanup(_cleanup)
         window.resize(width, height)
         window.show()
         self.app.processEvents()
@@ -143,15 +151,12 @@ class EditorUiRedesignTests(unittest.TestCase):
             editor._repair_mode,
             editor._add_bubble_btn,
             editor._repair_btn,
+            editor._fill_menu_btn,
             editor._repair_undo,
-            editor._fill_white_btn,
-            editor._fill_black_btn,
-            editor._fill_color_btn,
-            editor._pick_fill_btn,
-            editor._fill_custom_btn,
         ):
             mapped = QRect(btn.mapTo(toolbar, btn.rect().topLeft()), btn.size())
             self.assertTrue(bar_rect.contains(mapped), f'{btn.text()} clipped inside canvasToolBar: {mapped} vs {bar_rect}')
+        self.assertLessEqual(toolbar.height(), 46, f'canvasToolBar wrapped to multiple rows at 1024x720: {toolbar.height()}px')
 
     def test_compact_820x480_editor_layout_keeps_text_and_outline_unclipped(self):
         window = self._make_window(820, 480)
@@ -171,6 +176,8 @@ class EditorUiRedesignTests(unittest.TestCase):
         self.assertFalse(src_rect.intersects(inp_rect))
 
         editor._inspector_tabs.setCurrentIndex(1)
+        editor._advanced_style_toggle.setChecked(True)
+        self.app.processEvents()
         QTest.qWait(40)
         self.assertIs(editor._properties_scroll.parentWidget().parentWidget().parentWidget(),
                       editor._inspector_tabs.findChildren(QScrollArea)[0].parentWidget().parentWidget().parentWidget())
@@ -224,6 +231,192 @@ class EditorUiRedesignTests(unittest.TestCase):
                 self.assertTrue(vp_rect.contains(vp_box), f'{box.text()} clipped inside viewport: {vp_box} vs {vp_rect}')
                 card_box = QRect(box.mapTo(card, box.rect().topLeft()), box.size())
                 self.assertTrue(card_rect.contains(card_box), f'{box.text()} overflowed controlCard: {card_box} vs {card_rect}')
+
+    def test_820x640_text_editor_height_and_direct_quick_size_sync(self):
+        window = self._make_window(820, 640)
+        window._nav_editor.click()
+        editor = window.editor_page
+        self._load_editor_sample(editor)
+        QTest.qWait(60)
+
+        self.assertFalse(editor._favorite_fonts.isVisible())
+        self.assertFalse(editor._source_text.isVisible())
+        self.assertTrue(editor._text_input.isVisible())
+        self.assertGreaterEqual(editor._text_input.height(), 110)
+        self.assertTrue(editor._quick_size_spin.isVisible())
+        self.assertEqual(editor._quick_size_spin.value(), 26)
+
+        editor._quick_size_spin.setValue(33)
+        self.assertEqual(editor._size_spin.value(), 33)
+        QTest.qWait(90)
+        self.assertEqual(editor.items[0]['font_size'], 33)
+        self.assertEqual(editor.items[0]['rendered_font_size'], 33)
+
+        editor._size_spin.setValue(27)
+        self.assertEqual(editor._quick_size_spin.value(), 27)
+
+        editor._source_toggle.click()
+        QTest.qWait(240)
+        self.assertTrue(editor._source_text.isVisible())
+        self.assertLessEqual(editor._source_text.height(), 60)
+        self.assertGreaterEqual(editor._text_input.height(), 110)
+
+    def test_secondary_menus_single_level_containment_and_state_preservation(self):
+        window = self._make_window(1440, 900)
+        window._nav_editor.click()
+        editor = window.editor_page
+        self._load_editor_sample(editor)
+        QTest.qWait(50)
+
+        for menu in (
+            editor._view_menu,
+            editor._file_menu,
+            editor._fill_menu,
+            editor._font_menu,
+            editor._favorite_fonts.manage_menu,
+            window._font_picker.manage_menu,
+        ):
+            self.assertFalse(any(action.menu() is not None for action in menu.actions()))
+
+        self.assertFalse(editor._advanced_style_toggle.isChecked())
+        self.assertFalse(editor._advanced_style_panel.isVisible())
+        self.assertNotIn('已自定义', editor._advanced_style_toggle.text())
+        editor._outline_width.setValue(3.0)
+        self.assertIn('已自定义', editor._advanced_style_toggle.text())
+
+        editor._text_input.setPlainText('保留这段未保存译文')
+        editor.preview.set_zoom(1.5)
+        editor._repair_mode.setChecked(True)
+        editor._repair_box = (40, 40, 120, 120)
+        editor._update_repair_controls()
+        QTest.qWait(70)
+
+        editor._pages_action.trigger()
+        self.assertFalse(editor._pages_panel.isVisible())
+        editor._pages_action.trigger()
+        self.assertTrue(editor._pages_panel.isVisible())
+
+        self.assertFalse(editor._focus_btn.isVisible())
+        editor._focus_action.trigger()
+        self.assertTrue(editor._focus_btn.isChecked())
+        self.assertTrue(editor._focus_btn.isVisible())
+        self.assertFalse(editor._pages_panel.isVisible())
+        self.assertFalse(editor._properties_panel.isVisible())
+        self.assertEqual(editor._text_input.toPlainText(), '保留这段未保存译文')
+        self.assertEqual(editor.block_list.currentRow(), 0)
+        self.assertEqual(editor._repair_box, (40, 40, 120, 120))
+        self.assertAlmostEqual(editor.preview._zoom, 1.5)
+        self.assertTrue(editor._dirty)
+
+        editor._focus_btn.click()
+        self.assertFalse(editor._focus_btn.isChecked())
+        self.assertFalse(editor._focus_btn.isVisible())
+        self.assertTrue(editor._properties_panel.isVisible())
+
+        self.assertFalse(editor._pick_cancel_btn.isVisible())
+        editor._pick_fill_action.trigger()
+        self.assertTrue(editor._pick_fill_btn.isChecked())
+        self.assertTrue(editor._pick_cancel_btn.isVisible())
+        editor._pick_cancel_btn.click()
+        self.assertFalse(editor._pick_fill_btn.isChecked())
+        self.assertFalse(editor._pick_cancel_btn.isVisible())
+
+        editor._repair_mode.setChecked(False)
+        bubble_menu = QMenu(editor)
+        editor._populate_bubble_menu(bubble_menu)
+        self.assertFalse(any(action.menu() is not None for action in bubble_menu.actions()))
+        by_text = {action.text().split('\t')[0]: action for action in bubble_menu.actions() if not action.isSeparator()}
+        self.assertTrue(by_text['全屏编辑译文'].isEnabled())
+        self.assertTrue(by_text['白字黑边竖排'].isEnabled())
+
+        editor.items[0]['restore_original'] = True
+        editor._set_editable(True)
+        editor._populate_bubble_menu(bubble_menu)
+        by_text = {action.text().split('\t')[0]: action for action in bubble_menu.actions() if not action.isSeparator()}
+        self.assertTrue(by_text['恢复处理结果'].isEnabled())
+        self.assertFalse(by_text['全屏编辑译文'].isEnabled())
+        self.assertFalse(by_text['字体库…'].isEnabled())
+        self.assertFalse(by_text['白字黑边竖排'].isEnabled())
+        self.assertFalse(by_text['重置文字变形'].isEnabled())
+
+        editor.items[0]['restore_original'] = False
+        editor._set_editable(True)
+        canvas = editor.preview._label
+        page_rect = canvas.page_rect()
+        x1, y1, x2, y2 = editor.items[1]['box']
+        cx = page_rect.left() + ((x1 + x2) / 2) * page_rect.width() / canvas.image_size.width()
+        cy = page_rect.top() + ((y1 + y2) / 2) * page_rect.height() / canvas.image_size.height()
+        seen = []
+        with patch.object(editor, '_show_bubble_context_menu', side_effect=lambda pos: seen.append(pos)):
+            QApplication.sendEvent(
+                canvas,
+                QContextMenuEvent(QContextMenuEvent.Mouse, QPoint(round(cx), round(cy)), QPoint(100, 100)),
+            )
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(editor.block_list.currentRow(), 1)
+
+        editor._pick_fill_btn.setChecked(True)
+        with patch.object(editor, '_show_bubble_context_menu', side_effect=lambda pos: seen.append(pos)):
+            QTest.mouseClick(canvas, Qt.RightButton, pos=QPoint(round(cx), round(cy)))
+            QApplication.sendEvent(
+                canvas,
+                QContextMenuEvent(QContextMenuEvent.Mouse, QPoint(round(cx), round(cy)), QPoint(100, 100)),
+            )
+        self.assertEqual(len(seen), 1)
+        self.assertFalse(editor._pick_fill_btn.isChecked())
+
+    def test_en_and_ja_toolbar_and_canvas_toolbar_unclipped_at_820_and_1024(self):
+        self.addCleanup(lambda: (set_ui_language('zh-CN'), install_qt_language(self.app)))
+        for lang in ('en', 'ja'):
+            with patch.object(config, 'PROJECT_ROOT', Path(self._tmp.name)), \
+                 patch.object(config, 'CONFIG_PATH', Path(self._tmp.name) / 'config.yaml'):
+                config.save_ai_config({'ui_language': lang, 'ui_language_selected': True})
+                set_ui_language(lang)
+                install_qt_language(self.app)
+                for width, height in ((1024, 720), (820, 640)):
+                    with self.subTest(language=lang, width=width, height=height):
+                        window = self._make_window(width, height)
+                        window._nav_editor.click()
+                        editor = window.editor_page
+                        self._load_editor_sample(editor)
+                        QTest.qWait(50)
+
+                        toolbar = editor.findChild(type(editor._pages_panel), 'editorToolbar')
+                        self.assertIsNotNone(toolbar)
+                        toolbar_buttons = [
+                            editor._view_menu_btn, editor._zoom_out_btn, editor._zoom,
+                            editor._zoom_in_btn, editor._file_menu_btn, editor._save_btn,
+                        ]
+                        for prev, nxt in zip(toolbar_buttons, toolbar_buttons[1:]):
+                            gap = nxt.mapTo(toolbar, nxt.rect().topLeft()).x() - prev.mapTo(toolbar, prev.rect().topRight()).x()
+                            self.assertGreaterEqual(gap, 0, (lang, width, prev.objectName(), nxt.objectName()))
+                        for widget in toolbar_buttons:
+                            mapped = QRect(widget.mapTo(toolbar, widget.rect().topLeft()), widget.size())
+                            self.assertTrue(toolbar.rect().contains(mapped), (lang, width, mapped, toolbar.rect()))
+
+                        canvas_bar = editor.preview.parentWidget().findChild(type(editor._pages_panel), 'canvasToolBar')
+                        self.assertIsNotNone(canvas_bar)
+                        for btn in (
+                            editor._repair_mode, editor._add_bubble_btn, editor._repair_btn,
+                            editor._fill_menu_btn, editor._repair_undo,
+                        ):
+                            mapped = QRect(btn.mapTo(canvas_bar, btn.rect().topLeft()), btn.size())
+                            self.assertTrue(canvas_bar.rect().contains(mapped), (lang, width, btn.text(), mapped, canvas_bar.rect()))
+                            extra = 26 if btn.property('menuButton') else 16
+                            self.assertGreaterEqual(btn.width(), btn.fontMetrics().horizontalAdvance(btn.text()) + extra)
+                        if width == 1024:
+                            self.assertLessEqual(canvas_bar.height(), 46, (lang, canvas_bar.height()))
+
+                        for btn in (editor._line_break_btn, editor._expand_btn):
+                            self.assertTrue(btn.isVisible(), (lang, width, btn.text()))
+                            self.assertGreaterEqual(btn.width(), btn.fontMetrics().horizontalAdvance(btn.text()) + 14, (lang, width, btn.text(), btn.width()))
+                            parent = btn.parentWidget()
+                            mapped = QRect(btn.mapTo(parent, btn.rect().topLeft()), btn.size())
+                            self.assertTrue(parent.rect().contains(mapped), (lang, width, btn.text(), mapped, parent.rect()))
+                        self.assertLess(
+                            editor._line_break_btn.mapTo(editor._properties_panel, editor._line_break_btn.rect().topRight()).x(),
+                            editor._expand_btn.mapTo(editor._properties_panel, editor._expand_btn.rect().topLeft()).x(),
+                        )
 
 
 if __name__ == '__main__':

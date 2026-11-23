@@ -9,6 +9,7 @@ import yaml
 from comic_translate_core.detector_paths import LEGACY_PATH, SPLIT_PATH, REGION_FILE, LINE_FILE
 from comic_translate_core.chinese import normalize_target_language
 from comic_translate_core.layout_options import normalize_text_color, normalize_vertical_alignment
+from comic_translate_core.windows_install import data_directory
 from .i18n import normalize_ui_language
 from comic_translate_core.languages import (
     OCR_DEFAULTS, OCR_CONFIG_KEYS, effective_ocr_backend, source_language, validate_ocr_config,
@@ -16,15 +17,17 @@ from comic_translate_core.languages import (
 
 
 if getattr(sys, "frozen", False):
-    PROJECT_ROOT = Path(sys.executable).resolve().parent
-    AI_ROOT = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)) / "comic-translate-ai"
+    INSTALL_ROOT = Path(sys.executable).resolve().parent
+    PROJECT_ROOT = data_directory(INSTALL_ROOT)
+    AI_ROOT = Path(getattr(sys, "_MEIPASS", INSTALL_ROOT)) / "comic-translate-ai"
 else:
     PROJECT_ROOT = Path(__file__).resolve().parents[1]
     AI_ROOT = PROJECT_ROOT / "comic-translate-ai"
 MAIN_DIR = AI_ROOT / "main"
 MODELS_ROOT = PROJECT_ROOT / "comic-translate-ai" / "models"
+BUNDLED_MODELS_ROOT = AI_ROOT / "models" if getattr(sys, "frozen", False) else None
 PAGE_BASE = PROJECT_ROOT if getattr(sys, "frozen", False) else AI_ROOT
-ICON_PATH = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)) / "assets" / "ComiTrans.ico" if getattr(sys, "frozen", False) else PROJECT_ROOT / "assets" / "ComiTrans.ico"
+ICON_PATH = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)) / "assets" / "ComiTrans.ico"
 if getattr(sys, "frozen", False):
     CONFIG_PATH = PROJECT_ROOT / "config.yaml"
     DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "page" / "output_page_output"
@@ -112,7 +115,7 @@ def _clamped_int(value: Any, key: str) -> int:
     return max(low, min(high, number))
 
 
-def _resolve_path(value: Any, default: str, base: Path | None = None) -> Path:
+def _resolve_path(value: Any, default: str | Path, base: Path | None = None) -> Path:
     base = base or AI_ROOT
     raw = str(value).strip() if value else ""
     if not raw or raw in ("none", "None"):
@@ -123,6 +126,75 @@ def _resolve_path(value: Any, default: str, base: Path | None = None) -> Path:
             path = Path(*path.parts[1:])
         path = base / path
     return path
+
+
+def _resolve_model_path(value: Any, default: str | Path) -> Path:
+    """Resolve bundled models after an install moves, preserving custom paths."""
+    path = _resolve_path(value, default, base=MODELS_ROOT)
+    if BUNDLED_MODELS_ROOT is None:
+        return path
+    setting = Path(_clean_text(value))
+    if not setting.is_absolute() and (setting.parts[:1] == ('models',) or setting == LEGACY_PATH):
+        relative = setting if setting == LEGACY_PATH else Path(*setting.parts[1:])
+        if relative != Path('.') and '..' not in relative.parts:
+            bundled = BUNDLED_MODELS_ROOT / relative
+            if bundled.exists():
+                return bundled
+    if path.is_relative_to(MODELS_ROOT):
+        relative = path.relative_to(MODELS_ROOT)
+    else:
+        # Settings pages used to save absolute paths inside the old PyInstaller
+        # bundle. Recognize that layout without redirecting unrelated custom models.
+        parts = path.parts
+        marker = ('_internal', 'comic-translate-ai', 'models')
+        for index in range(len(parts) - 2):
+            if tuple(part.casefold() for part in parts[index:index + 3]) == marker:
+                relative = Path(*parts[index + 3:])
+                break
+        else:
+            return path
+    if relative == Path('.') or '..' in relative.parts:
+        return path
+    bundled = BUNDLED_MODELS_ROOT / relative
+    try:
+        if (not _clean_text(value) or not path.exists()) and bundled.exists():
+            return bundled
+    except OSError:
+        pass
+    return path
+
+
+def _model_path_setting(value: Any, default: str | Path) -> Any:
+    """Persist installed resources relative to the current application's AI root."""
+    text = _clean_text(value)
+    if not text or text.casefold() == 'auto':
+        return value
+    path = Path(text).expanduser()
+    if not path.is_absolute():
+        return path.as_posix()
+
+    def reference(relative):
+        # The historical "models/<legacy>" spelling means automatic selection.
+        # Keep an explicit legacy detector selection explicit after serialization.
+        if Path(default) == SPLIT_PATH and relative == LEGACY_PATH:
+            return relative.as_posix()
+        return (Path('models') / relative).as_posix()
+
+    for root in (BUNDLED_MODELS_ROOT, AI_ROOT / 'models'):
+        if root is not None and path.is_relative_to(root):
+            relative = path.relative_to(root)
+            if relative != Path('.') and '..' not in relative.parts:
+                return reference(relative)
+    resolved = _resolve_model_path(value, default)
+    if BUNDLED_MODELS_ROOT is not None and resolved.is_relative_to(BUNDLED_MODELS_ROOT):
+        relative = resolved.relative_to(BUNDLED_MODELS_ROOT)
+        if relative != Path('.') and '..' not in relative.parts:
+            return reference(relative)
+    # Missing legacy defaults in the writable profile are still relative settings;
+    # user-selected external models keep their own paths.
+    if path == MODELS_ROOT / default and not path.exists():
+        return (Path('models') / default).as_posix()
+    return value
 
 
 def load_ai_config() -> dict[str, Any]:
@@ -155,7 +227,7 @@ def load_ai_config() -> dict[str, Any]:
     use_gpu = bool(raw.get("use_gpu", True))
     detector_setting = detector_model_setting(raw.get("detector_model"))
     detector_path = _detector_path(detector_setting)
-    legacy = MODELS_ROOT / LEGACY_PATH
+    legacy = _resolve_model_path(None, LEGACY_PATH)
     cuda_detector = (legacy if use_gpu and detector_setting == "auto"
                      and detector_path != legacy and _model_file_exists(legacy) else None)
 
@@ -173,6 +245,9 @@ def load_ai_config() -> dict[str, Any]:
         "text_color": normalize_text_color(raw.get("text_color")),
         "translation_prompt": str(raw.get("translation_prompt") or ""),
         "chinese_names": str(raw.get("chinese_names") or ""),
+        "terminology_project": str(raw.get("terminology_project") or ""),
+        "terminology_projects": raw.get("terminology_projects") if isinstance(raw.get("terminology_projects"), dict) else {},
+        "usage_pricing": raw.get("usage_pricing") if isinstance(raw.get("usage_pricing"), dict) else {},
         "font_size": _clamped_int(raw.get("font_size"), "font_size"),
         "multimodal": bool(raw.get("multimodal", False)),
         # 实验开关：多模态下是否让 AI 参与字体族判别（默认关闭，见 docs/FONT_STYLE_STRATEGY.md §4.14）
@@ -195,13 +270,13 @@ def load_ai_config() -> dict[str, Any]:
         "detector_model": str(detector_path),
         "detector_model_setting": detector_setting,
         "cuda_detector_model": str(cuda_detector) if cuda_detector else None,
-        "lama_model": str(_resolve_path(raw.get("lama_model"), MODEL_DEFAULTS["lama_model"], base=MODELS_ROOT)),
+        "lama_model": str(_resolve_model_path(raw.get("lama_model"), MODEL_DEFAULTS["lama_model"])),
         "ocr_backend": ocr_backend,
-        "charspot_ocr_model": str(_resolve_path(raw.get("charspot_ocr_model"), MODEL_DEFAULTS["charspot_ocr_model"], base=MODELS_ROOT)),
-        "ocr_model": str(_resolve_path(raw.get("ocr_model"), MODEL_DEFAULTS["ocr_model"], base=MODELS_ROOT)),
-        "baberu_ocr_model": str(_resolve_path(raw.get("baberu_ocr_model"), MODEL_DEFAULTS["baberu_ocr_model"], base=MODELS_ROOT)),
-        "korean_ocr_model": str(_resolve_path(raw.get("korean_ocr_model"), "ppocr/korean_PP-OCRv5_rec_mobile.onnx", base=MODELS_ROOT)),
-        "english_ocr_model": str(_resolve_path(raw.get("english_ocr_model"), "ppocr/en_PP-OCRv5_rec_mobile.onnx", base=MODELS_ROOT)),
+        "charspot_ocr_model": str(_resolve_model_path(raw.get("charspot_ocr_model"), MODEL_DEFAULTS["charspot_ocr_model"])),
+        "ocr_model": str(_resolve_model_path(raw.get("ocr_model"), MODEL_DEFAULTS["ocr_model"])),
+        "baberu_ocr_model": str(_resolve_model_path(raw.get("baberu_ocr_model"), MODEL_DEFAULTS["baberu_ocr_model"])),
+        "korean_ocr_model": str(_resolve_model_path(raw.get("korean_ocr_model"), "ppocr/korean_PP-OCRv5_rec_mobile.onnx")),
+        "english_ocr_model": str(_resolve_model_path(raw.get("english_ocr_model"), "ppocr/en_PP-OCRv5_rec_mobile.onnx")),
         "page_input_dir": str(_resolve_path(raw.get("page_input_dir"), "page/test", base=PAGE_BASE)),
         "page_output_dir": str(_resolve_path(raw.get("page_output_dir"), "page/output_page_output", base=PAGE_BASE)),
         "page_test_output_dir": str(_resolve_path(raw.get("page_test_output_dir"), "page/test_output", base=PAGE_BASE)),
@@ -214,6 +289,12 @@ def save_ai_config(updates: dict[str, Any]) -> dict[str, Any]:
     for key, value in updates.items():
         if value is not None:
             raw[key] = value
+    defaults = {'detector_model': SPLIT_PATH, **MODEL_DEFAULTS,
+                'korean_ocr_model': 'ppocr/korean_PP-OCRv5_rec_mobile.onnx',
+                'english_ocr_model': 'ppocr/en_PP-OCRv5_rec_mobile.onnx'}
+    for key, default in defaults.items():
+        if key in raw:
+            raw[key] = _model_path_setting(raw[key], default)
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         yaml.safe_dump(raw, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
@@ -286,20 +367,21 @@ def _model_file_exists(path):
 def _detector_path(value):
     setting = detector_model_setting(value)
     if setting != "auto":
-        return _resolve_path(setting, str(SPLIT_PATH), base=MODELS_ROOT)
-    new = MODELS_ROOT / SPLIT_PATH
-    old = MODELS_ROOT / LEGACY_PATH
-    if not (_model_file_exists(new) and _model_file_exists(new.with_name(LINE_FILE))):
-        if _model_file_exists(old):
-            return old
-    return new
+        return _resolve_model_path(setting, SPLIT_PATH)
+    for root in (BUNDLED_MODELS_ROOT, MODELS_ROOT):
+        if root is not None:
+            new = root / SPLIT_PATH
+            if _model_file_exists(new) and _model_file_exists(new.with_name(LINE_FILE)):
+                return new
+    old = _resolve_model_path(None, LEGACY_PATH)
+    return old if _model_file_exists(old) else _resolve_model_path(None, SPLIT_PATH)
 
 
 def model_defaults() -> dict[str, str]:
     """Absolute built-in model locations, used for path reset and comparisons."""
     return {
         "detector_model": str(_detector_path(None)),
-        **{key: str(_resolve_path(None, path, base=MODELS_ROOT))
+        **{key: str(_resolve_model_path(None, path))
            for key, path in MODEL_DEFAULTS.items()},
     }
 
@@ -329,7 +411,7 @@ def _check_model_paths(config: dict[str, Any], missing: list[str]) -> list[str]:
         if not Path(config.get(key) or "").is_file():
             missing.append(f"{key}: {config.get(key, '')}（请运行 scripts/download_ocr_models.py）")
         return missing
-    charspot_path = Path(config.get("charspot_ocr_model") or MODELS_ROOT / "charspot-small")
+    charspot_path = Path(config.get("charspot_ocr_model") or _resolve_model_path(None, "charspot-small"))
     charspot_ok = all((charspot_path / name).is_file() for name in ("model.onnx", "config.json", "vocab.json"))
     if backend == "charspot":
         if not charspot_ok:

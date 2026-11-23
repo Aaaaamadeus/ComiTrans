@@ -9,7 +9,7 @@ from PIL import Image
 from PIL.ImageQt import ImageQt
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QMenu, QPushButton, QSizePolicy, QToolButton, QVBoxLayout, QWidget
 
 from .. import config
 from comic_translate_core.chinese import convert_chinese
@@ -41,18 +41,30 @@ class TranslationFontPicker(QWidget):
         self.combo.setToolTip(tr('指定字体用于全部译文；自动匹配保留漫画风格。缺字自动回退到内置中文字体。'))
         self.combo.setAccessibleName(tr('翻译默认字体'))
         row.addWidget(self.combo, 1)
-        self.import_button = QPushButton(tr('导入字体'))
+        self.manage_button = QToolButton(self)
+        self.manage_button.setText(tr('字体管理'))
+        self.manage_button.setProperty('role', 'chip')
+        self.manage_button.setProperty('compact', True)
+        self.manage_button.setProperty('menuButton', True)
+        self.manage_button.setPopupMode(QToolButton.InstantPopup)
+        self.manage_button.setToolTip(tr('字体库与本地字体导入'))
+        self.manage_menu = QMenu(self.manage_button)
+        self._library_action = self.manage_menu.addAction(tr('字体库…'), self._open_library)
+        self._import_action = self.manage_menu.addAction(tr('导入本地字体…'), self._choose_fonts)
+        self.manage_button.setMenu(self.manage_menu)
+        row.addWidget(self.manage_button)
+        self.import_button = QPushButton(tr('导入字体'), self)
         set_themed_icon(self.import_button, 'plus')
         self.import_button.setProperty('role', 'quiet')
         self.import_button.setProperty('compact', True)
         self.import_button.setToolTip(tr('导入 TTF、OTF、TTC 或 OTC；字体集合使用第一个款式'))
-        row.addWidget(self.import_button)
-        self.library_button = QPushButton(tr('字体库'))
+        self.import_button.hide()
+        self.library_button = QPushButton(tr('字体库'), self)
         self.library_button.setProperty('role', 'quiet')
         self.library_button.setProperty('compact', True)
         self.library_button.setToolTip(tr('检索完整开源字体目录，按需下载后离线使用'))
         self.library_button.clicked.connect(self._open_library)
-        row.addWidget(self.library_button)
+        self.library_button.hide()
         self.preview = QLabel()
         self.preview.setFixedHeight(34)
         self.preview.setMaximumWidth(300)

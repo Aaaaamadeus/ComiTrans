@@ -42,6 +42,7 @@ pip-delete-this-directory.txt
 dist/
 build/
 release/
+/.wix/
 
 # Only the current audited ONNX model set is tracked (weights use Git LFS).
 comic-translate-ai/models/*

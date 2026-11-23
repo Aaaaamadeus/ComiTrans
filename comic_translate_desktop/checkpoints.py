@@ -10,6 +10,7 @@ from threading import RLock
 
 from PIL import Image
 from comic_translate_core.translation_context import CONTEXT_VERSION
+from .productivity import desktop_translation_config
 
 
 def _digest(value):
@@ -18,11 +19,14 @@ def _digest(value):
 
 
 def _identity(source, config):
+    config = desktop_translation_config(config)
     with source.open('rb') as stream:
         source_hash = hashlib.file_digest(stream, 'sha256').hexdigest()
     ignored = {'raw', 'api_key', 'max_workers', 'resume_enabled', 'use_gpu',
                'retain_translation_context',
                'ui_language', 'ui_language_selected', 'issue_url',
+               'usage_pricing',
+               'terminology_project', 'terminology_projects',
                'page_input_dir', 'page_output_dir', 'page_test_output_dir'}
     settings = {key: value for key, value in config.items()
                 if key not in ignored and not key.endswith(('_key', '_token', '_password'))}

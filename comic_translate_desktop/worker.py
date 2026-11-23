@@ -25,6 +25,8 @@ from .pdf_utils import PdfPageRenderer, plan_pdf_pages, RenderedPdfPage
 from .cbz import CbzReader, PROJECT_EXTS
 from .pdf_project import create_pdf_project, publish_pdf_project, publish_project, write_project_metadata
 from .checkpoints import DocumentCheckpoint
+from .productivity import UsageMeter, desktop_translation_config
+from .desktop_translation import DesktopTranslationMixin
 from comic_translate_core.languages import OCR_CONFIG_KEYS
 from comic_translate_core.chinese import normalize_target_language
 from comic_translate_core.layout_options import normalize_text_color, normalize_vertical_alignment
@@ -113,6 +115,11 @@ class BatchWorker(QThread):
         self._pdf_renderer = None
         self._cbz_reader = None
         self._reader_document = None
+        self._usage_meter = UsageMeter(lambda usage: self._emit_workflow('usage', usage=usage))
+        self.usage_report = {}
+        self._trial_limit = max(0, min(3, int(self._config.get('trial_page_limit') or 0)))
+        if self._trial_limit:
+            self._config.update(resume_enabled=False, retain_translation_context=False)
 
     def stop(self) -> None:
         self._stop = True
@@ -170,6 +177,7 @@ class BatchWorker(QThread):
             raise
 
     def _configure_pipeline(self, pipeline) -> None:
+        pipeline.usage_meter = self._usage_meter
         pipeline.cancel_callback = self._is_stopped
         pipeline.progress_callback = self._emit_stage
         pipeline.watermark_enabled = bool(self._config.get("watermark_enabled", True))
@@ -212,7 +220,9 @@ class BatchWorker(QThread):
 
         self.log.emit("[预热] 开始实例化 AI 管线")
         with self._capture_pipeline_output():
-            pipeline = ComicTranslatorPipeline(
+            class DesktopPipeline(DesktopTranslationMixin, ComicTranslatorPipeline):
+                pass
+            pipeline = DesktopPipeline(
                 det_model_path=self._config["detector_model"],
                 cuda_detector_model_path=self._config.get("cuda_detector_model"),
                 font_map=self._config["font_map"],
@@ -241,6 +251,7 @@ class BatchWorker(QThread):
                 cancel_callback=self._is_stopped,
             )
         self.log.emit("[预热] 实例化完成")
+        self._apply_api_config(pipeline, self._config)
         return pipeline
 
     def _make_document_jobs(self) -> list[_DocumentJob]:
@@ -312,6 +323,23 @@ class BatchWorker(QThread):
             except Exception as exc:
                 document.error = str(exc)
                 document.error_stack = traceback.format_exc().strip()
+        self._total_pages = sum(len(document.pages) for document in documents)
+        self._total_pages_known = all(not document.error for document in documents)
+        if self._trial_limit:
+            remaining, sampled = self._trial_limit, []
+            for document in documents:
+                if remaining <= 0:
+                    break
+                if document.error:
+                    sampled.append(document)
+                    continue
+                document.pages = document.pages[:remaining]
+                remaining -= len(document.pages)
+                if document.project_dir is not None:
+                    write_project_metadata(document.project_dir, document.source_path.name,
+                                           [page.page_size_points for page in document.pages])
+                sampled.append(document)
+            documents = sampled
         return documents
 
     def _check_cancelled(self):
@@ -368,7 +396,7 @@ class BatchWorker(QThread):
 
     @staticmethod
     def _apply_api_config(pipeline, config) -> None:
-        apply_runtime_settings(pipeline, config)
+        apply_runtime_settings(pipeline, desktop_translation_config(config))
 
     def _cancel_page(self, page):
         self._page_event('cancelled', 'cancelled', '已取消')
@@ -508,6 +536,7 @@ class BatchWorker(QThread):
         return False
 
     def run(self) -> None:
+        task_started = perf_counter()
         main_dir = str(app_config.MAIN_DIR)
         if main_dir not in sys.path:
             sys.path.insert(0, main_dir)
@@ -534,8 +563,9 @@ class BatchWorker(QThread):
                 self.finished.emit(0, 0)
                 return
             self._translation_context = TranslationContext.start(
-                app_config.PROJECT_ROOT / '.cache' / 'translation-context.json',
-                retain=bool(self._config.get('retain_translation_context', False)))
+                (self._output_dir / '.translation-context.json' if self._trial_limit else
+                 app_config.PROJECT_ROOT / '.cache' / 'translation-context.json'),
+                retain=not self._trial_limit and bool(self._config.get('retain_translation_context', False)))
             self._pipeline.translation_context = self._translation_context
             self._pipeline.translation_context_managed = True
             self._translation_settings = TranslationSettings.from_pipeline(self._pipeline)
@@ -546,6 +576,7 @@ class BatchWorker(QThread):
             self._output_dir.mkdir(parents=True, exist_ok=True)
             documents = self._make_document_jobs()
             page_jobs = [page for document in documents for page in document.pages]
+            processing_started = perf_counter()
             completed_pages = sum(page.resumed for page in page_jobs)
             self.page_progress.emit(completed_pages, len(page_jobs))
             max_workers = max(1, int(self._config.get("max_workers") or 4))
@@ -657,5 +688,18 @@ class BatchWorker(QThread):
         finally:
             self._preparation_pipeline = None
             self._close_project_reader()
+            if self._files:
+                pages = locals().get('page_jobs', [])
+                self.usage_report = dict(
+                    trial=bool(self._trial_limit), model=self._config.get('translation_model', ''),
+                    total_pages=getattr(self, '_total_pages', len(pages)), planned_pages=len(pages),
+                    total_pages_known=getattr(self, '_total_pages_known', False),
+                    completed_pages=sum(page.completed or page.resumed for page in pages),
+                    elapsed_seconds=perf_counter() - task_started,
+                    processing_seconds=perf_counter() - locals().get('processing_started', task_started),
+                    cancelled=self._stop, failed=failed_count or bool(self._fatal_error),
+                    usage=self._usage_meter.snapshot(),
+                    outputs=[str(doc.output_path) for doc in locals().get('documents', [])
+                             if not doc.error and doc.pages and all(page.completed or page.resumed for page in doc.pages)])
 
         self.finished.emit(success_count, failed_count)

@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 from pathlib import Path
-from ..i18n import tr
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -10,7 +11,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QFrame,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -22,13 +22,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import mask_api_key
-from ..i18n import UI_LANGUAGES
 from comic_translate_core.languages import SOURCE_LANGUAGES
+from ..config import mask_api_key
+from ..i18n import UI_LANGUAGES, tr
 from .advanced_config import AdvancedConfigSection
 from .manga_components import PanelHeading
 from .motion import install_tab_motion, set_reduced_motion
-from .theme import apply_theme
+from .theme import apply_theme, set_themed_icon, ui_font
 
 
 class ApiConfigPage(QWidget):
@@ -43,22 +43,24 @@ class ApiConfigPage(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
         body = QFrame()
-        body.setObjectName('pageBody')
+        body.setObjectName('settingsBody')
         body_layout = QVBoxLayout(body)
-        body_layout.setContentsMargins(24, 16, 24, 12)
+        body_layout.setContentsMargins(24, 14, 24, 0)
+        body_layout.setSpacing(0)
         self._sections = QTabWidget()
         self._sections.setDocumentMode(True)
         self._sections.setAccessibleName(tr('设置分类'))
         install_tab_motion(self._sections)
         body_layout.addWidget(self._sections)
         outer.addWidget(body, 1)
+
         root = self._add_section(tr('01  翻译服务'), tr('连接你的翻译服务'), tr('配置接口、翻译方式和输出水印，保存后将在下一次任务生效。'))
         ocr_root = self._add_section(tr('02  文字识别'), tr('选择语言与识别方式'), tr('本地识别和自定义 OCR 均在这里配置。'))
         runtime_root = self._add_section(tr('03  运行与输出'), tr('安排输出与运行选项'), tr('设置默认保存位置和硬件加速。'))
         advanced_root = self._add_section(tr('04  详细配置'), tr('微调运行与模型细节'), tr('原先需要手动编辑 config.yaml 的选项集中在这里，保存后下一次任务生效。'))
 
-        api_group = QGroupBox(tr('翻译服务'))
-        api_form = QFormLayout(api_group)
+        api_card, api_layout = self._make_card('翻译服务')
+        api_form = QFormLayout()
         self._style_form(api_form)
 
         self._key_input = QLineEdit()
@@ -68,6 +70,7 @@ class ApiConfigPage(QWidget):
         self._show_key_check = QCheckBox(tr('显示密钥'))
         self._show_key_check.toggled.connect(self._toggle_key_visibility)
         key_row = QHBoxLayout()
+        key_row.setSpacing(10)
         key_row.addWidget(self._key_input, 1)
         key_row.addWidget(self._show_key_check)
 
@@ -95,12 +98,20 @@ class ApiConfigPage(QWidget):
         api_form.addRow(tr('多模态'), self._multimodal_check)
         api_form.addRow(tr('字体判别'), self._font_probe_check)
         api_form.addRow(tr('思考模式'), self._no_thinking_check)
-        root.addWidget(api_group)
+        api_layout.addLayout(api_form)
+        root.addWidget(api_card)
+
+        watermark_card, watermark_layout = self._make_card(
+            '输出水印',
+            '在输出图片和 PDF 每页右下角添加小号半透明字标，精修保存时同样生效。取消勾选并保存可关闭。',
+        )
         self._watermark_check = QCheckBox(tr('添加 @ComiTrans 水印（默认开启）'))
         self._watermark_check.setToolTip(tr('在输出图片和 PDF 每页右下角添加小号半透明字标，精修保存时同样生效。取消勾选并保存可关闭。'))
-        root.addWidget(self._watermark_check)
-        interface_group = QGroupBox(tr('界面语言'))
-        interface_form = QFormLayout(interface_group)
+        watermark_layout.addWidget(self._watermark_check)
+        root.addWidget(watermark_card)
+
+        interface_card, interface_layout = self._make_card('界面语言')
+        interface_form = QFormLayout()
         self._style_form(interface_form)
         self._ui_language = QComboBox()
         self._ui_language.setAccessibleName(tr('界面语言'))
@@ -110,17 +121,32 @@ class ApiConfigPage(QWidget):
         interface_note = QLabel(tr('保存后下次启动生效，不影响漫画译文语言。'))
         interface_note.setWordWrap(True)
         interface_note.setProperty('muted', True)
-        interface_form.addRow(tr(interface_note))
-        root.insertWidget(0, interface_group)
+        interface_layout.addLayout(interface_form)
+        interface_layout.addWidget(interface_note)
+        root.addWidget(interface_card)
         root.addStretch(1)
 
-        runtime_group = QGroupBox(tr('运行设置'))
-        runtime_form = QFormLayout(runtime_group)
+        runtime_card, runtime_layout = self._make_card('运行设置')
+        runtime_form = QFormLayout()
         self._style_form(runtime_form)
 
         self._gpu_check = QCheckBox(tr('使用 GPU（需要本机 CUDA 可用）'))
         self._gpu_help = QPushButton(tr('GPU 安装说明与下载'))
+        self._gpu_help.setProperty('role', 'utility')
+        self._gpu_help.setProperty('compact', True)
+        self._gpu_help.setCursor(Qt.PointingHandCursor)
+        set_themed_icon(self._gpu_help, 'external-link', size=13)
         self._gpu_help.clicked.connect(self._show_gpu_setup)
+        gpu_col = QVBoxLayout()
+        gpu_col.setContentsMargins(0, 0, 0, 0)
+        gpu_col.setSpacing(8)
+        gpu_col.addWidget(self._gpu_check)
+        gpu_btn_row = QHBoxLayout()
+        gpu_btn_row.setContentsMargins(0, 0, 0, 0)
+        gpu_btn_row.addWidget(self._gpu_help)
+        gpu_btn_row.addStretch(1)
+        gpu_col.addLayout(gpu_btn_row)
+
         self._ocr_backend = QComboBox()
         self._source_language = QComboBox()
         for code, label in SOURCE_LANGUAGES:
@@ -130,8 +156,11 @@ class ApiConfigPage(QWidget):
 
         self._output_input = QLineEdit()
         browse_btn = QPushButton(tr('浏览...'))
+        browse_btn.setProperty('role', 'utility')
+        browse_btn.setProperty('compact', True)
         browse_btn.clicked.connect(self._browse_output)
         output_row = QHBoxLayout()
+        output_row.setSpacing(8)
         output_row.addWidget(self._output_input, 1)
         output_row.addWidget(browse_btn)
 
@@ -139,16 +168,19 @@ class ApiConfigPage(QWidget):
         self._issue_input.setPlaceholderText(tr('https://github.com/你的用户名/ComiTrans/issues'))
 
         self._model_info = QLabel()
+        self._model_info.setObjectName('statusCallout')
+        self._model_info.setFont(ui_font(12, mono=True))
         self._model_info.setWordWrap(True)
-        self._model_info.setProperty("muted", True)
+        self._model_info.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
-        runtime_form.addRow(tr('硬件'), self._gpu_check)
-        runtime_form.addRow('', self._gpu_help)
+        runtime_form.addRow(tr('硬件'), gpu_col)
         runtime_form.addRow(tr('输出目录'), output_row)
         runtime_form.addRow(tr('Issue 链接'), self._issue_input)
-        runtime_root.addWidget(runtime_group)
-        appearance_group = QGroupBox(tr('外观'))
-        appearance_form = QFormLayout(appearance_group)
+        runtime_layout.addLayout(runtime_form)
+        runtime_root.addWidget(runtime_card)
+
+        appearance_card, appearance_layout = self._make_card('外观')
+        appearance_form = QFormLayout()
         self._style_form(appearance_form)
         self._theme = QComboBox()
         self._theme.setAccessibleName(tr('界面主题'))
@@ -165,46 +197,52 @@ class ApiConfigPage(QWidget):
         appearance_note = QLabel(tr('跟随系统会随 Windows 深浅色自动切换。'))
         appearance_note.setWordWrap(True)
         appearance_note.setProperty('muted', True)
-        appearance_form.addRow(tr(appearance_note))
-        runtime_root.addWidget(appearance_group)
+        appearance_layout.addLayout(appearance_form)
+        appearance_layout.addWidget(appearance_note)
+        runtime_root.addWidget(appearance_card)
         runtime_root.addStretch(1)
-        ocr_group = QGroupBox(tr('语言与引擎'))
-        ocr_form = QFormLayout(ocr_group)
+
+        ocr_card, ocr_layout = self._make_card('语言与引擎')
+        ocr_form = QFormLayout()
         self._style_form(ocr_form)
         ocr_form.addRow(tr('原文语言'), self._source_language)
         ocr_form.addRow(tr('OCR 引擎'), self._ocr_backend)
         ocr_form.addRow(tr('本地模型'), self._model_info)
-        self._model_info.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        ocr_root.addWidget(ocr_group)
+        ocr_layout.addLayout(ocr_form)
+        ocr_root.addWidget(ocr_card)
 
-        self._ppocr_group = QGroupBox(tr('韩语 / 英语本地 OCR'))
-        ppocr_form = QFormLayout(self._ppocr_group)
+        self._ppocr_group, ppocr_layout = self._make_card('韩语 / 英语本地 OCR')
+        ppocr_form = QFormLayout()
         self._style_form(ppocr_form)
         self._korean_model = QLineEdit()
         self._english_model = QLineEdit()
         for label, field in ((tr('韩语模型'), self._korean_model), (tr('英语模型'), self._english_model)):
             row = QHBoxLayout()
+            row.setSpacing(8)
             button = QPushButton(tr('浏览...'))
+            button.setProperty('role', 'utility')
+            button.setProperty('compact', True)
             button.clicked.connect(lambda _checked=False, target=field: self._browse_model(target))
             row.addWidget(field, 1)
             row.addWidget(button)
             ppocr_form.addRow(tr(label), row)
         note = QLabel(tr('使用 PP-OCRv5 ONNX 模型。模型包缺失时，按 docs/MULTILINGUAL_OCR.md 下载后选择模型文件。'))
         note.setWordWrap(True)
-        note.setProperty("muted", True)
-        ppocr_form.addRow(tr(note))
+        note.setProperty('muted', True)
+        ppocr_layout.addLayout(ppocr_form)
+        ppocr_layout.addWidget(note)
         ocr_root.addWidget(self._ppocr_group)
 
-        self._custom_group = QGroupBox(tr('自定义 OCR'))
-        custom_form = QFormLayout(self._custom_group)
+        self._custom_group, custom_layout = self._make_card('自定义 OCR')
+        custom_form = QFormLayout()
         self._style_form(custom_form)
         self._custom_language = QLineEdit()
         self._custom_language.setPlaceholderText(tr('例如 fr、de、th；选择自定义 OCR 语言时必填'))
         self._custom_language_name = QLineEdit()
         self._custom_language_name.setPlaceholderText(tr('例如 法语（可选）'))
         self._custom_protocol = QComboBox()
-        self._custom_protocol.addItem(tr('标准 HTTP OCR'), "http")
-        self._custom_protocol.addItem(tr('兼容 OpenAI 的视觉模型'), "openai")
+        self._custom_protocol.addItem(tr('标准 HTTP OCR'), 'http')
+        self._custom_protocol.addItem(tr('兼容 OpenAI 的视觉模型'), 'openai')
         self._custom_url = QLineEdit()
         self._custom_url.setPlaceholderText(tr('HTTP 完整识别地址；视觉模型填写 Base URL'))
         self._custom_key = QLineEdit()
@@ -222,10 +260,11 @@ class ApiConfigPage(QWidget):
         custom_form.addRow('OCR API Key', self._custom_key)
         custom_form.addRow(tr('OCR 模型'), self._custom_model)
         custom_form.addRow(tr('请求超时'), self._custom_timeout)
-        note = QLabel(tr('此模式会将文本区域图片发送到配置的 OCR 服务。标准 HTTP 返回 {"text": "原文"}；完整接入协议见 docs/MULTILINGUAL_OCR.md。译文简繁在翻译页选择。'))
-        note.setWordWrap(True)
-        note.setProperty("muted", True)
-        custom_form.addRow(tr(note))
+        custom_note = QLabel(tr('此模式会将文本区域图片发送到配置的 OCR 服务。标准 HTTP 返回 {"text": "原文"}；完整接入协议见 docs/MULTILINGUAL_OCR.md。译文简繁在翻译页选择。'))
+        custom_note.setWordWrap(True)
+        custom_note.setProperty('muted', True)
+        custom_layout.addLayout(custom_form)
+        custom_layout.addWidget(custom_note)
         ocr_root.addWidget(self._custom_group)
         ocr_root.addStretch(1)
 
@@ -236,10 +275,12 @@ class ApiConfigPage(QWidget):
         footer.setObjectName('pageActions')
         actions = QHBoxLayout(footer)
         actions.setContentsMargins(24, 12, 24, 12)
+        actions.setSpacing(10)
         self._save_btn = QPushButton(tr('保存配置'))
-        self._save_btn.setProperty("role", "primary")
+        self._save_btn.setProperty('role', 'primary')
+        self._save_btn.setCursor(Qt.PointingHandCursor)
         self._save_status = QLabel(tr('修改后点击保存，下次任务生效'))
-        self._save_status.setProperty("muted", True)
+        self._save_status.setProperty('muted', True)
         actions.addWidget(self._save_status)
         actions.addStretch(1)
         actions.addWidget(self._save_btn)
@@ -259,18 +300,19 @@ class ApiConfigPage(QWidget):
 
     def _add_section(self, tab_title, title, description):
         scroll = QScrollArea()
+        scroll.setObjectName('settingsScroll')
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         canvas = QFrame()
-        canvas.setObjectName('editorPanel')
+        canvas.setObjectName('settingsScrollContent')
         centered = QHBoxLayout(canvas)
         centered.setContentsMargins(0, 0, 0, 0)
         content = QFrame()
-        content.setObjectName('editorPanel')
-        content.setMaximumWidth(1040)
+        content.setObjectName('settingsScrollContent')
+        content.setMaximumWidth(920)
         root = QVBoxLayout(content)
-        root.setContentsMargins(20, 24, 20, 24)
-        root.setSpacing(16)
+        root.setContentsMargins(16, 22, 16, 24)
+        root.setSpacing(14)
         heading = PanelHeading('', title)
         root.addWidget(heading)
         hint = QLabel(tr(description))
@@ -278,19 +320,37 @@ class ApiConfigPage(QWidget):
         hint.setWordWrap(True)
         root.addWidget(hint)
         centered.addStretch(1)
-        centered.addWidget(content, 8)
+        centered.addWidget(content, 10)
         centered.addStretch(1)
         scroll.setWidget(canvas)
         self._sections.addTab(scroll, tr(tab_title))
         return root
 
     @staticmethod
+    def _make_card(title: str, description: str | None = None):
+        card = QFrame()
+        card.setObjectName('settingsCard')
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
+        heading = QLabel(tr(title))
+        heading.setObjectName('cardTitle')
+        heading.setFont(ui_font(14, QFont.Bold))
+        layout.addWidget(heading)
+        if description:
+            hint = QLabel(tr(description))
+            hint.setProperty('muted', True)
+            hint.setWordWrap(True)
+            layout.addWidget(hint)
+        return card, layout
+
+    @staticmethod
     def _style_form(form):
         form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
-        form.setHorizontalSpacing(24)
-        form.setVerticalSpacing(14)
+        form.setHorizontalSpacing(22)
+        form.setVerticalSpacing(12)
 
     def _mark_unsaved(self, *args):
         if not self._loading_config:
@@ -320,20 +380,20 @@ class ApiConfigPage(QWidget):
         self._ocr_backend.blockSignals(True)
         self._ocr_backend.clear()
         language = self._source_language.currentData()
-        if language == "ja":
-            choices = [(tr('自动（使用已安装的日语模型）'), "auto")]
-            selected = self._config.get("ocr_backend")
-            for label, value, key in (("CharSpot Small", "charspot", "charspot_ocr_model"),
-                                      ("Baberu OCR", "baberu", "baberu_ocr_model"),
-                                      ("manga-ocr", "manga-ocr", "ocr_model")):
+        if language == 'ja':
+            choices = [(tr('自动（使用已安装的日语模型）'), 'auto')]
+            selected = self._config.get('ocr_backend')
+            for label, value, key in (('CharSpot Small', 'charspot', 'charspot_ocr_model'),
+                                      ('Baberu OCR', 'baberu', 'baberu_ocr_model'),
+                                      ('manga-ocr', 'manga-ocr', 'ocr_model')):
                 directory = self._config.get(key)
-                if (directory and Path(directory).is_dir()) or selected == value or (value == "manga-ocr" and selected == "manga"):
+                if (directory and Path(directory).is_dir()) or selected == value or (value == 'manga-ocr' and selected == 'manga'):
                     choices.append((label, value))
-        elif language in ("ko", "en"):
-            choices = [(tr('自动（PP-OCRv5 本地识别）'), "auto")]
+        elif language in ('ko', 'en'):
+            choices = [(tr('自动（PP-OCRv5 本地识别）'), 'auto')]
         else:
             choices = []
-        for label, value in choices + [(tr('自定义 OCR'), "custom")]:
+        for label, value in choices + [(tr('自定义 OCR'), 'custom')]:
             self._ocr_backend.addItem(tr(label), value)
         index = self._ocr_backend.findData(previous)
         self._ocr_backend.setCurrentIndex(max(0, index))
@@ -341,92 +401,95 @@ class ApiConfigPage(QWidget):
         self._refresh_custom_visibility()
 
     def _refresh_custom_visibility(self) -> None:
-        if not hasattr(self, "_custom_group"):
+        if not hasattr(self, '_custom_group'):
             return
-        self._custom_group.setVisible(self._ocr_backend.currentData() == "custom")
-        custom_language = self._source_language.currentData() == "custom"
+        self._custom_group.setVisible(self._ocr_backend.currentData() == 'custom')
+        custom_language = self._source_language.currentData() == 'custom'
         self._custom_language.setEnabled(custom_language)
         self._custom_language_name.setEnabled(custom_language)
-        self._ppocr_group.setVisible(self._source_language.currentData() in ("ko", "en") and self._ocr_backend.currentData() != "custom")
+        self._ppocr_group.setVisible(self._source_language.currentData() in ('ko', 'en') and self._ocr_backend.currentData() != 'custom')
 
     def load_config(self, config: dict) -> None:
         self._loading_config = True
         self._config = config
         self._key_input.clear()
         self._ui_language.setCurrentIndex(max(0, self._ui_language.findData(config.get('ui_language', 'zh-CN'))))
-        if config.get("api_key"):
+        if config.get('api_key'):
             self._key_input.setPlaceholderText(tr('当前密钥: {_0}', _0=mask_api_key(config['api_key'])))
-        self._base_input.setText(config.get("api_base_url", ""))
-        self._model_input.setText(config.get("translation_model", ""))
-        self._multimodal_check.setChecked(bool(config.get("multimodal", False)))
-        self._font_probe_check.setChecked(bool(config.get("multimodal_font_probe", False)))
-        self._no_thinking_check.setChecked(bool(config.get("disable_thinking", True)))
-        self._gpu_check.setChecked(bool(config.get("use_gpu", True)))
-        self._source_language.setCurrentIndex(max(0, self._source_language.findData(config.get("source_language", "ja"))))
+        self._base_input.setText(config.get('api_base_url', ''))
+        self._model_input.setText(config.get('translation_model', ''))
+        self._multimodal_check.setChecked(bool(config.get('multimodal', False)))
+        self._font_probe_check.setChecked(bool(config.get('multimodal_font_probe', False)))
+        self._no_thinking_check.setChecked(bool(config.get('disable_thinking', True)))
+        self._gpu_check.setChecked(bool(config.get('use_gpu', True)))
+        self._source_language.setCurrentIndex(max(0, self._source_language.findData(config.get('source_language', 'ja'))))
         self._refresh_ocr_choices()
-        backend = str(config.get("ocr_backend") or "auto")
-        backend = {"manga": "manga-ocr", "ppocr": "auto"}.get(backend, backend)
+        backend = str(config.get('ocr_backend') or 'auto')
+        backend = {'manga': 'manga-ocr', 'ppocr': 'auto'}.get(backend, backend)
         backend_index = self._ocr_backend.findData(backend)
         self._ocr_backend.setCurrentIndex(max(0, backend_index))
-        self._korean_model.setText(config.get("korean_ocr_model", ""))
-        self._english_model.setText(config.get("english_ocr_model", ""))
-        self._custom_language.setText(config.get("custom_source_language") or "")
-        self._custom_language_name.setText(config.get("custom_source_language_name") or "")
-        self._custom_protocol.setCurrentIndex(max(0, self._custom_protocol.findData(config.get("custom_ocr_protocol", "http"))))
-        self._custom_url.setText(config.get("custom_ocr_url") or "")
-        self._custom_key.setText(config.get("custom_ocr_api_key") or "")
-        self._custom_model.setText(config.get("custom_ocr_model") or "")
-        self._custom_timeout.setValue(int(config.get("custom_ocr_timeout") or 60))
+        self._korean_model.setText(config.get('korean_ocr_model', ''))
+        self._english_model.setText(config.get('english_ocr_model', ''))
+        self._custom_language.setText(config.get('custom_source_language') or '')
+        self._custom_language_name.setText(config.get('custom_source_language_name') or '')
+        self._custom_protocol.setCurrentIndex(max(0, self._custom_protocol.findData(config.get('custom_ocr_protocol', 'http'))))
+        self._custom_url.setText(config.get('custom_ocr_url') or '')
+        self._custom_key.setText(config.get('custom_ocr_api_key') or '')
+        self._custom_model.setText(config.get('custom_ocr_model') or '')
+        self._custom_timeout.setValue(int(config.get('custom_ocr_timeout') or 60))
         self._advanced.load_config(config)
         self._refresh_custom_visibility()
-        self._output_input.setText(config.get("page_output_dir", ""))
-        self._watermark_check.setChecked(bool(config.get("watermark_enabled", True)))
+        self._output_input.setText(config.get('page_output_dir', ''))
+        self._watermark_check.setChecked(bool(config.get('watermark_enabled', True)))
         self._output_input.setToolTip(self._output_input.text())
         self._output_input.setCursorPosition(len(self._output_input.text()))
-        self._issue_input.setText(config.get("issue_url", ""))
+        self._issue_input.setText(config.get('issue_url', ''))
         self._theme.blockSignals(True)
-        self._theme.setCurrentIndex(max(0, self._theme.findData(config.get("ui_theme", "auto"))))
+        self._theme.setCurrentIndex(max(0, self._theme.findData(config.get('ui_theme', 'auto'))))
         self._theme.blockSignals(False)
         self._reduced_motion.blockSignals(True)
-        self._reduced_motion.setChecked(bool(config.get("ui_reduced_motion", False)))
+        self._reduced_motion.setChecked(bool(config.get('ui_reduced_motion', False)))
         self._reduced_motion.blockSignals(False)
         self._model_info.setText(
-            tr('CharSpot Small: {_4}\n检测: {_0}\nBaberu OCR: {_1}\nmanga-ocr: {_2}\n修复: {_3}', _4=config.get('charspot_ocr_model', ''), _0=config.get('detector_model', ''), _1=config.get('baberu_ocr_model', ''), _2=config.get('ocr_model', ''), _3=config.get('lama_model', ''))
+            tr('CharSpot Small: {_4}\n检测: {_0}\nBaberu OCR: {_1}\nmanga-ocr: {_2}\n修复: {_3}',
+               _4=config.get('charspot_ocr_model', ''), _0=config.get('detector_model', ''),
+               _1=config.get('baberu_ocr_model', ''), _2=config.get('ocr_model', ''),
+               _3=config.get('lama_model', ''))
         )
         self._loading_config = False
         self._save_status.setText(tr('修改后点击保存，下次任务生效'))
 
     def values(self) -> dict:
         data = {
-            "ui_language": self._ui_language.currentData(),
-            "ui_language_selected": True,
-            "api_base_url": self._base_input.text().strip(),
-            "translation_model": self._model_input.text().strip(),
-            "multimodal": self._multimodal_check.isChecked(),
-            "multimodal_font_probe": self._font_probe_check.isChecked(),
-            "disable_thinking": self._no_thinking_check.isChecked(),
-            "watermark_enabled": self._watermark_check.isChecked(),
-            "use_gpu": self._gpu_check.isChecked(),
-            "ocr_backend": self._ocr_backend.currentData(),
-            "source_language": self._source_language.currentData(),
-            "korean_ocr_model": self._korean_model.text().strip(),
-            "english_ocr_model": self._english_model.text().strip(),
-            "custom_source_language": self._custom_language.text().strip(),
-            "custom_source_language_name": self._custom_language_name.text().strip(),
-            "custom_ocr_protocol": self._custom_protocol.currentData(),
-            "custom_ocr_url": self._custom_url.text().strip(),
-            "custom_ocr_api_key": self._custom_key.text().strip(),
-            "custom_ocr_model": self._custom_model.text().strip(),
-            "custom_ocr_timeout": self._custom_timeout.value(),
-            "page_output_dir": self._output_input.text().strip(),
-            "issue_url": self._issue_input.text().strip(),
-            "ui_theme": self._theme.currentData(),
-            "ui_reduced_motion": self._reduced_motion.isChecked(),
+            'ui_language': self._ui_language.currentData(),
+            'ui_language_selected': True,
+            'api_base_url': self._base_input.text().strip(),
+            'translation_model': self._model_input.text().strip(),
+            'multimodal': self._multimodal_check.isChecked(),
+            'multimodal_font_probe': self._font_probe_check.isChecked(),
+            'disable_thinking': self._no_thinking_check.isChecked(),
+            'watermark_enabled': self._watermark_check.isChecked(),
+            'use_gpu': self._gpu_check.isChecked(),
+            'ocr_backend': self._ocr_backend.currentData(),
+            'source_language': self._source_language.currentData(),
+            'korean_ocr_model': self._korean_model.text().strip(),
+            'english_ocr_model': self._english_model.text().strip(),
+            'custom_source_language': self._custom_language.text().strip(),
+            'custom_source_language_name': self._custom_language_name.text().strip(),
+            'custom_ocr_protocol': self._custom_protocol.currentData(),
+            'custom_ocr_url': self._custom_url.text().strip(),
+            'custom_ocr_api_key': self._custom_key.text().strip(),
+            'custom_ocr_model': self._custom_model.text().strip(),
+            'custom_ocr_timeout': self._custom_timeout.value(),
+            'page_output_dir': self._output_input.text().strip(),
+            'issue_url': self._issue_input.text().strip(),
+            'ui_theme': self._theme.currentData(),
+            'ui_reduced_motion': self._reduced_motion.isChecked(),
         }
         data.update(self._advanced.values())
         key = self._key_input.text().strip()
         if key:
-            data["api_key"] = key
+            data['api_key'] = key
         return data
 
     def mark_saved(self) -> None:

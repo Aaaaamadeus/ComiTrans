@@ -1,0 +1,135 @@
+name: Build and sign Windows installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      previous_version:
+        description: Previous signed Windows Setup release for upgrade testing and optional delta
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    runs-on: windows-2022
+    if: github.ref_type == 'tag'
+    environment: windows-release-signing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+      - name: Check release tag and install build dependencies
+        id: release
+        shell: pwsh
+        run: |
+          $version = python -c 'from comic_translate_desktop import __version__; print(__version__)'
+          if ($env:GITHUB_REF_NAME -cne "v$version") { throw 'Tag and application version differ.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          python -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          choco install nsis --version=3.13 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test and build the application, service and NSIS uninstaller
+        shell: powershell
+        run: |
+          .\.venv\Scripts\python.exe -m unittest -v tests.test_nsis_installer tests.test_release_update
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\build_app.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\.venv\Scripts\python.exe installer/build.py --stage-only --include-models --output build/unsigned
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force build/signing | Out-Null
+          foreach ($name in 'ComiTrans.exe', 'ComiTransReleaseService.exe', 'Uninstall.exe') {
+            Copy-Item -LiteralPath "build/unsigned/payload/$name" -Destination build/signing
+          }
+      - name: Stage executables for verified signing
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-windows-payload
+          path: build/signing/*.exe
+          if-no-files-found: error
+          compression-level: 0
+      - name: Sign the application, service and uninstaller
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: windows-payload
+          parameters: |
+            version: ${{ toJSON(steps.release.outputs.version) }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: build/signed-payload
+      - name: Build NSIS Setup with the signed executables
+        shell: pwsh
+        run: |
+          Copy-Item -Path build/signed-payload/*.exe -Destination build/unsigned/payload -Force
+          .\.venv\Scripts\python.exe installer/build.py --payload build/unsigned/payload --output release/unsigned
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        id: unsigned-setup
+        with:
+          name: unsigned-windows-setup
+          path: release/unsigned/*-Setup.exe
+          if-no-files-found: error
+          compression-level: 0
+      - name: Sign the final Setup EXE
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: windows-setup
+          parameters: |
+            version: ${{ toJSON(steps.release.outputs.version) }}
+          github-artifact-id: ${{ steps.unsigned-setup.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: release/signed
+      - name: Verify signatures, test Setup and prepare the release files
+        shell: pwsh
+        env:
+          PREVIOUS_VERSION: ${{ inputs.previous_version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          function Confirm-ComiTransSignature($path) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $path
+            if ($signature.Status -ne 'Valid' -or !$signature.TimeStamperCertificate -or
+                $signature.SignerCertificate.GetNameInfo('SimpleName', $false) -ne 'SignPath Foundation') {
+              throw "Windows could not verify the timestamped SignPath Foundation signature: $path"
+            }
+          }
+          foreach ($name in 'ComiTrans.exe', 'ComiTransReleaseService.exe', 'Uninstall.exe') {
+            Confirm-ComiTransSignature "build/unsigned/payload/$name"
+          }
+          $stem = "ComiTrans-$($env:GITHUB_REF_NAME)-x64"
+          $setup = (Get-Item "release/signed/$stem-Setup.exe").FullName
+          Confirm-ComiTransSignature $setup
+          $test = @{ Setup = $setup; Version = $env:GITHUB_REF_NAME.Substring(1); LogDirectory = $env:RUNNER_TEMP }
+          if ($env:PREVIOUS_VERSION) {
+            if ($env:PREVIOUS_VERSION -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Invalid base version.' }
+            $name = "ComiTrans-v$env:PREVIOUS_VERSION-x64-Setup.exe"
+            gh release download "v$env:PREVIOUS_VERSION" --pattern $name --dir build/previous
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Confirm-ComiTransSignature "build/previous/$name"
+            $test.PreviousSetup = (Resolve-Path "build/previous/$name").Path
+            .\.venv\Scripts\python.exe installer/build.py --delta "build/previous/$name" $setup
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          & installer/Test-Setup.ps1 @test
+          .\.venv\Scripts\python.exe -c "from pathlib import Path; from package_release import write_checksums; p=Path('release/signed'); write_checksums(p, sorted(p.glob('ComiTrans-*')))"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-windows-release
+          path: release/signed/*
+          if-no-files-found: error
+          compression-level: 0

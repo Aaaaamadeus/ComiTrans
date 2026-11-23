@@ -19,7 +19,7 @@ from .i18n import install_qt_language, load_ui_catalog, set_ui_language, tr
 from .ui.language_dialog import InterfaceLanguageDialog
 from .ui.gpu_setup_dialog import GpuSetupDialog
 from .ui.star_prompt import STAR_PROMPT_PROBABILITY, STAR_PROMPT_IDLE_MS
-from .ui.theme import install_ui_font
+from .ui.theme import install_ui_font, log_font
 from comic_translate_core.chinese import convert_chinese
 
 
@@ -34,6 +34,22 @@ def run_smoke_test(app, output_dir, *, require_gpu=False):
     QSettings.setDefaultFormat(QSettings.IniFormat)
     QSettings.setPath(QSettings.IniFormat, QSettings.UserScope, str(output / "settings"))
     config.save_ai_config({'use_gpu': require_gpu})
+    defaults = config.load_ai_config()
+    # Reproduce a retained profile from a removed installation. No user settings
+    # or credentials are copied into the release verification directory.
+    relocated = {}
+    if config.BUNDLED_MODELS_ROOT is not None:
+        old_models = output / 'removed-install/_internal/comic-translate-ai/models'
+        relatives = {**config.MODEL_DEFAULTS,
+                     'korean_ocr_model': 'ppocr/korean_PP-OCRv5_rec_mobile.onnx',
+                     'english_ocr_model': 'ppocr/en_PP-OCRv5_rec_mobile.onnx'}
+        relocated = {key: str(old_models / relative) for key, relative in relatives.items()
+                     if (config.BUNDLED_MODELS_ROOT / relative).exists()}
+        # Write the stale profile directly so load_ai_config itself must recover it.
+        import yaml
+        raw = config.load_yaml(config.CONFIG_PATH)
+        raw.update(relocated)
+        config.CONFIG_PATH.write_text(yaml.safe_dump(raw), encoding='utf-8')
     window = MainWindow()
     window.setAttribute(Qt.WA_DontShowOnScreen, True)
     window.show()
@@ -41,6 +57,7 @@ def run_smoke_test(app, output_dir, *, require_gpu=False):
     # verification explicitly requests it so the complete model stack is tested.
     window._start_warmup()
     result = {"version": __version__, "frozen": bool(getattr(sys, "frozen", False))}
+    result['relocated_models_recovered'] = all(window.config[key] == defaults[key] for key in relocated)
 
     def finish():
         if window.warmup_worker is not None:
@@ -231,7 +248,7 @@ def run_smoke_test(app, output_dir, *, require_gpu=False):
                 result["translation_https_client"] = True
             result["success"] = all((result['jpeg_paper_fill'], result['white_box_fallback'], result["translation_https_client"], result["pipeline_ready"], result["svg_valid"], result["window_visible"],
                                      result["screenshot_saved"], result["brand_font"] == "Skribble",
-                                     result["log_font"] == "Aa今日花晴 春懒猫困", not result["missing_glyphs"],
+                                     result["log_font"] == QFontInfo(log_font()).family(), not result["missing_glyphs"],
                                      result['font_imported'], result['font_choice_persisted'], result['font_pipeline_updated'],
                                      result['font_models_reused'], result['font_editor_updated'],
                                      result['catalog_families'] == 2056, result['font_search_enabled'],
@@ -247,7 +264,7 @@ def run_smoke_test(app, output_dir, *, require_gpu=False):
                 value for name, value in result.items()
                 if name.startswith(('en_', 'ja_', 'onboarding_')) or name == 'star_prompt_behavior')
             result['success'] = result['success'] and all(result.get(key, False) for key in (
-                'real_detection_and_ocr', 'native_repair_pixels', 'no_torch_import'))
+                'real_detection_and_ocr', 'native_repair_pixels', 'no_torch_import', 'relocated_models_recovered'))
             if require_gpu:
                 result['success'] = result['success'] and result.get('gpu_active', False)
         except Exception as exc:

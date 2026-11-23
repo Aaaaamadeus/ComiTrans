@@ -102,6 +102,19 @@ class ThemeTests(unittest.TestCase):
         finally:
             apply_theme(self.app, 'light')
 
+    def test_refactored_secondary_ui_modules_avoid_hardcoded_hex_colors(self):
+        import re
+        from pathlib import Path
+        ui_dir = Path(__file__).resolve().parents[1] / 'comic_translate_desktop' / 'ui'
+        hex_re = re.compile(r'#[0-9a-fA-F]{3,8}\b')
+        for filename in (
+            'api_config_page.py', 'advanced_config.py', 'gpu_setup_dialog.py',
+            'language_dialog.py', 'star_prompt.py', 'font_library_dialog.py',
+            'favorite_fonts.py', 'error_log_page.py', 'text_editor_dialog.py', 'update_notice.py',
+        ):
+            text = (ui_dir / filename).read_text(encoding='utf-8')
+            self.assertEqual(hex_re.findall(text), [], filename)
+
     def test_material_motion_hooks_ripple_and_focus_underline(self):
         host = QWidget()
         layout = QHBoxLayout(host)
