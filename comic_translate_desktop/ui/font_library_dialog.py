@@ -1,16 +1,22 @@
 """Search the complete offline catalog and download a chosen font face."""
 from __future__ import annotations
-from ..i18n import tr
 
 from PIL import Image
 from PIL.ImageQt import ImageQt
-from PySide6.QtCore import QThread, Signal, Qt
-from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit,
-                              QListWidget, QListWidgetItem, QProgressBar, QPushButton, QVBoxLayout)
+from PySide6.QtCore import QThread, Qt, Signal
+from PySide6.QtGui import QFont, QPixmap
+from PySide6.QtWidgets import (
+    QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+    QListWidgetItem, QProgressBar, QPushButton, QVBoxLayout,
+)
+from shiboken6 import isValid
 
 from ..font_catalog import CATEGORY_LABELS, LANGUAGE_LABELS, download_face, installed_faces, load_catalog, search_text
 from ..font_library import font_alias, resolve_font_reference
+from ..i18n import tr
+from .manga_components import PanelHeading
+from .theme import theme, theme_changed, ui_font
+from .window_chrome import apply_window_chrome
 
 
 class FontDownloadThread(QThread):
@@ -35,28 +41,52 @@ class FontLibraryDialog(QDialog):
     def __init__(self, settings, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr('开源字体库'))
-        self.resize(820, 660)
+        self.resize(840, 680)
         self.setMinimumSize(560, 480)
+        self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
         self.reference = None
         self._settings = settings
         self._worker = None
         self._closing = False
         self._downloaded = None
+        self._preview_reference = None
         self._installed = installed_faces()
         catalog = load_catalog()
         self._families = [(family, search_text(family)) for family in catalog['families']]
-        root = QVBoxLayout(self)
-        root.setContentsMargins(20, 18, 20, 18)
-        root.setSpacing(12)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        header = QFrame()
+        header.setObjectName('dialogHeader')
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(24, 18, 24, 14)
+        header_layout.setSpacing(6)
+        header_layout.addWidget(PanelHeading('', '开源字体库'))
         intro = QLabel(tr('Google Fonts · {_0:,} 款字体族\n完整目录离线检索，按需下载；下载后离线使用。', _0=len(self._families)))
+        intro.setProperty('muted', True)
         intro.setWordWrap(True)
-        root.addWidget(intro)
+        header_layout.addWidget(intro)
+        outer.addWidget(header)
+
+        body = QVBoxLayout()
+        body.setContentsMargins(24, 16, 24, 16)
+        body.setSpacing(12)
+
+        filter_card = QFrame()
+        filter_card.setObjectName('dialogCard')
+        filter_layout = QVBoxLayout(filter_card)
+        filter_layout.setContentsMargins(16, 14, 16, 14)
+        filter_layout.setSpacing(10)
         self.search = QLineEdit()
         self.search.setPlaceholderText(tr('搜索名称、中文别名、语言或风格，例如：霞鹜、中文、手写…'))
         self.search.setClearButtonEnabled(True)
         self.search.setAccessibleName(tr('检索开源字体库'))
-        root.addWidget(self.search)
+        filter_layout.addWidget(self.search)
+
         filters = QHBoxLayout()
+        filters.setSpacing(8)
         self.language = QComboBox()
         self.language.addItem(tr('全部语言'), '')
         for subset, label in LANGUAGE_LABELS.items():
@@ -69,50 +99,94 @@ class FontLibraryDialog(QDialog):
         self.availability.addItem(tr('全部字体'), False)
         self.availability.addItem(tr('已下载'), True)
         for widget in (self.language, self.category, self.availability):
-            filters.addWidget(widget)
-        root.addLayout(filters)
+            filters.addWidget(widget, 1)
         self.count = QLabel()
-        self.count.setProperty('muted', True)
-        root.addWidget(self.count)
+        self.count.setObjectName('badgePill')
+        self.count.setFont(ui_font(11, mono=True))
+        filters.addWidget(self.count)
+        filter_layout.addLayout(filters)
+        body.addWidget(filter_card)
+
         self.font_list = QListWidget()
+        self.font_list.setObjectName('catalogList')
         self.font_list.setAccessibleName(tr('开源字体检索结果'))
-        root.addWidget(self.font_list, 1)
+        body.addWidget(self.font_list, 1)
+
+        inspector_card = QFrame()
+        inspector_card.setObjectName('dialogCard')
+        inspector_layout = QVBoxLayout(inspector_card)
+        inspector_layout.setContentsMargins(16, 14, 16, 14)
+        inspector_layout.setSpacing(10)
+
+        meta_row = QHBoxLayout()
+        meta_row.setSpacing(12)
         self.details = QLabel()
         self.details.setWordWrap(True)
         self.details.setProperty('muted', True)
-        root.addWidget(self.details)
+        meta_row.addWidget(self.details, 1)
         self.face = QComboBox()
-        self.face.setMinimumContentsLength(20)
+        self.face.setMinimumContentsLength(18)
+        self.face.setMinimumWidth(200)
+        self.face.setMaximumWidth(320)
         self.face.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.face.setAccessibleName(tr('字体款式与字重'))
-        root.addWidget(self.face)
+        meta_row.addWidget(self.face)
+        inspector_layout.addLayout(meta_row)
+
+        preview_frame = QFrame()
+        preview_frame.setObjectName('fontPreviewFrame')
+        preview_layout = QVBoxLayout(preview_frame)
+        preview_layout.setContentsMargins(12, 8, 12, 8)
         self.preview = QLabel(tr('下载后显示实际字体预览'))
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setMinimumHeight(52)
         self.preview.setWordWrap(True)
-        root.addWidget(self.preview)
+        self.preview.setProperty('muted', True)
+        preview_layout.addWidget(self.preview)
+        inspector_layout.addWidget(preview_frame)
+
         self.progress = QProgressBar()
         self.progress.hide()
-        root.addWidget(self.progress)
+        inspector_layout.addWidget(self.progress)
         self.status = QLabel()
         self.status.setWordWrap(True)
-        root.addWidget(self.status)
-        actions = QHBoxLayout()
+        self.status.setProperty('muted', True)
+        inspector_layout.addWidget(self.status)
+        body.addWidget(inspector_card)
+        outer.addLayout(body, 1)
+
+        footer = QFrame()
+        footer.setObjectName('pageActions')
+        actions = QHBoxLayout(footer)
+        actions.setContentsMargins(24, 12, 24, 12)
+        actions.setSpacing(10)
         actions.addStretch()
         self.cancel_button = QPushButton(tr('关闭'))
+        self.cancel_button.setProperty('role', 'utility')
         self.cancel_button.clicked.connect(self.reject)
         actions.addWidget(self.cancel_button)
         self.use_button = QPushButton(tr('下载并使用'))
         self.use_button.setProperty('role', 'primary')
+        self.use_button.setCursor(Qt.PointingHandCursor)
         self.use_button.clicked.connect(self._use_font)
         actions.addWidget(self.use_button)
-        root.addLayout(actions)
+        outer.addWidget(footer)
+
         self.search.textChanged.connect(self._filter)
         for widget in (self.language, self.category, self.availability):
             widget.currentIndexChanged.connect(self._filter)
         self.font_list.currentItemChanged.connect(self._family_changed)
         self.face.currentIndexChanged.connect(self._face_changed)
+        theme_changed.changed.connect(self._refresh_theme_preview)
         self._filter()
+
+    def _refresh_theme_preview(self, _mode):
+        if isValid(self) and self._preview_reference:
+            self._show_preview(self._preview_reference)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        apply_window_chrome(self)
 
     def _filter(self):
         tokens = self.search.text().casefold().split()
@@ -155,6 +229,7 @@ class FontLibraryDialog(QDialog):
 
     def _face_changed(self):
         self.preview.clear()
+        self._preview_reference = None
         face = self.face.currentData()
         family = self.font_list.currentItem().data(Qt.UserRole) if self.font_list.currentItem() else None
         reference = self._installed.get(face['sha1']) if face else None
@@ -171,13 +246,16 @@ class FontLibraryDialog(QDialog):
 
     def _show_preview(self, reference):
         from vertical_typesetter import VerticalTypesetter
+        self._preview_reference = reference
+        palette = theme()
         path = str(resolve_font_reference(reference))
         typesetter = VerticalTypesetter({style: path for style in self._settings['font_map']}, 24,
                                        fallback_fonts=self._settings.get('font_fallbacks'))
         dpr = self.devicePixelRatioF()
-        image = Image.new('RGB', (round(500 * dpr), round(52 * dpr)), 'white')
+        image = Image.new('RGB', (round(500 * dpr), round(52 * dpr)), palette['paper'])
         typesetter.draw_text(image, [0, 0, image.width, image.height], '故事，从这里开始。Aa 0123',
-                             'dialogue', direction=0, target_font_size=round(24 * dpr), manual_layout=True)
+                             'dialogue', direction=0, target_font_size=round(24 * dpr),
+                             manual_layout=True, text_color=palette['ink'], outline_width=0)
         pixmap = QPixmap.fromImage(ImageQt(image))
         pixmap.setDevicePixelRatio(dpr)
         self.preview.setPixmap(pixmap)

@@ -1,6 +1,7 @@
-"""Build the ComiTrans Windows MSI and branded Setup EXE with WiX 5."""
+"""Build the ComiTrans Windows installer with NSIS Modern UI 2."""
 
 import argparse
+import json
 import mmap
 import os
 from pathlib import Path
@@ -8,9 +9,6 @@ import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
-from uuid import NAMESPACE_URL, uuid5
-
-from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -20,20 +18,63 @@ from comic_translate_core.release_update import (
     VERSION, delta_name, installer_name,
 )
 from comic_translate_desktop import __version__
-from package_release import collect_app
-
+from package_release import MODEL_ARCHIVE_PREFIX, MODEL_FILES, collect_app, collect_models, legacy_detector_entry
 
 ICON = ROOT / 'assets/ComiTrans.ico'
-BAL = ROOT / '.wix/extensions/WixToolset.Bal.wixext/5.0.2/wixext5/WixToolset.BootstrapperApplications.wixext.dll'
 
 
-def stage_app(dist, stage):
+def nsis_literal(value):
+    return str(value).replace('$', '$$').replace('"', '$\\"').replace('\n', '$\\r$\\n')
+
+
+def find_makensis(command):
+    candidates = [command, shutil.which('makensis')]
+    for folder in ('ProgramFiles(x86)', 'ProgramFiles'):
+        if folder in os.environ:
+            candidates.append(Path(os.environ[folder]) / 'NSIS/makensis.exe')
+    candidates.extend(sorted((ROOT / 'build/installer-native-tools').glob('nsis-*/makensis.exe'), reverse=True))
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file():
+            return str(Path(candidate).resolve())
+    raise FileNotFoundError('Install NSIS 3 or pass --makensis PATH')
+
+
+def nsis_inputs(payload, work):
+    """Embed an explicit uninstall list; never recursively delete an installation directory."""
+    files = sorted(path.relative_to(payload) for path in payload.rglob('*') if path.is_file()
+                   and path.name not in {'ComiTransReleaseService.exe', 'Uninstall.exe'})
+    directories = {parent for path in files for parent in path.parents if parent != Path('.')}
+    manifest = work / 'uninstall-files.nsh'
+    manifest.write_text('\n'.join(
+        [f'Delete "$INSTDIR\\{nsis_literal(path)}"' for path in files] +
+        [f'RMDir "$INSTDIR\\{nsis_literal(path)}"' for path in
+         sorted(directories, key=lambda path: (len(path.parts), str(path)), reverse=True)]
+    ) + '\n', encoding='utf-8-sig')
+    languages = {'en': 'ENGLISH', 'zh-CN': 'SIMPCHINESE', 'zh-TW': 'TRADCHINESE', 'ja': 'JAPANESE'}
+    strings = json.loads((ROOT / 'installer/nsis_strings.json').read_text('utf-8'))
+    if set(strings) != set(languages) or any(set(texts) != set(strings['en']) for texts in strings.values()):
+        raise ValueError('Installer languages must contain the same strings')
+    localization = work / 'languages.nsh'
+    localization.write_text('\n'.join(
+        f'LangString {key} ${{LANG_{languages[locale]}}} "{nsis_literal(value)}"'
+        for locale, texts in strings.items() for key, value in texts.items()
+    ) + '\n', encoding='utf-8-sig')
+    return manifest, localization
+
+
+def stage_app(dist, stage, *, include_models=True):
     files = collect_app(dist, portable_tools=False)
+    if include_models:
+        files.extend((source, f'ComiTrans/_internal/comic-translate-ai/models/{name.removeprefix(MODEL_ARCHIVE_PREFIX)}')
+                     for source, name in collect_models())
     stage.mkdir(parents=True)
     for source, archive_path in files:
         target = stage / archive_path.removeprefix('ComiTrans/')
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
+    license_file = ROOT / 'LICENSE'
+    if license_file.is_file():
+        shutil.copyfile(license_file, stage / 'LICENSE')
     compiler = Path(os.environ['SystemRoot']) / 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
     version_file = stage.parent / f'{stage.name}-version.cs'
     version_file.write_text(
@@ -50,38 +91,50 @@ def stage_app(dist, stage):
         version_file.unlink()
 
 
-def build_msi(wix, stage, output):
-    parts = [int(part) for part in __version__.split('.')]
-    if len(parts) != 3 or max(parts[:2]) > 255 or not 0 <= parts[2] <= 65535:
-        raise ValueError('An MSI release version needs three numbers within MSI ProductVersion limits')
+def compile_nsis(makensis, payload, work, output, **extra):
+    manifest, localization = nsis_inputs(payload, work)
+    defines = {'VERSION': __version__, 'PAYLOAD': payload, 'ICON': ICON, 'OUTPUT': output,
+               'UNINSTALL_FILES': manifest, 'LOCALIZATION': localization, **extra}
+    command = [makensis, '/V2', '/WX', '/INPUTCHARSET', 'UTF8']
+    command.extend(f'/D{key}={nsis_literal(value)}' for key, value in defines.items())
+    command.append(str(ROOT / 'installer/ComiTrans.nsi'))
+    subprocess.run(command, check=True)
+
+
+def build_uninstaller(makensis, payload, work):
+    generator = work / 'write-uninstaller.exe'
+    target = payload / 'Uninstall.exe'
+    compile_nsis(makensis, payload, work, generator, GENERATE_UNINSTALLER='1', UNINSTALLER_OUT=target)
+    if not target.is_file():
+        raise FileNotFoundError('NSIS did not generate the uninstaller')
+
+
+def build_setup(makensis, payload, output, work):
+    for name in ('ComiTrans.exe', 'ComiTransReleaseService.exe', 'Uninstall.exe'):
+        if not (payload / name).is_file():
+            raise FileNotFoundError(f'Missing installer payload: {payload / name}')
+    validate_installer_models(payload)
     output.mkdir(parents=True, exist_ok=True)
-    target = output / installer_name(__version__)
-    code = uuid5(NAMESPACE_URL, f'https://github.com/Aaaaamadeus/ComiTrans/msi/x64/{__version__}')
-    subprocess.run([wix, 'build', '-arch', 'x64', '-d', f'Version={__version__}', '-d', f'ProductCode={code}',
-                    '-d', f'Payload={stage}', '-d', f'Icon={ICON}',
-                    '-pdbtype', 'none', '-out', str(target), str(ROOT / 'installer/ComiTrans.wxs')], check=True)
+    target = output / installer_name(__version__, setup=True)
+    compile_nsis(makensis, payload, work, target)
     print(target, flush=True)
     return target
 
 
-def build_bundle(wix, msi, output):
-    if msi.name != installer_name(__version__) or not msi.is_file():
-        raise ValueError(f'Expected an existing {installer_name(__version__)}')
-    if not BAL.is_file():
-        raise FileNotFoundError('Run wix extension add WixToolset.Bal.wixext/5.0.2 from the repository root')
-    output.mkdir(parents=True, exist_ok=True)
-    target = output / installer_name(__version__, setup=True)
-    with TemporaryDirectory(prefix='burn-', dir=ROOT / 'build') as work:
-        logo = Path(work) / 'logo.png'
-        with Image.open(ICON) as image:
-            image.thumbnail((64, 64), Image.Resampling.LANCZOS)
-            image.save(logo)
-        # The MSI cabinets are already compressed. Embed the exact bytes so they can be reused in EXE deltas.
-        subprocess.run([wix, 'build', '-arch', 'x64', '-ext', str(BAL), '-dcl', 'none',
-                        '-d', f'Version={__version__}', '-d', f'Msi={msi}', '-d', f'Icon={ICON}',
-                        '-d', f'Logo={logo}', '-pdbtype', 'none', '-out', str(target),
-                        str(ROOT / 'installer/ComiTransSetup.wxs')], check=True)
-    print(target, flush=True)
+def validate_installer_models(payload):
+    """A direct installer must contain every model needed by its default pipeline."""
+    from scripts.model_package import verify
+
+    models = payload / '_internal/comic-translate-ai/models'
+    for relative in (*MODEL_FILES, legacy_detector_entry()['path']):
+        path = models / relative
+        if not path.is_file() or path.stat().st_size == 0:
+            raise FileNotFoundError(f'Full installer is missing a required model: {path}')
+    for name in ('charspot-small', 'split-detector'):
+        manifest = ROOT / f'docs/models/{name}.json'
+        verify(models / name, json.loads(manifest.read_text('utf-8')))
+        if (models / name / 'model-manifest.json').read_bytes() != manifest.read_bytes():
+            raise ValueError(f'Full installer has an inconsistent {name} manifest')
 
 
 def build_delta(base, target):
@@ -115,7 +168,7 @@ def build_delta(base, target):
               mmap.mmap(previous.fileno(), 0, access=mmap.ACCESS_READ) as base_bytes):
             for offset in range(0, target_size, block_size):
                 block = source_file.read(block_size)
-                # Cabinet data can shift. Setup uses smaller blocks to reuse data between Burn cabinet headers.
+                # Compressed installer data can shift. Search nearby blocks for reusable bytes.
                 start = max(0, offset - DELTA_OVERLAP)
                 position = base_bytes.find(block, start, offset + len(block) + DELTA_OVERLAP)
                 if position >= 0:
@@ -137,27 +190,36 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dist', type=Path, default=ROOT / 'dist/ComiTrans')
     parser.add_argument('--output', type=Path, default=ROOT / 'release' / f'v{__version__}')
-    parser.add_argument('--wix', default='wix')
+    parser.add_argument('--makensis', help='Path to the NSIS 3 makensis.exe compiler')
+    parser.add_argument('--include-models', action='store_true', default=True,
+                        help='Embed release models in Setup (always enabled for a direct installer)')
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument('--msi-only', action='store_true', help='Build only the MSI, for signing before bundling')
-    mode.add_argument('--bundle-from', type=Path, metavar='MSI', help='Build the Setup EXE around an existing MSI')
+    mode.add_argument('--stage-only', action='store_true', help='Stage payload and uninstaller for signing')
+    mode.add_argument('--payload', type=Path, help='Build Setup from an already staged/signed payload')
     mode.add_argument('--delta', nargs=2, type=Path, metavar=('PREVIOUS_INSTALLER', 'NEW_INSTALLER'))
     args = parser.parse_args()
     if args.delta:
         build_delta(*args.delta)
-    elif args.bundle_from:
-        work = ROOT / 'build'
-        work.mkdir(exist_ok=True)
-        build_bundle(args.wix, args.bundle_from.resolve(), args.output.resolve())
-    else:
-        work = ROOT / 'build'
-        work.mkdir(exist_ok=True)
-        with TemporaryDirectory(prefix='msi-', dir=work) as directory:
-            stage = Path(directory) / 'payload'
-            stage_app(args.dist.resolve(), stage)
-            msi = build_msi(args.wix, stage, args.output.resolve())
-        if not args.msi_only:
-            build_bundle(args.wix, msi, args.output.resolve())
+        return
+    makensis = find_makensis(args.makensis)
+    parts = __version__.split('.')
+    if len(parts) != 3 or any(not part.isdigit() or int(part) > 65535 for part in parts):
+        raise ValueError('NSIS requires a three-part numeric release version')
+    work_root = ROOT / 'build'
+    work_root.mkdir(exist_ok=True)
+    with TemporaryDirectory(prefix='nsis-', dir=work_root) as directory:
+        work = Path(directory)
+        output = args.output.resolve()
+        if args.payload:
+            payload = args.payload.resolve()
+        else:
+            payload = output / 'payload' if args.stage_only else work / 'payload'
+            stage_app(args.dist.resolve(), payload, include_models=args.include_models)
+            build_uninstaller(makensis, payload, work)
+        if args.stage_only:
+            print(payload, flush=True)
+        else:
+            build_setup(makensis, payload, output, work)
 
 
 if __name__ == '__main__':

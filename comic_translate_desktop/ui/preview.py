@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt, QElapsedTimer, QRectF, QPointF, QSize, QTimer, Si
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap, QImageReader, QRegion
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QStackedLayout, QPushButton, QSizePolicy, QProgressBar
 from ..pdf_utils import render_pdf_preview
+from ..cbz import render_cbz_preview
 from ..config import ICON_PATH
 from .halftone import COMPACT_BREAKPOINT, draw_corner_tones, draw_tone
 from .theme import color, display_font, theme_name, ui_font
@@ -79,6 +80,7 @@ class PageCanvas(QLabel):
     region_edited = Signal(object)
     region_edit_finished = Signal()
     region_clicked = Signal(int)
+    regions_selected = Signal(object, str)
     region_context_menu = Signal(int, object)
     bubble_created = Signal(object)
 
@@ -265,12 +267,28 @@ class PageCanvas(QLabel):
 
     def cancel_region_drag(self):
         self._region_drag = None
+        self._selection_start = self._selection_rect = None
         if self.mouseGrabber() is self:
             self.releaseMouse()
         self.unsetCursor()
 
     def mousePressEvent(self, event):
         hit = self._region_hit(event.position())
+        if (event.button() == Qt.LeftButton and not self.region_creation and not self.bubble_creation
+                and self.page_rect().contains(event.position())):
+            if event.modifiers() & Qt.ShiftModifier:
+                self._selection_start = QPointF(event.position())
+                self._selection_rect = QRectF(self._selection_start, self._selection_start)
+                self.setFocus(Qt.MouseFocusReason)
+                self.grabMouse()
+                event.accept()
+                return
+            if event.modifiers() & Qt.ControlModifier:
+                index = self._region_at(event.position())
+                if index is not None:
+                    self.regions_selected.emit([index], 'toggle')
+                    event.accept()
+                    return
         if (self.bubble_creation and event.button() == Qt.LeftButton
                 and self.page_rect().contains(event.position())):
             self._region_drag = ('bubble_create', QPointF(event.position()), self.region)
@@ -356,6 +374,11 @@ class PageCanvas(QLabel):
             self.region_edited.emit(box)
 
     def mouseMoveEvent(self, event):
+        if getattr(self, '_selection_start', None) is not None:
+            self._selection_rect = QRectF(self._selection_start, event.position()).normalized().intersected(self.page_rect())
+            self.update()
+            event.accept()
+            return
         if self._region_drag is not None:
             self._drag_region_to(event.position())
             event.accept()
@@ -377,6 +400,16 @@ class PageCanvas(QLabel):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and getattr(self, '_selection_start', None) is not None:
+            rect = self._selection_rect
+            indices = [index for index, box in self.regions if rect.intersects(self._box_rect(box))]
+            self._selection_start = self._selection_rect = None
+            if self.mouseGrabber() is self:
+                self.releaseMouse()
+            self.regions_selected.emit(indices, 'add' if event.modifiers() & Qt.ControlModifier else 'replace')
+            self.update()
+            event.accept()
+            return
         if event.button() == Qt.LeftButton and self._region_drag is not None:
             self._drag_region_to(event.position())
             drag = self._region_drag
@@ -396,6 +429,13 @@ class PageCanvas(QLabel):
         super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape and getattr(self, '_selection_start', None) is not None:
+            self._selection_start = self._selection_rect = None
+            if self.mouseGrabber() is self:
+                self.releaseMouse()
+            self.update()
+            event.accept()
+            return
         if event.key() == Qt.Key_Escape and self._region_drag is not None:
             if self._region_drag[0] == 'bubble_create':
                 self.cancel_region_drag()
@@ -490,6 +530,13 @@ class PageCanvas(QLabel):
         painter.setPen(edge)
         painter.setBrush(Qt.NoBrush)
         painter.drawRect(page.adjusted(.5, .5, -.5, -.5))
+        rubber = getattr(self, '_selection_rect', None)
+        if rubber is not None:
+            painter.setPen(QPen(QColor(color('guide')), 1, Qt.DashLine))
+            tint = QColor(color('guide'))
+            tint.setAlpha(25)
+            painter.setBrush(tint)
+            painter.drawRect(rubber)
         selected_index = None
         if self.regions_visible and self.regions:
             painter.setClipping(False)
@@ -503,7 +550,12 @@ class PageCanvas(QLabel):
                     selected_index = index
                     continue
                 guide = QColor(color('guide'))
-                if index == self._hover_index:
+                if index in getattr(self, 'selected_indices', set()):
+                    pen = QPen(QColor(color('guide')), 2, Qt.SolidLine)
+                    pen.setCosmetic(True)
+                    painter.setPen(pen)
+                    painter.setBrush(Qt.NoBrush)
+                elif index == self._hover_index:
                     hs = max(0.25, min(1.0, self._hover_strength if self._hover_strength > 0 else 1.0))
                     halo = QColor(color('guideHalo'))
                     halo.setAlpha(int(round(180 * hs)))
@@ -582,6 +634,7 @@ class ImagePreview(QWidget):
     region_edited = Signal(object)
     region_edit_finished = Signal()
     region_clicked = Signal(int)
+    regions_selected = Signal(object, str)
     region_context_menu = Signal(int, object)
     bubble_created = Signal(object)
     zoom_changed = Signal(object)
@@ -677,6 +730,7 @@ class ImagePreview(QWidget):
         self._label.region_clicked.connect(self.region_clicked)
         self._label.region_context_menu.connect(self.region_context_menu)
         self._label.bubble_created.connect(self.bubble_created)
+        self._label.regions_selected.connect(self.regions_selected)
         self._label.installEventFilter(self)
         self._label.setObjectName('previewLabel')
         self._label.setAlignment(Qt.AlignCenter)
@@ -793,8 +847,11 @@ class ImagePreview(QWidget):
 
     def set_image(self, path):
         try:
-            if Path(path).suffix.lower() == '.pdf':
+            suffix = Path(path).suffix.lower()
+            if suffix == '.pdf':
                 self.set_pixmap(QPixmap.fromImage(render_pdf_preview(path, QSize(1600, 1600))))
+            elif suffix == '.cbz':
+                self.set_pixmap(QPixmap.fromImage(render_cbz_preview(path, QSize(1600, 1600))))
             else:
                 reader = QImageReader(str(path))
                 reader.setAutoTransform(True)
@@ -959,6 +1016,11 @@ class ImagePreview(QWidget):
     def set_regions(self, regions, visible=True):
         """All text boxes of the page, in image coordinates; click to select."""
         self._label.set_regions(regions, visible)
+
+    def set_selected_regions(self, indices):
+        self._selected_regions = set(indices)
+        self._label.selected_indices = self._selected_regions
+        self._label.update()
 
     def set_region(self, box=None, *, editable=False):
         """Canvas-only selection guide; never alter the rendered/exported pixels."""

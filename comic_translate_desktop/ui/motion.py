@@ -12,6 +12,7 @@ import math
 
 from PySide6.QtCore import (
     QAbstractAnimation,
+    QBasicTimer,
     QElapsedTimer,
     QEasingCurve,
     QEvent,
@@ -245,22 +246,23 @@ class _RippleOverlay(QWidget):
     _FADE_MS = 240.0
 
     def __init__(self, target: QAbstractButton) -> None:
-        super().__init__(target)
+        # Qt may dispatch paint while the native widget is being constructed.
+        # Establish the idle paint state before any QWidget calls can re-enter us.
         self._target = target
-        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        self.setGeometry(target.rect())
-
         self._hover_alpha = 0.0
         self._hover_target = 0.0
         self._last_ms = 0.0
         self._ripples: list[dict] = []
 
+        super().__init__(target)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.setGeometry(target.rect())
+
         self._clock = QElapsedTimer()
         self._clock.start()
 
-        self._timer = QTimer(self)
-        self._timer.setInterval(16)
-        self._timer.timeout.connect(self._step)
+        # Deliver frames to the widget itself, including inside modal dialogs.
+        self._timer = QBasicTimer()
         self.show()
 
     def set_hovered(self, hovered: bool) -> None:
@@ -308,10 +310,22 @@ class _RippleOverlay(QWidget):
     def _ensure_running(self) -> None:
         self._last_ms = float(self._clock.elapsed())
         if not self._timer.isActive():
-            self._timer.start()
+            self._timer.start(16, self)
 
-    def _step(self) -> None:
-        if not isValid(self) or not isValid(self._target):
+    def hideEvent(self, event) -> None:
+        timer = getattr(self, '_timer', None)
+        if timer is not None:
+            timer.stop()
+            self._ripples.clear()
+            self._hover_alpha = self._hover_target = 0.0
+        super().hideEvent(event)
+
+    def timerEvent(self, event) -> None:
+        timer = getattr(self, '_timer', None)
+        if timer is None or event.timerId() != timer.timerId():
+            super().timerEvent(event)
+            return
+        if not isValid(self._target):
             self._timer.stop()
             return
         now = float(self._clock.elapsed())
@@ -341,6 +355,9 @@ class _RippleOverlay(QWidget):
         self.update()
 
     def paintEvent(self, event) -> None:
+        # Qt can request paint before the Python animation state is available.
+        if getattr(self, '_timer', None) is None:
+            return
         if not isValid(self._target) or (self._hover_alpha <= 0.004 and not self._ripples):
             return
         r = QRectF(self.rect())
@@ -405,14 +422,15 @@ class _FocusLineOverlay(QWidget):
     """Draws Google AI Studio center-out expanding monochrome focus underline."""
 
     def __init__(self, target: QWidget) -> None:
-        super().__init__(target)
+        # Keep early native paint callbacks safe, as with the ripple overlay.
         self._target = target
-        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        self.setGeometry(target.rect())
-
         self._progress = 0.0
         self._target_progress = 0.0
         self._last_ms = 0.0
+
+        super().__init__(target)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.setGeometry(target.rect())
 
         self._clock = QElapsedTimer()
         self._clock.start()
@@ -453,6 +471,8 @@ class _FocusLineOverlay(QWidget):
         self.update()
 
     def paintEvent(self, event) -> None:
+        if getattr(self, '_timer', None) is None:
+            return
         if self._progress <= 0.004 or not isValid(self._target):
             return
         r = QRectF(self.rect())

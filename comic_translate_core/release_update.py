@@ -14,6 +14,7 @@ import requests
 
 REPOSITORY_URL = 'https://github.com/Aaaaamadeus/ComiTrans'
 RELEASE_API = 'https://api.github.com/repos/Aaaaamadeus/ComiTrans/releases/latest'
+SIGNPATH_ASSET_LABEL = 'SignPath Foundation signed'
 RESPONSE_LIMIT = 512 * 1024
 DELTA_LIMIT = 768 * 1024 * 1024
 DELTA_BLOCK_SIZE = 256 * 1024
@@ -65,8 +66,10 @@ def latest_stable(data, current, *, setup=False):
         assets = {item['name']: item for item in entries
                   if isinstance(item, dict) and isinstance(item.get('name'), str)}
 
-    def asset(name):
+    def asset(name, *, required_label=None):
         item = assets.get(name, {})
+        if required_label is not None and item.get('label') != required_label:
+            return None
         download = f'{REPOSITORY_URL}/releases/download/{tag}/{name}'
         size, digest = item.get('size'), item.get('digest')
         if (item.get('browser_download_url') == download and type(size) is int and 0 < size < 2**31
@@ -74,7 +77,9 @@ def latest_stable(data, current, *, setup=False):
             return Asset(download, size, digest[7:])
         return None
 
-    return Release(version, url, asset(installer_name(version, setup=setup)),
+    # A digest establishes integrity, so require the publisher's signing label
+    # before offering a download. Windows still verifies the actual signature.
+    return Release(version, url, asset(installer_name(version, setup=setup), required_label=SIGNPATH_ASSET_LABEL),
                    asset(delta_name(current, version, setup=setup)), setup)
 
 

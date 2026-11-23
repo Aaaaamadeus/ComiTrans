@@ -50,6 +50,34 @@ class ModelUpgradeTests(unittest.TestCase):
                 explicit = config.save_ai_config({"use_gpu": True, "detector_model": str(new)})
                 self.assertIsNone(explicit["cuda_detector_model"])
 
+    def test_installed_defaults_use_bundled_models_with_an_empty_profile(self):
+        from comic_translate_core.detector_paths import LEGACY_PATH, SPLIT_PATH, LINE_FILE
+        from comic_translate_desktop import config
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundled = root / 'install' / 'models'
+            user_models = root / 'profile' / 'models'
+            for relative in (SPLIT_PATH, SPLIT_PATH.with_name(LINE_FILE), LEGACY_PATH,
+                             config.MODEL_DEFAULTS['lama_model'], 'charspot-small/model.onnx',
+                             'charspot-small/config.json', 'charspot-small/vocab.json'):
+                path = bundled / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch()
+            with (patch.object(config, 'MODELS_ROOT', user_models),
+                  patch.object(config, 'BUNDLED_MODELS_ROOT', bundled),
+                  patch.object(config, 'CONFIG_PATH', root / 'config.yaml')):
+                defaults = config.load_ai_config()
+                self.assertEqual(config.missing_models(defaults), [])
+                self.assertEqual(defaults['detector_model'], str(bundled / SPLIT_PATH))
+                self.assertEqual(defaults['cuda_detector_model'], str(bundled / LEGACY_PATH))
+                relative = config.MODEL_DEFAULTS['lama_model']
+                previous = user_models / relative
+                self.assertEqual(config._resolve_model_path(previous, relative), bundled / relative)
+                previous.parent.mkdir(parents=True)
+                previous.touch()
+                self.assertEqual(config._resolve_model_path(previous, relative), previous)
+
     def test_auto_detector_uses_legacy_only_when_cuda_is_active(self):
         from onnx_text_detector import create_text_detector
         from comic_translate_core.detector_paths import REGION_FILE

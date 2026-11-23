@@ -16,7 +16,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from PIL import Image, ImageDraw, ImageFont
-from PySide6.QtCore import QSettings, QTimer, QPointF, Qt, QEvent
+from PySide6.QtCore import QSettings, QTimer, QPointF, Qt, QEvent, QRect
 from PySide6.QtGui import QFontInfo, QMouseEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (QApplication, QWidget, QToolButton, QLabel, QAbstractSpinBox,
@@ -40,6 +40,8 @@ def main():
     parser.add_argument('--theme', choices=('light', 'dark'), default='light',
                         help='Capture the paper (light) or night ink (dark) palette')
     parser.add_argument('--language', choices=('zh-CN', 'en', 'ja'), default='zh-CN')
+    parser.add_argument('--screen-size', nargs=2, type=int, metavar=('WIDTH', 'HEIGHT'),
+                        help='Virtual desktop bounds for reproducible headless captures')
     parser.add_argument('--editor-tools-only', action='store_true',
                         help='Review fill/color/font controls at every supported width')
     parser.add_argument('--context-only', action='store_true',
@@ -86,14 +88,16 @@ def main():
          patch.object(MainWindow, '_start_warmup'):
         config.save_ai_config({'ui_theme': args.theme, 'ui_language': args.language})
         window = MainWindow()
-        screen = app.primaryScreen().availableGeometry()
+        screen = (QRect(0, 0, *args.screen_size) if args.screen_size
+                  else app.primaryScreen().availableGeometry())
         window.resize(min(1440, int(screen.width() * .94)), min(900, int(screen.height() * .94)))
         window.show()
 
         def capture(name, page, buttons=(), ensure_visible=None):
             window.tabs.setCurrentWidget(page)
             app.processEvents()
-            QTest.qWait(80)
+            # Capture settled pages, after the 180/190 ms preview/tab fades.
+            QTest.qWait(240)
             if ensure_visible is not None:
                 window._pref_container.ensureWidgetVisible(ensure_visible, 0, 0)
                 app.processEvents()

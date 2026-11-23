@@ -5,6 +5,8 @@ from html import escape
 from pathlib import Path
 import json
 import random
+import hashlib
+import uuid
 
 from PySide6.QtCore import (
     QEasingCurve,
@@ -26,6 +28,7 @@ from PySide6.QtGui import (
     QIcon,
     QImageReader,
     QPixmap,
+    QFontMetrics,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -34,6 +37,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QCheckBox,
+    QDialog,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -55,15 +59,19 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from comic_translate_core.pipeline_settings import apply_runtime_settings
 from .. import config as app_config
 from ..config import config_fingerprint, missing_models, save_ai_config
+from ..productivity import nonnegative_number, terminology_projects
+from .workflow_dialogs import TerminologyDialog, TrialDialog, UsageDialog
 from comic_translate_core.languages import SOURCE_LANGUAGES, validate_ocr_config
 from comic_translate_core.chinese import TARGET_LANGUAGES, target_language_name
 from comic_translate_core.layout_options import VERTICAL_ALIGNMENTS
 from ..diagnostics import Diagnostics
 from ..pdf_utils import render_pdf_preview
+from ..cbz import PROJECT_EXTS, render_cbz_preview
 from ..pdf_project import project_link_path
 from ..worker import BatchWorker
 from .api_config_page import ApiConfigPage
@@ -96,7 +104,7 @@ from .star_prompt import StarPrompt, STAR_PROMPT_PROBABILITY
 
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
-DOCUMENT_EXTS = IMAGE_EXTS | {".pdf"}
+DOCUMENT_EXTS = IMAGE_EXTS | PROJECT_EXTS
 
 
 class MainWindow(QMainWindow):
@@ -295,7 +303,7 @@ class MainWindow(QMainWindow):
         heading = PanelHeading("01", tr('漫画队列'), sidebar=True)
         layout.addWidget(heading)
         self._file_count_label = QLabel(tr('0 个文件'))
-        self._file_selection_label = QLabel(tr('支持图片与 PDF'))
+        self._file_selection_label = QLabel(tr('支持图片、PDF 与 CBZ'))
         self._file_selection_label.setProperty("muted", True)
         layout.addWidget(self._file_count_label)
         layout.addWidget(self._file_selection_label)
@@ -317,7 +325,7 @@ class MainWindow(QMainWindow):
         self._folder_btn.setProperty("role", "chip")
         drop.addWidget(self._add_btn)
         drop.addWidget(self._folder_btn)
-        hint = QLabel('PNG / JPG / WEBP / BMP / PDF')
+        hint = QLabel('PNG / JPG / WEBP / BMP / PDF / CBZ')
         hint.setObjectName("dropHint")
         hint.setWordWrap(True)
         self._drop_hint = hint
@@ -356,10 +364,14 @@ class MainWindow(QMainWindow):
         self._elapsed_label.setProperty("muted", True)
         control_card = QFrame()
         control_card.setObjectName("controlCard")
+        control_card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self._control_card = control_card
         control_layout = QVBoxLayout(control_card)
         control_layout.setContentsMargins(0, 0, 0, 6)
         control_layout.setSpacing(4)
-        self._control_grid = QGridLayout()
+        self._control_bar = QWidget()
+        self._control_bar.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self._control_grid = QGridLayout(self._control_bar)
         self._control_grid.setContentsMargins(0, 0, 0, 0)
         self._control_grid.setHorizontalSpacing(10)
         self._control_grid.setVerticalSpacing(4)
@@ -435,6 +447,42 @@ class MainWindow(QMainWindow):
         self._language_stacked = False
         self._start_btn = QPushButton(tr('开始翻译'))
         self._start_btn.setProperty("role", "primary")
+        self._last_usage_report = None
+        self._trial_outputs = []
+        self._usage_report_timer = QTimer(self)
+        self._usage_report_timer.setSingleShot(True)
+        self._usage_report_timer.timeout.connect(self._show_usage)
+        self._trial_btn = QPushButton(tr('试译'))
+        self._trial_btn.setProperty('compact', True)
+        self._trial_btn.setToolTip(tr('先翻译队列开头的 1–3 页，查看效果和消耗'))
+        self._trial_btn.clicked.connect(self._start_trial)
+        self._usage_btn = QPushButton(tr('消耗'), self)
+        self._usage_btn.setProperty('compact', True)
+        self._usage_btn.setToolTip(tr('查看本次翻译 token 用量并设置估算单价'))
+        self._usage_btn.clicked.connect(self._show_usage)
+        self._usage_btn.setEnabled(False)
+        self._usage_btn.hide()
+        self._task_menu_btn = QToolButton()
+        self._task_menu_btn.setText(tr('任务'))
+        self._task_menu_btn.setProperty('compact', True)
+        self._task_menu_btn.setProperty('role', 'utility')
+        self._task_menu_btn.setProperty('menuButton', True)
+        self._task_menu_btn.setPopupMode(QToolButton.InstantPopup)
+        self._task_menu = QMenu(self._task_menu_btn)
+        self._task_menu.setToolTipsVisible(True)
+        self._task_work_info = self._task_menu.addAction(tr('未启用作品术语库'))
+        self._task_work_info.setEnabled(False)
+        self._task_terms_action = self._task_menu.addAction(tr('作品术语库'), self._edit_terminology)
+        self._task_menu.addSeparator()
+        self._task_usage_action = self._task_menu.addAction(tr('翻译消耗'), self._show_usage)
+        self._task_usage_action.setEnabled(False)
+        self._task_menu_btn.setMenu(self._task_menu)
+        self._run_controls = QWidget()
+        run_row = QHBoxLayout(self._run_controls)
+        run_row.setContentsMargins(0, 0, 0, 0)
+        run_row.setSpacing(6)
+        for button in (self._task_menu_btn, self._trial_btn, self._start_btn):
+            run_row.addWidget(button)
         self._output_controls = QWidget()
         output_row = QHBoxLayout(self._output_controls)
         output_row.setContentsMargins(0, 0, 0, 0)
@@ -451,18 +499,21 @@ class MainWindow(QMainWindow):
         self._browse_output_btn.clicked.connect(self._browse_output_dir)
         output_row.addWidget(self._output_dir_input, 1)
         output_row.addWidget(self._browse_output_btn)
-        control_layout.addLayout(self._control_grid)
+        control_layout.addWidget(self._control_bar)
         self._font_picker = TranslationFontPicker(self.config)
         self._font_picker.selection_changed.connect(self._change_translation_font)
         self._pref_container = QScrollArea()
+        self._pref_container.setObjectName('prefContainer')
         self._pref_container.setWidgetResizable(True)
         self._pref_container.setFrameShape(QFrame.NoFrame)
         self._pref_container.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._pref_container.setVisible(False)
         pref_content = QWidget()
+        pref_content.setObjectName('prefContent')
+        self._pref_content = pref_content
         self._pref_container.setWidget(pref_content)
         pref_layout = QVBoxLayout(pref_content)
-        pref_layout.setContentsMargins(0, 0, 0, 0)
+        pref_layout.setContentsMargins(0, 10, 0, 4)
         pref_layout.setSpacing(10)
         pref_layout.addWidget(self._font_picker)
 
@@ -555,13 +606,25 @@ class MainWindow(QMainWindow):
         names_panel.setSpacing(4)
         names_label = QLabel(tr('中文人名（每行一个，AI 会自动对照）'))
         names_label.setProperty("muted", True)
+        names_label.setWordWrap(True)
         self._names_input = QPlainTextEdit()
         self._names_input.setObjectName('prefInput')
         self._names_input.setPlaceholderText(tr('例如：\n路飞\n娜美\n索隆'))
         self._names_input.setMinimumHeight(62)
         self._names_input.setMaximumHeight(72)
-        names_panel.addWidget(names_label)
+        names_header = QHBoxLayout()
+        names_header.addWidget(names_label, 1)
+        self._terminology_btn = QPushButton(tr('作品术语库'))
+        self._terminology_btn.setProperty('compact', True)
+        self._terminology_btn.clicked.connect(self._edit_terminology)
+        names_header.addWidget(self._terminology_btn)
+        names_panel.addLayout(names_header)
         names_panel.addWidget(self._names_input)
+        self._terminology_summary = QLabel()
+        self._terminology_summary.setWordWrap(True)
+        self._terminology_summary.setProperty('muted', True)
+        self._refresh_terminology_summary()
+        names_panel.addWidget(self._terminology_summary)
         right_layout.addLayout(prompt_panel)
         right_layout.addLayout(names_panel)
         right_layout.addStretch(1)
@@ -829,9 +892,11 @@ class MainWindow(QMainWindow):
         self._update_actions()
 
     def _thumbnail_icon(self, path: Path) -> QIcon:
-        if path.suffix.lower() == ".pdf":
+        suffix = path.suffix.lower()
+        if suffix in PROJECT_EXTS:
             try:
-                return QIcon(QPixmap.fromImage(render_pdf_preview(path, QSize(96, 96))))
+                preview = render_cbz_preview if suffix == '.cbz' else render_pdf_preview
+                return QIcon(QPixmap.fromImage(preview(path, QSize(96, 96))))
             except Exception:
                 return QIcon()
         reader = QImageReader(str(path))
@@ -845,9 +910,9 @@ class MainWindow(QMainWindow):
     def _choose_files(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
             self,
-            tr('选择漫画图片或 PDF'),
+            tr('选择漫画文件'),
             "",
-            tr('漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf);;图片文件 (*.png *.jpg *.jpeg *.webp *.bmp);;PDF 文件 (*.pdf)'),
+            tr('漫画文件 (*.png *.jpg *.jpeg *.webp *.bmp *.pdf *.cbz);;图片文件 (*.png *.jpg *.jpeg *.webp *.bmp);;PDF 文件 (*.pdf);;CBZ 文件 (*.cbz)'),
         )
         self._add_paths(paths)
 
@@ -979,7 +1044,7 @@ class MainWindow(QMainWindow):
             self._set_status(tr('模型已就绪'), "ready")
         self._update_actions()
 
-    def _start_translation(self) -> None:
+    def _start_translation(self, checked=False, *, trial_pages=0) -> None:
         if self.worker is not None or self.warmup_worker is not None:
             return
         self._warmup_timer.stop()
@@ -1025,7 +1090,13 @@ class MainWindow(QMainWindow):
         if self.pipeline is None or self.pipeline_fingerprint != fingerprint:
             self.pipeline = None
 
-        for index in range(self.file_list.count()):
+        self._trial_outputs = []
+        worker_config = dict(self.config)
+        if trial_pages:
+            worker_config.update(trial_page_limit=trial_pages, resume_enabled=False,
+                                 retain_translation_context=False)
+            output_dir = output_dir / 'trial' / uuid.uuid4().hex[:12]
+        for index in range(self.file_list.count() if not trial_pages else 0):
             item = self.file_list.item(index)
             key = item.data(Qt.UserRole)
             item.setText(tr('○ 等待\n{_0}', _0=item.data(Qt.UserRole + 1) or Path(key).name))
@@ -1034,7 +1105,7 @@ class MainWindow(QMainWindow):
         self.worker = BatchWorker(
             files,
             output_dir,
-            self.config,
+            worker_config,
             pipeline=self.pipeline,
             parent=self,
         )
@@ -1058,6 +1129,62 @@ class MainWindow(QMainWindow):
         self.stage_label.setText(tr('任务已创建，正在准备第一份文件'))
         self._set_running(True)
 
+    def _start_trial(self):
+        if self.worker is not None or self.warmup_worker is not None or not self._all_files():
+            return
+        dialog = TrialDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._start_translation(trial_pages=dialog.pages.value())
+        dialog.deleteLater()
+
+    def _refresh_terminology_summary(self):
+        project = terminology_projects(self.config.get('terminology_projects')).get(
+            self.config.get('terminology_project', ''))
+        self._terminology_summary.setText(
+            tr('当前作品：{_0} · {_1} 个译名 · AI 自动匹配', _0=project['name'], _1=len(project['terms']))
+            if project else tr('未启用作品术语库'))
+        summary = self._terminology_summary.text()
+        self._task_work_info.setText(QFontMetrics(self._task_menu.font()).elidedText(summary, Qt.ElideRight, 420))
+        self._task_work_info.setToolTip(summary)
+        self._task_menu_btn.setToolTip(summary)
+
+    def _edit_terminology(self):
+        if self.worker is not None:
+            return
+        dialog = TerminologyDialog(self.config, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            try:
+                self.config = save_ai_config(dialog.values())
+                self._refresh_terminology_summary()
+            except OSError as exc:
+                QMessageBox.warning(self, tr('保存失败'), str(exc))
+        dialog.deleteLater()
+
+    def _pricing_scope(self):
+        return hashlib.sha256((str(self.config.get('api_base_url', '')) + '\n'
+                               + str(self.config.get('translation_model', ''))).encode()).hexdigest()
+
+    def _show_usage(self):
+        if not self._last_usage_report:
+            return
+        report = self._last_usage_report
+        raw = self.config.get('usage_pricing', {})
+        pricing = raw if raw.get('scope') == report.get('scope') else {}
+        pricing = {**pricing, 'input': nonnegative_number(pricing.get('input')),
+                   'output': nonnegative_number(pricing.get('output'))}
+        dialog = UsageDialog(report, pricing, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            try:
+                self.config = save_ai_config({'usage_pricing': {**dialog.pricing(), 'scope': report.get('scope')}})
+            except OSError as exc:
+                QMessageBox.warning(self, tr('保存失败'), str(exc))
+            if dialog.action == 'edit':
+                self._nav_editor.click()
+                self.editor_page.request_import(report.get('outputs', []))
+            elif dialog.action == 'full':
+                self._start_translation()
+        dialog.deleteLater()
+
     def _stop_translation(self) -> None:
         if self.worker and self.worker.isRunning():
             self._stop_requested = True
@@ -1080,6 +1207,11 @@ class MainWindow(QMainWindow):
         selected_count = len(self.file_list.selectedItems())
         self._start_btn.setText(tr('开始翻译（{_0}）', _0=count) if count else tr('开始翻译'))
         self._start_btn.setEnabled(not running and not warming and count > 0)
+        self._trial_btn.setEnabled(not running and not warming and count > 0)
+        self._usage_btn.setEnabled(not running and bool(self._last_usage_report))
+        self._task_menu_btn.setEnabled(not running)
+        self._task_terms_action.setEnabled(not running)
+        self._task_usage_action.setEnabled(not running and bool(self._last_usage_report))
         self._stop_btn.setVisible(running)
         self._stop_btn.setEnabled(running and not self._stop_requested)
         self._add_btn.setEnabled(not running)
@@ -1105,22 +1237,22 @@ class MainWindow(QMainWindow):
         self._page_progress_label.setVisible((count > 0 or running) and not compact_pref)
         self._progress_label.setVisible((count > 0 or running) and not compact_pref)
         self._file_selection_label.setText(
-            tr('已选 {_0} 个', _0=selected_count) if selected_count else tr('支持图片与 PDF')
+            tr('已选 {_0} 个', _0=selected_count) if selected_count else tr('支持图片、PDF 与 CBZ')
         )
         selected = self.file_list.selectedItems()
         output = self.results.get(selected[-1].data(Qt.UserRole)) if selected else None
         self._edit_result_btn.setEnabled(bool(output and (
-            Path(output).suffix.lower() != ".pdf" or project_link_path(output).is_file())))
-        self._edit_result_btn.setToolTip(tr('精修已生成的图片或 PDF') if self._edit_result_btn.isEnabled() else tr('请选择已完成且带精修资料的图片或 PDF'))
+            Path(output).suffix.lower() not in PROJECT_EXTS or project_link_path(output).is_file())))
+        self._edit_result_btn.setToolTip(tr('精修已生成的结果') if self._edit_result_btn.isEnabled() else tr('请选择已完成且带精修资料的结果'))
         editable = self._editable_outputs()
         self._edit_all_btn.setEnabled(bool(editable) and not running)
         self._edit_all_btn.setToolTip(
-            tr('把上次任务生成的全部图片或 PDF 加入嵌字精修列表') if editable
+            tr('把上次任务的全部结果加入嵌字精修列表') if editable
             else tr('上次任务还没有可精修的结果'))
         if warming:
             self._start_btn.setToolTip(tr('本地模型正在准备，完成后即可开始'))
         elif not count:
-            self._start_btn.setToolTip(tr('请先添加漫画图片或 PDF'))
+            self._start_btn.setToolTip(tr('请先添加漫画文件'))
         else:
             self._start_btn.setToolTip(tr('开始处理当前列表中的 {_0} 个文件', _0=count))
 
@@ -1149,7 +1281,8 @@ class MainWindow(QMainWindow):
             return
         self.step_panel.consume_workflow_event(event)
         if event.get('type') == 'publish' and event.get('state') == 'running':
-            self.stage_focus.set_stage('07', tr('合成译文 PDF'), event.get('document_name', ''))
+            title = tr('打包译文 CBZ') if event.get('output_format') == 'CBZ' else tr('合成译文 PDF')
+            self.stage_focus.set_stage('07', title, event.get('document_name', ''))
 
     def _on_stage_event(self, event) -> None:
         if self.worker is None or event['task_id'] != self.worker.task_id:
@@ -1167,7 +1300,7 @@ class MainWindow(QMainWindow):
         self.stage_label.setText(detail)
         self.stage_label.setToolTip(tr(event['message']))
         index = event['document_index']
-        if 0 < index <= self.file_list.count():
+        if not self.worker._trial_limit and 0 < index <= self.file_list.count():
             item = self.file_list.item(index - 1)
             state = {'failed': tr('⊠ 失败'), 'cancelled': tr('— 已取消')}.get(event['state'], tr('◉ 处理中'))
             item.setText(f'{state}\n{item.data(Qt.UserRole + 1)}')
@@ -1181,6 +1314,11 @@ class MainWindow(QMainWindow):
         self._append_log(tr('AI 模型初始化完成。'))
 
     def _on_image_done(self, input_path: str, output_path: str) -> None:
+        if self.worker is not None and self.worker._trial_limit:
+            self._trial_outputs.append(output_path)
+            self.result_view.set_image(output_path)
+            self.preview_tabs.setCurrentWidget(self.result_view)
+            return
         key = str(Path(input_path).resolve())
         self.results[key] = output_path
         current = self._current_result_paths()
@@ -1203,6 +1341,9 @@ class MainWindow(QMainWindow):
 
     def _on_image_failed(self, name: str, message: str) -> None:
         self.step_panel.mark_failed()
+        if self.worker is not None and self.worker._trial_limit:
+            self._append_log(tr('[失败] {_0}: {_1}', _0=name, _1=message))
+            return
         for index in range(self.file_list.count()):
             item = self.file_list.item(index)
             original_name = item.data(Qt.UserRole + 1) or Path(item.data(Qt.UserRole)).name
@@ -1213,6 +1354,10 @@ class MainWindow(QMainWindow):
         self._append_log(tr('[失败] {_0}: {_1}', _0=name, _1=message))
 
     def _on_finished(self, success: int, failed: int) -> None:
+        trial = bool(self.worker is not None and self.worker._trial_limit)
+        if self.worker is not None and self.worker.usage_report:
+            self._last_usage_report = {**self.worker.usage_report, 'scope': self._pricing_scope()}
+            self._usage_btn.setEnabled(True)
         # The terminal signal is emitted as run() returns. Keep the worker until it exits.
         if self.worker is not None:
             self._stop_requested = self._stop_requested or self.worker._is_stopped()
@@ -1226,6 +1371,19 @@ class MainWindow(QMainWindow):
         self._elapsed_timer.stop()
         self._update_elapsed()
         self._set_running(False)
+        if trial:
+            self.stage_label.setText(tr('试译结束，结果已单独保存。'))
+            self._set_status(tr('试译完成') if not failed and not self._stop_requested else tr('试译已结束'),
+                             'ready' if not failed and not self._stop_requested else 'warning')
+            self._sync_step_panel_queue()
+            if failed:
+                self.step_panel.mark_failed()
+            elif self._stop_requested:
+                self.step_panel.mark_cancelled()
+            else:
+                self.step_panel.mark_done()
+            self._usage_report_timer.start(0)
+            return
         total_done = success + failed
         if self._stop_requested and total_done < self.file_list.count():
             summary = tr('已停止，完成 {_0} 个文件，失败 {_1} 个文件。', _0=success, _1=failed)
@@ -1284,7 +1442,11 @@ class MainWindow(QMainWindow):
         )
         copy_btn = box.addButton(tr('复制诊断提示词'), QMessageBox.ActionRole)
         issue_btn = box.addButton(tr('打开 Issue 页面'), QMessageBox.ActionRole)
-        box.addButton(tr('关闭'), QMessageBox.RejectRole)
+        close_btn = box.addButton(tr('关闭'), QMessageBox.RejectRole)
+        copy_btn.setProperty('role', 'primary')
+        issue_btn.setProperty('role', 'utility')
+        close_btn.setProperty('role', 'quiet')
+        box.setDefaultButton(copy_btn)
         box.exec()
         clicked = box.clickedButton()
         if clicked is copy_btn:
@@ -1352,7 +1514,7 @@ class MainWindow(QMainWindow):
             key = str(path)
             if key in seen or not path.exists():
                 continue
-            if path.suffix.lower() == '.pdf' and not project_link_path(path).is_file():
+            if path.suffix.lower() in PROJECT_EXTS and not project_link_path(path).is_file():
                 continue
             seen.add(key)
             outputs.append(key)
@@ -1374,96 +1536,142 @@ class MainWindow(QMainWindow):
 
     def _toggle_preferences(self, checked: bool) -> None:
         if not checked:
-            self._pref_scroll_value = self._pref_container.verticalScrollBar().value()
+            if self._pref_animation is None:
+                self._pref_scroll_value = self._pref_container.verticalScrollBar().value()
             if self._pref_save_timer.isActive():
                 self._save_translation_preferences()
         self._pref_toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow)
         self._ui_settings.setValue('ui/preferencesVisible', checked)
-        # Animate the foldout height and leave the log alone. Hiding the log in
-        # one step (and fading the scroll area through a QGraphicsOpacityEffect)
-        # is what made the old transition stutter instead of animate.
-        self._pref_animating = True
         self._animate_preferences(checked)
-        self._apply_compact_layout()
+
+    def _sync_pref_columns(self) -> None:
+        if not hasattr(self, '_pref_columns'):
+            return
+        control_layout = self._control_card.layout()
+        margins = control_layout.contentsMargins()
+        available_width = (
+            self._control_card.contentsRect().width()
+            - margins.left()
+            - margins.right()
+        )
+        if available_width <= 0:
+            available_width = max(0, self.width() - 320)
+        direction = (
+            QHBoxLayout.LeftToRight
+            if available_width >= 680
+            else QHBoxLayout.TopToBottom
+        )
+        if self._pref_columns.direction() == direction:
+            return
+        self._pref_columns.setDirection(direction)
+        self._pref_content.layout().invalidate()
+        self._pref_content.updateGeometry()
 
     def _pref_target_height(self) -> int:
-        if self.height() >= 760:
-            # Keep the log panel visible so nothing jumps when the foldout opens.
-            return min(280, max(220, self.height() - 620))
-        # The scroll viewport must fit its card in short windows; a 160px
-        # minimum otherwise lets the card clip controls that Qt reports visible.
-        reserve = 396 + (40 if hasattr(self, 'stage_focus') and self.stage_focus.isVisible() else 0)
-        available = max(56, self.height() - reserve)
-        return min(240, available)
+        self._sync_pref_columns()
+        self._pref_content.layout().activate()
+        content_height = self._pref_content.sizeHint().height()
+        if content_height <= 0:
+            content_height = 276
+        if self.height() < 760:
+            stage_visible = (
+                hasattr(self, 'stage_focus')
+                and not self.stage_focus.isHidden()
+            )
+            reserve = 392 + (40 if stage_visible else 0)
+            available = max(56, self.height() - reserve)
+            return min(max(240, min(content_height + 6, 300)), available)
+
+        cap = min(320, max(220, self.height() - 500))
+        return max(220, min(content_height + 6, cap))
+
+    def _unfreeze_pref_content(self) -> None:
+        if hasattr(self, '_pref_content'):
+            self._pref_content.setMinimumSize(0, 0)
+            self._pref_content.setMaximumSize(16777215, 16777215)
+        self._pref_container.setWidgetResizable(True)
 
     def _animate_preferences(self, expand: bool) -> None:
         container = self._pref_container
         previous = self._pref_animation
         if previous is not None:
+            self._pref_animation = None
             previous.stop()
             previous.deleteLater()
-            self._pref_animation = None
-        target = self._pref_target_height() if expand else 0
-        duration = 230 if expand else 195
-        if reduced_motion() or self.height() < 680:
-            # Short windows hide the log and stage focus while the foldout is open;
-            # apply compact visibility first so _pref_target_height sees freed space.
-            self._pref_animating = False
-            self._apply_compact_layout()
-            target = self._pref_target_height() if expand else 0
-            container.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-            container.setVisible(expand)
-            container.setMinimumHeight(target)
-            container.setMaximumHeight(target)
-            if expand:
-                self._restore_preferences_scroll()
-            return
-        start = container.height() if container.isVisible() else 0
+
+        start = 0 if container.isHidden() else container.height()
         if start > 10000:
             start = 0
+        self._unfreeze_pref_content()
+        self._pref_animating = True
+        self._apply_compact_layout()
+        target = self._pref_target_height() if expand else 0
+
+        if (
+            not self.isVisible()
+            or reduced_motion()
+            or self.height() < 680
+            or start == target
+        ):
+            self._finish_preferences_animation(expand, None)
+            return
+
+        container.setFixedHeight(start)
         container.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        container.setVisible(True)
+        container.show()
         if expand:
             container.verticalScrollBar().setValue(self._pref_scroll_value)
-        container.setFixedHeight(start)
+
+        control_layout = self._control_card.layout()
+        work_layout = getattr(self, '_work_layout', None)
 
         animation = QVariantAnimation(self)
-        animation.setDuration(duration)
+        animation.setDuration(230 if expand else 195)
         animation.setStartValue(float(start))
         animation.setEndValue(float(target))
         animation.setEasingCurve(STANDARD)
 
-        def _on_val(value) -> None:
-            container.setFixedHeight(max(0, int(round(float(value)))))
+        def apply_height(value) -> None:
+            if self._pref_animation is not animation:
+                return
+            container.setFixedHeight(max(0, round(float(value))))
+            control_layout.activate()
+            if work_layout is not None:
+                work_layout.activate()
 
-        animation.valueChanged.connect(_on_val)
+        animation.valueChanged.connect(apply_height)
         animation.finished.connect(
-            lambda: self._finish_preferences_animation(expand, target))
+            lambda: self._finish_preferences_animation(expand, animation)
+        )
         self._pref_animation = animation
         animation.start()
 
-    def _finish_preferences_animation(self, expand: bool, target: int) -> None:
-        self._pref_animating = False
+    def _finish_preferences_animation(self, expand: bool, animation) -> None:
+        if self._pref_animation is not animation:
+            return
         self._pref_animation = None
-        if expand:
-            target = self._pref_target_height()
-        else:
-            target = 0
+        self._pref_animating = False
+        if animation is not None:
+            animation.deleteLater()
+
         container = self._pref_container
+        self._unfreeze_pref_content()
         container.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        container.setMinimumHeight(target)
-        container.setMaximumHeight(target)
-        if expand:
-            bar = container.verticalScrollBar()
-            if bar.value() != self._pref_scroll_value:
-                bar.setValue(self._pref_scroll_value)
-        else:
-            container.setVisible(False)
+        container.setVisible(expand)
         self._apply_compact_layout()
+        self._control_card.layout().activate()
+        work_layout = getattr(self, '_work_layout', None)
+        if work_layout is not None:
+            work_layout.activate()
+        if expand:
+            self._restore_preferences_scroll()
 
     def _restore_preferences_scroll(self) -> None:
-        QTimer.singleShot(
-            0, lambda: self._pref_container.verticalScrollBar().setValue(self._pref_scroll_value))
+        QTimer.singleShot(0, self, self._apply_preferences_scroll)
+
+    def _apply_preferences_scroll(self) -> None:
+        if isValid(self) and isValid(self._pref_container):
+            self._pref_container.verticalScrollBar().setValue(self._pref_scroll_value)
 
     def _toggle_log_panel(self, visible: bool) -> None:
         was_visible = self._log_panel.isVisible()
@@ -1493,13 +1701,11 @@ class MainWindow(QMainWindow):
             self.stage_focus.setVisible((active_items or warming) and not compact_pref)
             self._page_progress_label.setVisible(active_items and not compact_pref)
             self._progress_label.setVisible(active_items and not compact_pref)
-        wide = self._pref_container.width() >= 680
-        if not self._pref_animating:
+        if self._pref_animating:
+            self._sync_pref_columns()
+        else:
             wanted = self._pref_target_height() if expanded else 0
-            self._pref_container.setMinimumHeight(wanted)
-            self._pref_container.setMaximumHeight(wanted)
-        if hasattr(self, '_pref_columns'):
-            self._pref_columns.setDirection(QHBoxLayout.LeftToRight if wide else QHBoxLayout.TopToBottom)
+            self._pref_container.setFixedHeight(wanted)
         self._brand_title.setFont(brand_font(28 if self.width() < 960 else 36 if self.width() < 1180 else 40))
         self._header_layout.setContentsMargins(12 if self.width() < 1120 else 20, 8, 12 if self.width() < 1120 else 20, 8)
         self._nav_auto.setText(tr('自动处理') if (self.width() < 1120 or ui_language() != 'zh-CN') else tr('01  自动处理'))
@@ -1510,7 +1716,7 @@ class MainWindow(QMainWindow):
         self._issue_btn.setVisible(not narrow)
         self._settings_btn.setVisible(self.width() >= 960)
         self._logs_btn.setVisible(self.width() >= 960)
-        inline = self.width() >= (1400 if ui_language() == 'en' else 1280 if ui_language() == 'ja' else 1180)
+        inline = self.width() >= (1580 if ui_language() == 'en' else 1500 if ui_language() == 'ja' else 1420)
         controls_mode = 'inline' if inline else 'narrow' if self.width() < 880 else 'split'
         stacked = controls_mode == 'split' and ui_language() != 'zh-CN'
         if stacked != self._language_stacked:
@@ -1535,7 +1741,7 @@ class MainWindow(QMainWindow):
             self._language_grid.setColumnStretch(5, 1)
         if controls_mode != self._controls_mode:
             self._controls_mode = controls_mode
-            for widget in (self._language_controls, self._output_controls, self._start_btn,
+            for widget in (self._language_controls, self._output_controls, self._run_controls,
                            self._quick_options, self._control_divider):
                 self._control_grid.removeWidget(widget)
             if inline:
@@ -1543,19 +1749,19 @@ class MainWindow(QMainWindow):
                 self._control_grid.addWidget(self._control_divider, 0, 1)
                 self._control_grid.addWidget(self._output_controls, 0, 2)
                 self._control_grid.addWidget(self._quick_options, 0, 3)
-                self._control_grid.addWidget(self._start_btn, 0, 4)
+                self._control_grid.addWidget(self._run_controls, 0, 4)
                 self._control_divider.setVisible(True)
             elif controls_mode == 'narrow':
                 self._control_grid.addWidget(self._language_controls, 0, 0, 1, 5)
                 self._control_grid.addWidget(self._quick_options, 1, 0, 1, 3, Qt.AlignLeft)
-                self._control_grid.addWidget(self._start_btn, 1, 3, 1, 2, Qt.AlignRight)
+                self._control_grid.addWidget(self._run_controls, 1, 3, 1, 2, Qt.AlignRight)
                 self._control_grid.addWidget(self._output_controls, 2, 0, 1, 5)
                 self._control_divider.setVisible(False)
             else:
                 self._control_grid.addWidget(self._language_controls, 0, 0, 1, 3)
                 self._control_grid.addWidget(self._quick_options, 0, 3, 1, 2, Qt.AlignRight)
                 self._control_grid.addWidget(self._output_controls, 1, 0, 1, 3)
-                self._control_grid.addWidget(self._start_btn, 1, 3, 1, 2, Qt.AlignRight)
+                self._control_grid.addWidget(self._run_controls, 1, 3, 1, 2, Qt.AlignRight)
                 self._control_divider.setVisible(False)
             self._control_grid.setColumnStretch(1, 0)
             self._control_grid.setColumnStretch(2, 1)
@@ -1585,9 +1791,15 @@ class MainWindow(QMainWindow):
     def showEvent(self, event):
         super().showEvent(event)
         apply_window_chrome(self)
+        self._apply_compact_layout()
+        QTimer.singleShot(0, self, self._apply_deferred_compact_layout)
         if not self._warmup_scheduled and self.pipeline is None:
             self._warmup_scheduled = True
             self._warmup_timer.start()
+
+    def _apply_deferred_compact_layout(self) -> None:
+        if isValid(self) and isValid(self._pref_container):
+            self._apply_compact_layout()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

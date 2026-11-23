@@ -4,15 +4,17 @@ from __future__ import annotations
 import json
 
 from PySide6.QtCore import Qt, QSettings, Signal
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QFormLayout, QFrame, QGridLayout, QHBoxLayout,
-    QLabel, QMenu, QPushButton, QSizePolicy, QToolButton, QVBoxLayout,
+    QLabel, QMenu, QPushButton, QScrollArea, QSizePolicy, QToolButton, QVBoxLayout, QWidget,
 )
 
 from ..font_library import available_fonts, font_description, font_display_name, font_reference, inspect_font, resolve_font_reference
 from ..i18n import tr
+from .manga_components import PanelHeading
 from .searchable_combo import SearchableFontCombo
-from .theme import set_themed_icon
+from .theme import set_themed_icon, ui_font
 
 
 class FavoriteFontBar(QFrame):
@@ -171,14 +173,52 @@ class FavoriteFontBar(QFrame):
     def configure(self):
         dialog = QDialog(self)
         dialog.setWindowTitle(tr('设置快捷字体'))
-        layout = QVBoxLayout(dialog)
+        dialog.setMinimumSize(460, 360)
+        dialog.resize(560, 560)
+        dialog.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+
+        root = QVBoxLayout(dialog)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        header = QFrame()
+        header.setObjectName('dialogHeader')
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(24, 18, 24, 14)
+        header_layout.setSpacing(6)
+        header_layout.addWidget(PanelHeading('', '设置快捷字体'))
         hint = QLabel(tr('最多 9 个字体，对应数字键 1–9；留空可清除该快捷键。'))
+        hint.setProperty('muted', True)
         hint.setWordWrap(True)
-        layout.addWidget(hint)
-        form = QFormLayout()
+        header_layout.addWidget(hint)
+        root.addWidget(header)
+
+        scroll = QScrollArea()
+        scroll.setObjectName('dialogScroll')
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        container = QWidget()
+        container.setObjectName('dialogScrollContent')
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(24, 16, 24, 16)
+        container_layout.setSpacing(12)
+
+        card = QFrame()
+        card.setObjectName('dialogCard')
+        form = QFormLayout(card)
+        form.setContentsMargins(20, 16, 20, 16)
+        form.setHorizontalSpacing(14)
+        form.setVerticalSpacing(10)
+        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         fonts = available_fonts(self.config)
         choices = []
         for index, reference in enumerate(self.slots):
+            badge = QLabel(f'{index + 1:02d}')
+            badge.setObjectName('stepBadge')
+            badge.setFont(ui_font(11, QFont.Bold, mono=True))
+            badge.setAlignment(Qt.AlignCenter)
+            badge.setFixedSize(28, 24)
+
             combo = SearchableFontCombo()
             combo.addItem(tr('未设置'), '')
             for font in fonts:
@@ -189,13 +229,29 @@ class FavoriteFontBar(QFrame):
                 combo.addItem(tr('不可用：{_0}', _0=reference), reference)
                 row = combo.count() - 1
             combo.setCurrentIndex(row)
-            form.addRow(str(index + 1), combo)
+            form.addRow(badge, combo)
             choices.append(combo)
-        layout.addLayout(form)
+        container_layout.addWidget(card)
+        container_layout.addStretch(1)
+        scroll.setWidget(container)
+        root.addWidget(scroll, 1)
+
+        footer = QFrame()
+        footer.setObjectName('pageActions')
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(24, 12, 24, 12)
         actions = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        ok_btn = actions.button(QDialogButtonBox.Ok)
+        cancel_btn = actions.button(QDialogButtonBox.Cancel)
+        if ok_btn is not None:
+            ok_btn.setProperty('role', 'primary')
+            ok_btn.setDefault(True)
+        if cancel_btn is not None:
+            cancel_btn.setProperty('role', 'utility')
         actions.accepted.connect(dialog.accept)
         actions.rejected.connect(dialog.reject)
-        layout.addWidget(actions)
-        dialog.resize(540, dialog.sizeHint().height())
+        footer_layout.addWidget(actions)
+        root.addWidget(footer)
+
         if dialog.exec() == QDialog.Accepted:
             self.set_slots([combo.currentData() or '' for combo in choices])

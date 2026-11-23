@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from PIL import Image
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
@@ -16,6 +16,7 @@ from comic_translate_desktop import config
 from comic_translate_desktop.pdf_project import project_link_path
 from comic_translate_desktop.ui.main_window import MainWindow
 from comic_translate_desktop.ui.motion import set_reduced_motion
+from comic_translate_desktop.ui.theme import apply_theme
 from tests.qt_utils import destroy_widget
 
 
@@ -165,6 +166,38 @@ class RetouchAndMotionTests(unittest.TestCase):
         self.assertFalse(window._pref_animating)
         self.assertFalse(window._pref_container.isVisible())
         self.assertEqual(window._pref_container.maximumHeight(), 0)
+
+    def test_pointer_clicks_and_interrupted_preferences_animation_have_no_qt_callback_errors(self):
+        errors = []
+        window = self.window()
+        window.setAttribute(Qt.WA_DontShowOnScreen)
+        window.show()
+        try:
+            with patch('sys.excepthook', lambda kind, value, tb: errors.append(str(value))):
+                for theme in ('light', 'dark'):
+                    apply_theme(self.app, theme)
+                    for size in ((1440, 900), (1024, 720), (820, 640)):
+                        with self.subTest(theme=theme, size=size):
+                            window.resize(*size)
+                            window._pref_toggle.setChecked(False)
+                            QTest.qWait(260)
+                            # Click through the motion event filter, including reversal mid-animation.
+                            for _ in range(4):
+                                QTest.mouseClick(window._pref_toggle, Qt.LeftButton)
+                                QTest.qWait(20)
+                            QTest.qWait(280)
+                            self.assertFalse(window._pref_container.isVisible())
+                            QTest.mouseClick(window._pref_toggle, Qt.LeftButton)
+                            QTest.qWait(300)
+                            self.assertTrue(window._pref_container.isVisible())
+                            self.assertFalse(window.grab().isNull())
+                            QTest.mouseClick(window._pref_toggle, Qt.LeftButton)
+                            QTest.qWait(260)
+                            self.assertFalse(window._pref_container.isVisible())
+                            self.assertFalse(window._pref_animating)
+                            self.assertEqual(errors, [])
+        finally:
+            apply_theme(self.app, 'light')
 
     def test_reduced_motion_and_restored_open_state_apply_without_animation(self):
         window = self.window()

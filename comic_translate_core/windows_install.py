@@ -1,4 +1,4 @@
-"""Locate an MSI installation without changing portable layouts."""
+"""Locate a Windows installation without changing portable layouts."""
 
 from dataclasses import dataclass
 import os

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       previous_version:
-        description: Previous signed Windows release for optional deltas (e.g. 2.6.0)
+        description: Previous signed Windows Setup release for upgrade testing and optional delta
         type: string
         required: false
 
@@ -16,8 +16,6 @@ jobs:
     runs-on: windows-2022
     if: github.ref_type == 'tag'
     environment: windows-release-signing
-    env:
-      DOTNET_ROLL_FORWARD: Major
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,9 +23,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.10'
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
       - name: Check release tag and install build dependencies
         id: release
         shell: pwsh
@@ -38,77 +33,53 @@ jobs:
           python -m venv .venv
           .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet tool install --tool-path build/wix wix --version 5.0.2
+          choco install nsis --version=3.13 --yes --no-progress
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & build/wix/wix.exe extension add WixToolset.Bal.wixext/5.0.2
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Build the Windows x64 MSI
+      - name: Test and build the application, service and NSIS uninstaller
         shell: powershell
         run: |
+          .\.venv\Scripts\python.exe -m unittest -v tests.test_nsis_installer tests.test_release_update
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           .\build_app.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          .\.venv\Scripts\python.exe installer/build.py --wix build/wix/wix.exe --msi-only --output release/unsigned
-      - name: Stage installer for verified signing
+          .\.venv\Scripts\python.exe installer/build.py --stage-only --include-models --output build/unsigned
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force build/signing | Out-Null
+          foreach ($name in 'ComiTrans.exe', 'ComiTransReleaseService.exe', 'Uninstall.exe') {
+            Copy-Item -LiteralPath "build/unsigned/payload/$name" -Destination build/signing
+          }
+      - name: Stage executables for verified signing
         id: unsigned
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-windows-msi
-          path: release/unsigned/ComiTrans-*-x64.msi
+          name: unsigned-windows-payload
+          path: build/signing/*.exe
           if-no-files-found: error
           compression-level: 0
-      - name: Sign the installer and both ComiTrans executables
+      - name: Sign the application, service and uninstaller
         uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
           project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
-          artifact-configuration-slug: windows-msi
+          artifact-configuration-slug: windows-payload
           parameters: |
             version: ${{ toJSON(steps.release.outputs.version) }}
           github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
           wait-for-completion: true
-          output-artifact-directory: release/signed
-      - name: Wrap the signed MSI and detach the Burn engine for signing
+          output-artifact-directory: build/signed-payload
+      - name: Build NSIS Setup with the signed executables
         shell: pwsh
         run: |
-          $stem = "ComiTrans-$($env:GITHUB_REF_NAME)-x64"
-          .\.venv\Scripts\python.exe installer/build.py --wix build/wix/wix.exe `
-            --bundle-from "release/signed/$stem.msi" --output build/burn
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & build/wix/wix.exe burn detach "build/burn/$stem-Setup.exe" -engine build/burn/ComiTrans-BurnEngine.exe
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v4
-        id: unsigned-engine
-        with:
-          name: unsigned-burn-engine
-          path: build/burn/ComiTrans-BurnEngine.exe
-          if-no-files-found: error
-      - name: Sign the Burn engine used for repair and uninstall
-        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
-          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
-          artifact-configuration-slug: windows-setup
-          parameters: |
-            version: ${{ toJSON(steps.release.outputs.version) }}
-          github-artifact-id: ${{ steps.unsigned-engine.outputs.artifact-id }}
-          wait-for-completion: true
-          output-artifact-directory: build/signed-engine
-      - name: Reattach the signed engine
-        shell: pwsh
-        run: |
-          $name = "ComiTrans-$($env:GITHUB_REF_NAME)-x64-Setup.exe"
-          New-Item -ItemType Directory -Force build/unsigned-setup | Out-Null
-          & build/wix/wix.exe burn reattach "build/burn/$name" -engine build/signed-engine/ComiTrans-BurnEngine.exe -out "build/unsigned-setup/$name"
+          Copy-Item -Path build/signed-payload/*.exe -Destination build/unsigned/payload -Force
+          .\.venv\Scripts\python.exe installer/build.py --payload build/unsigned/payload --output release/unsigned
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         id: unsigned-setup
         with:
           name: unsigned-windows-setup
-          path: build/unsigned-setup/*-Setup.exe
+          path: release/unsigned/*-Setup.exe
           if-no-files-found: error
           compression-level: 0
       - name: Sign the final Setup EXE
@@ -123,7 +94,7 @@ jobs:
             version: ${{ toJSON(steps.release.outputs.version) }}
           github-artifact-id: ${{ steps.unsigned-setup.outputs.artifact-id }}
           wait-for-completion: true
-          output-artifact-directory: release/signed-setup
+          output-artifact-directory: release/signed
       - name: Verify signatures, test Setup and prepare the release files
         shell: pwsh
         env:
@@ -137,29 +108,22 @@ jobs:
               throw "Windows could not verify the timestamped SignPath Foundation signature: $path"
             }
           }
+          foreach ($name in 'ComiTrans.exe', 'ComiTransReleaseService.exe', 'Uninstall.exe') {
+            Confirm-ComiTransSignature "build/unsigned/payload/$name"
+          }
           $stem = "ComiTrans-$($env:GITHUB_REF_NAME)-x64"
-          $msi = "release/signed/$stem.msi"
-          $setup = (Get-Item "release/signed-setup/$stem-Setup.exe").FullName
-          Confirm-ComiTransSignature $msi
+          $setup = (Get-Item "release/signed/$stem-Setup.exe").FullName
           Confirm-ComiTransSignature $setup
-          Confirm-ComiTransSignature 'build/signed-engine/ComiTrans-BurnEngine.exe'
           $test = @{ Setup = $setup; Version = $env:GITHUB_REF_NAME.Substring(1); LogDirectory = $env:RUNNER_TEMP }
-          Copy-Item -LiteralPath $setup -Destination release/signed
           if ($env:PREVIOUS_VERSION) {
             if ($env:PREVIOUS_VERSION -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Invalid base version.' }
-            $previousTag = "v$env:PREVIOUS_VERSION"
-            $assets = gh release view $previousTag --json assets --jq '.assets[].name'
+            $name = "ComiTrans-v$env:PREVIOUS_VERSION-x64-Setup.exe"
+            gh release download "v$env:PREVIOUS_VERSION" --pattern $name --dir build/previous
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            foreach ($suffix in '.msi', '-Setup.exe') {
-              $name = "ComiTrans-$previousTag-x64$suffix"
-              if ($name -notin $assets) { continue }
-              gh release download $previousTag --pattern $name --dir build/previous
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-              Confirm-ComiTransSignature "build/previous/$name"
-              if ($suffix -eq '-Setup.exe') { $test.PreviousSetup = (Resolve-Path "build/previous/$name").Path }
-              .\.venv\Scripts\python.exe installer/build.py --delta "build/previous/$name" "release/signed/$stem$suffix"
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            }
+            Confirm-ComiTransSignature "build/previous/$name"
+            $test.PreviousSetup = (Resolve-Path "build/previous/$name").Path
+            .\.venv\Scripts\python.exe installer/build.py --delta "build/previous/$name" $setup
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           & installer/Test-Setup.ps1 @test
           .\.venv\Scripts\python.exe -c "from pathlib import Path; from package_release import write_checksums; p=Path('release/signed'); write_checksums(p, sorted(p.glob('ComiTrans-*')))"

@@ -192,6 +192,21 @@ class FontCatalogTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '许可证'):
             download_face(family, family['faces'][0])
 
+    def test_font_preview_matches_dark_theme_surface_and_ink(self):
+        import sys
+        from comic_translate_desktop.ui.theme import apply_theme
+        main_dir = str(ROOT / 'comic-translate-ai' / 'main')
+        if main_dir not in sys.path:
+            sys.path.insert(0, main_dir)
+        apply_theme(self.app, 'dark')
+        self.addCleanup(lambda: apply_theme(self.app, 'light'))
+        dialog = self.dialog()
+        font_path = ROOT / 'comic-translate-ai' / 'font_file' / 'CN' / 'SourceHanSansSC-Medium-2.otf'
+        dialog._show_preview(str(font_path))
+        pixmap = dialog.preview.pixmap()
+        self.assertFalse(pixmap.isNull())
+        self.assertLess(pixmap.toImage().pixelColor(0, 0).lightness(), 40)
+
 
 if __name__ == '__main__':
     unittest.main()

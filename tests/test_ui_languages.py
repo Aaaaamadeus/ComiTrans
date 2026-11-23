@@ -278,3 +278,19 @@ class UiLanguageTests(unittest.TestCase):
         with patch.object(window.diagnostics, 'add_error') as add:
             window._append_log(tr('[失败] {_0}: {_1}', _0='page.png', _1='failure'))
             add.assert_called_once()
+
+    def test_clicking_language_card_selects_option_and_updates_preview_in_dark_theme(self):
+        from PySide6.QtCore import Qt
+        from comic_translate_desktop.ui.theme import apply_theme
+        apply_theme(self.app, 'dark')
+        self.addCleanup(lambda: apply_theme(self.app, 'light'))
+        dialog = InterfaceLanguageDialog('zh-CN')
+        self.addCleanup(destroy_widget, dialog)
+        dialog.show()
+        self.app.processEvents()
+        ja_card = dialog._radios['ja'].parentWidget()
+        QTest.mouseClick(ja_card, Qt.LeftButton)
+        self.assertEqual(dialog.selected_language, 'ja')
+        self.assertEqual(dialog.continue_button.text(), '続行')
+        self.assertTrue(ja_card.property('selected'))
+        self.assertFalse(dialog._radios['zh-CN'].parentWidget().property('selected'))

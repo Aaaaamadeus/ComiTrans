@@ -1,0 +1,47 @@
+name: Verify Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to verify, including draft releases
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify release files
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Invalid release tag.' }
+          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern '*-Setup.exe' --pattern 'SHA256SUMS.txt' --dir package
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($line in Get-Content package/SHA256SUMS.txt) {
+            if ($line -notmatch '^([a-fA-F0-9]{64})  ([^/\\]+)$') { throw 'Invalid checksum entry.' }
+            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path package $Matches[2])).Hash
+            if ($actual -ine $Matches[1]) { throw 'Release checksum mismatch.' }
+          }
+      - name: Install, reinstall and uninstall on a clean Windows runner
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          $setup = (Resolve-Path "package/ComiTrans-$env:RELEASE_TAG-x64-Setup.exe").Path
+          & installer/Test-Setup.ps1 -Setup $setup -Version $env:RELEASE_TAG.Substring(1) -LogDirectory $env:RUNNER_TEMP
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-release-verification
+          path: |
+            ${{ runner.temp }}/comitrans-nsis-install.log
+            ${{ runner.temp }}/comitrans-installed-smoke/smoke-result.json
+          if-no-files-found: ignore
