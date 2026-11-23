@@ -10,6 +10,9 @@ from .ui.theme import APP_STYLESHEET, install_ui_font
 
 
 def main() -> int:
+    from comic_translate_core.image_session import enable_desktop_model_host
+
+    enable_desktop_model_host()
     parser = argparse.ArgumentParser(description="ComiTrans desktop client")
     parser.add_argument("--smoke-test", metavar="OUTPUT_DIR", help="Verify startup/resources/models, write evidence, then exit")
     parser.add_argument("--smoke-test-require-gpu", action="store_true", help="Fail smoke verification if CUDA is not actually active")

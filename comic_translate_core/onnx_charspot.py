@@ -15,7 +15,7 @@ import onnxruntime as ort
 from PIL import Image
 
 from .inference_control import run_inference
-from .onnx_session import create_onnx_session
+from .image_session import create_image_session
 
 
 def preprocess(image):
@@ -41,6 +41,13 @@ def preprocess(image):
     return np.ascontiguousarray(canvas.transpose(2, 0, 1)[None], dtype=np.float32)
 
 
+def _session_options():
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = min(8, os.cpu_count() or 1)
+    options.inter_op_num_threads = 1
+    return options
+
+
 class OnnxCharSpot:
     def __init__(self, directory):
         root = Path(directory)
@@ -53,10 +60,7 @@ class OnnxCharSpot:
         if len(chars) > config["n_cls"] or config["n_cls"] + len(combos) != config["n_out"]:
             raise ValueError("Incompatible CharSpot vocabulary")
         self.vocab = chars + [""] * (config["n_cls"] - len(chars)) + combos
-        options = ort.SessionOptions()
-        options.intra_op_num_threads = min(8, os.cpu_count() or 1)
-        options.inter_op_num_threads = 1
-        self.session = create_onnx_session(root / "model.onnx", "cpu", sess_options=options)
+        self.session = create_image_session(root / "model.onnx", "cpu", options_factory=_session_options)
         if ([v.name for v in self.session.get_inputs()] != ["img"] or
                 [v.name for v in self.session.get_outputs()] != ["boxes", "scores", "ids", "order"]):
             raise ValueError("Incompatible CharSpot ONNX interface")
