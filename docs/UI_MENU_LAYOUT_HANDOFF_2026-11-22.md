@@ -104,3 +104,22 @@ $env:QT_QPA_PLATFORM = 'offscreen'
 - 尚未重新构建安装程序。本地 `release/` 中旧安装包不包含本轮菜单和功能适配。
 - 源码版本当前仍为 `2.5.2`；此前 `2.6.0` 安装包通过构建快照覆盖版本生成。后续打包要从当前完整工作区生成新快照，避免沿用旧快照遗漏菜单、新模块或相对模型路径修复。
 - 后续若提交当前未提交功能，请显式选择实现、配置、翻译和测试依赖，按 `AGENTS.md` 分离 UI、安装器和发布内容，不提交 `build/`、`release/`、`output_layout/`、模型权重、配置与日志。
+
+## 2026-11-22 · 人工开合偏好面板后的动画修复
+
+- 反馈：反复开合翻译偏好时，`_RippleOverlay.paintEvent()` 持续报告缺少 `_target`。
+- 构造边界回归可复现同样异常：原生 QWidget 初始化尚未返回，Qt 绘制回调已读取 Python 动画状态。`motion.py` 中的涟漪与焦点动画层现均先设置空闲绘制状态，再调用 QWidget 构造及几何设置。
+- `tests/test_motion_overlay_lifecycle.py` 覆盖构造期间的 Qt 绘制回调，以及初始化后涟漪正常绘制、结束和停止计时器；旧实现会在构造回归中失败。
+- `tests/test_retouch_and_motion.py` 增加真实按钮点击、动画中途反向开合、浅/深色和三个窗口尺寸的回归；Qt 回调异常纳入失败条件。
+- 本轮相关回归 96 项通过，Windows 原生平台额外执行 3 项通过；浅/深色各 73 张审查图通过，字体为 `Source Han Sans SC`。日志及图像位于 `build/ripple-fix-*`。上文 524 项为菜单合并阶段的完整验收记录。
+- 修复与新增测试保留在当前工作区；已运行的程序需关闭后从源码重新启动。前述菜单交接备份对应此次动画修复之前的状态。
+- 本轮远端同步遇到镜像 403 和直连代理 TLS 错误，重试后仍失败；保留现有远端和协议配置，本地修复与回归已完成。
+
+## 2026-11-22 · 试译、术语与消耗弹窗确认修复
+
+- 人工反馈：试译确认、术语保存后，主窗口访问 `dialog.Accepted` 抛出 `AttributeError`；消耗报告入口也有同样写法。
+- `main_window.py` 的三处返回值判断统一为 `QDialog.DialogCode.Accepted`。
+- 新增 `tests/test_workflow_dialog_actions.py`，通过真实弹窗和按钮触发验证试译页数与取消、术语持久化与取消、消耗单价保存与取消，以及从报告进入完整翻译/精修；同时验证弹窗释放和 Qt 回调不报错。
+- 新增测试在无显示器平台与 Windows 原生平台各 7 项通过；连同生产力、偏好、更新相关回归共 32 项通过。日志为 `build/dialog-actions-tests.log`、`build/dialog-actions-windows-tests.log`、`build/dialog-workflow-regression.log`。
+- `QIODevice::read (QSslSocket): device not open` 尚未形成稳定复现，本轮未修改网络逻辑。代码中 Qt 网络请求由后台更新检查发起，翻译请求走 Python 客户端；目前不能将该网络警告判定为已解决。
+- 修复保留在当前工作区，已运行的程序需关闭后重新启动。远端同步本轮仍遇到代理连接错误，未推送。

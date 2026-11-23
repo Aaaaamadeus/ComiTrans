@@ -16,7 +16,10 @@
 
 ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测、日语/韩语/英语 OCR、背景修复和中文排版，通过配置的大模型 API 翻译。支持接入自定义 OCR，不依赖 Web 前端。
 
-从 v2.2.1 开始，检测、OCR、修复全部切换为 **ONNX Runtime 推理**，彻底移除 PyTorch / torchvision / transformers 依赖；主程序和模型拆分发布，更新程序时不再需要重新下载模型。
+从 v2.2.1 开始，检测、OCR 和修复均使用 **ONNX Runtime**，无需 PyTorch / torchvision / transformers。
+
+> [!NOTE]
+> **v2.6.0 Windows x64 版**将程序和模型放进一个安装包。模型在独立进程预热，翻译前可用作品术语库统一译名、先试译几页查看用量。[发布说明与升级步骤](docs/RELEASE-v2.6.0.md)
 
 > [!NOTE]
 > **v2.5.2 更新**：滚动上下文记忆与可选缓存保留、OCR 后“按序翻译 ∥ 后台修补”Fork-Join 并行流水线、实时工作流拓扑可视化，以及精修画框、取色与自定义 RGB 填色、9 槽收藏字体、文字拉伸/旋转/描边和 PDF 边缘修复。已有 v2.5.1 模型可复用。[v2.5.2 发布说明](docs/RELEASE-v2.5.2.md) · [更新日志](CHANGELOG.md)。
@@ -113,7 +116,7 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 - **多语言源文与自定义 OCR**：选择日语、韩语、英语或“自定义 OCR”，可翻译成简体或繁体中文；支持独立 HTTP OCR 与兼容视觉模型接口。[接入说明与混合语言策略](docs/MULTILINGUAL_OCR.md)。
 - **纯本地桌面客户端**：PySide6 桌面应用，抛弃 Web 页面，启动后即可使用。
 - **全 ONNX 推理**：漫画文本检测、日/韩/英本地 OCR、LaMa 修复全部为 ONNX 模型，不再依赖 PyTorch。
-- **模型拆包发布**：模型单独一个下载包，更新程序无需重新下载模型。
+- **Windows 一体化安装**：v2.6.0 将程序和本地模型放进一个 Setup。
 - **延迟后台预热**：打开客户端先显示界面，模型在低优先级后台准备，开始翻译时直接复用。
 - **GPU 推理**：新安装默认优先 NVIDIA CUDA；软件内提供 CUDA/cuDNN 官方安装链接，需兼容的 NVIDIA 驱动，日志明确实际设备。保留旧配置中的 CPU 选择。
 - **多模态翻译开关**：勾选后发送整页图片给 AI，结合画面翻译；不勾选则发送 OCR 文本。字体、字号与横竖方向默认由本地算法决定，实验性字体比对需单独启用。
@@ -136,7 +139,9 @@ ComiTrans 是一款漫画自动汉化桌面客户端。本地执行文本检测�
 
 ### Release 用户（推荐）
 
-从 GitHub Releases 下载 `ComiTrans-v<版本>-x64-Setup.exe` 并双击安装。管理员部署可使用同版 MSI。首次安装仍需准备独立模型包，已有模型可复用。应用每次启动查询 GitHub，发现较新正式版本时提示更新。详见 [Windows 安装与更新](docs/WINDOWS_INSTALLER.md)。
+下载 `ComiTrans-v2.6.0-x64-Setup.exe` 和 `SHA256SUMS.txt`，核对 SHA-256 后关闭 ComiTrans 并运行 Setup。首次使用请在设置中填写翻译 API 密钥和模型。[下载 v2.6.0](https://github.com/Aaaaamadeus/ComiTrans/releases/tag/v2.6.0)
+
+本版安装包未签名，Windows 可能显示「未知发布者」，请从发布页手动下载安装。应用启动时会检查更高的正式版本，点击模型状态左侧的「有更新」可查看版本详情并前往发布页。[安装与迁移说明](docs/WINDOWS_INSTALLER.md)
 
 #### 历史 ZIP 版（v2.5.2）
 
@@ -313,20 +318,13 @@ v2.5.1 本地预览只随包提供 CharSpot Small 日语 OCR，默认使用 Smal
 
 ### 生成发布包
 
-新版主程序使用 WiX 构建 Setup EXE 和 MSI。官方签名、差分生成和模型包命令见 [Windows 安装与更新](docs/WINDOWS_INSTALLER.md)。以下命令用于维护历史 ZIP 版。
+构建桌面程序并安装 NSIS 后，运行以下命令生成包含默认模型的 Windows 安装包。打包脚本从客户端读取版本号。[Windows 打包说明](docs/WINDOWS_INSTALLER.md)
 
 ```powershell
-python package_release.py --output release/v2.5.2
+.\.venv\Scripts\python.exe installer/build.py --include-models
 ```
 
-本地构建生成两个 v2.5.2 压缩包。
-
-- `ComiTrans-v2.5.2-app.zip`：主程序，不含模型
-- `ComiTrans-v2.5.2-models.zip`：与 v2.5.1 一致的 ONNX 模型包（含日语 CharSpot Small、双检测器、韩语、英语 OCR 与 LaMa）；v2.5.1 已有模型可直接复用
-
-不发布 CUDA/cuDNN 运行库包；v2.5.0 修补版与 v2.5.1+ 用户可在设置中点击「下载安装便携 GPU 运行库」，重启后从程序目录加载。发布页同时提供 `SHA256SUMS.txt` 和 `baseline.json`。
-
-版本元数据保存在源码仓库，随发布提交：
+历史 ZIP 版的校验文件
 
 - [docs/releases/v2.5.2/baseline.json](docs/releases/v2.5.2/baseline.json)：2.5.2 目标构建基线
 - [docs/releases/v2.5.2/SHA256SUMS.txt](docs/releases/v2.5.2/SHA256SUMS.txt)：2.5.2 程序包、模型包及目标基线的 SHA256
@@ -366,6 +364,10 @@ ComiTrans
 └── package_release.py             # Release 拆包脚本
 ```
 ## 更新日志
+
+### v2.6.0（2026-11-23）
+
+Windows 安装包附带默认模型。桌面端支持后台模型预热、作品术语库、试译和顶栏更新提醒。[发布说明](docs/RELEASE-v2.6.0.md)
 
 ### v2.5.2（2026-11-17）
 
@@ -482,11 +484,11 @@ ComiTrans
 
 **Release 需要安装 Python 或 GPU 运行库吗？**
 
-不需要 Python。CPU 模式解压程序与模型即可运行；GPU 模式需要兼容的 NVIDIA 驱动、CUDA 12 和 cuDNN 9，软件内提供官方安装链接，已有环境可复用。实际设备可在日志中确认。
+不需要 Python。单文件 Setup 安装完成后即可用 CPU 加载本地模型。GPU 模式需要兼容的 NVIDIA 驱动、CUDA 12 和 cuDNN 9，软件内提供安装指引。
 
 **模型放哪里？**
 
-模型位于 exe 旁的 `comic-translate-ai/models/`。两个压缩包解压到同一个父目录并合并顶层 `ComiTrans` 文件夹，避免出现 `ComiTrans/ComiTrans` 的嵌套目录。
+v2.6.0 Setup 会自动把模型装到程序目录。v2.5.2 等历史 ZIP 版仍按上方步骤将程序和模型解压到同一目录。
 
 **为什么英文文本没有被翻译？**
 
@@ -502,7 +504,7 @@ v2.2.1 已全面 ONNX 化并移除 PyTorch。检测、OCR、修复均使用 ONNX
 
 ## 开源协议
 
-- 项目代码遵循相应开源协议发布（详见仓库 LICENSE 文件）。
+- 项目源码采用 [GPL-3.0](LICENSE)。
 - 字体：得意黑 Smiley Sans、霞鹜文楷 LXGW WenKai、霞鹜漫黑 LXGW Marker Gothic（SIL OFL 1.1）、Klee One、思源黑体/宋体、setofont（濑户字体）、851手写杂书体 均为可免费商用的开源/免费字体，各自的授权见字体项目说明。
 - UI 字体 Skribble 与 Aa今日花晴 春懒猫困使用各自的内嵌版权信息，来源与用途见 [字体说明](assets/ui/fonts/README.md)。
 - 模型：CharSpot Small 权重为 CC BY-NC-SA 4.0，各模型的来源、署名与许可见 [docs/ONNX_MODELS.md](docs/ONNX_MODELS.md)。
