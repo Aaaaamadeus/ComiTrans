@@ -16,7 +16,7 @@ RequestExecutionLevel admin
 !uninstfinalize 'cmd /D /C copy /Y "%1" "${UNINSTALLER_OUT}" >nul' = 0
 !endif
 ManifestDPIAware True
-SetCompressor zlib
+SetCompressor /SOLID lzma
 ShowInstDetails show
 ShowUninstDetails show
 VIProductVersion "${VERSION}.0"
