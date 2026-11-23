@@ -38,7 +38,7 @@ $branch = 'feat/ui-2.0'
 $tmp = Join-Path $env:TEMP 'gitconfig-push-direct'
 @"
 [http]
-    proxy = http://127.0.0.1:7897
+    proxy = http://127.0.0.1:7890
 [credential]
     helper = manager
 "@ | Set-Content -Encoding utf8 $tmp
