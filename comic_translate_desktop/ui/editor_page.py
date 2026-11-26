@@ -2,15 +2,27 @@ from __future__ import annotations
 from ..i18n import tr
 import json
 import sys
+import time
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
+import numpy as np
+from PIL import Image
+from PIL.ImageQt import ImageQt
 from PySide6.QtCore import Qt, QRect, QSize, QSettings, QTimer, QEvent, QPoint, QVariantAnimation, QItemSelectionModel, QUrl
-from PySide6.QtGui import QAction, QDesktopServices, QColor, QFont, QPainter, QPixmap, QIcon, QImageReader, QShortcut, QKeySequence
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel, QListWidget, QListWidgetItem, QMenu, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView, QStyledItemDelegate, QStyle)
+from PySide6.QtGui import QAction, QDesktopServices, QColor, QFont, QImage, QPainter, QPixmap, QIcon, QImageReader, QShortcut, QKeySequence
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel, QListWidget, QListWidgetItem, QMenu, QPushButton, QScrollArea, QSplitter, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QFileDialog, QMessageBox, QSizePolicy, QTabWidget, QCheckBox, QToolButton, QApplication, QLineEdit, QTextEdit, QAbstractSpinBox, QAbstractButton, QAbstractItemView, QStyledItemDelegate, QStyle, QDialog)
 from ..config import load_ai_config, MAIN_DIR
 from ..font_library import available_fonts, font_description, font_display_name, font_reference, import_font, inspect_font, resolve_font_reference
 from comic_translate_core.page_compositor import compose_page, intersection, layer_bounds
+from comic_translate_core.paint_engine import (
+    BrushEngine,
+    BrushSettings,
+    BrushTool,
+    ImageFilters,
+    SelectionEngine,
+    sample_color,
+)
 from comic_translate_core.restoration import (
     find_original, save_original, original_snapshot_path, legacy_region, protected_region,
     intersects_restored_region,
@@ -24,6 +36,8 @@ from ..editor_jobs import LatestJobQueue, read_page, read_project_pages, read_tr
 from ..lettering_transform import text_transform, transform_layer, outline_width
 from ..productivity import STYLE_DEFAULTS, lettering_style, apply_lettering_style
 from .color_picker import TextColorPicker
+from .paint_filter_dialog import PaintFilterDialog
+from .paint_studio_panel import PaintStudioPanel
 from .strip_preview import StripPreview
 from .thumbnail_loader import ThumbnailLoader
 from .theme import color, set_themed_icon, ui_font
@@ -171,8 +185,23 @@ class EditorPage(QWidget):
         self._cleaned_image = None
         self._original_image = None
         self._repair_history = []
+        self._repair_redo = []
         self._repair_box = None
         self._fill_color = QColor('#ffffff')
+        self._brush_engine = BrushEngine()
+        self._selection_engine = SelectionEngine()
+        self._paint_canvas_np = None
+        self._stroke_session = None
+        self._active_stroke_fps_ts = 0.0
+        self._paint_shape_points = []
+        self._paint_poly_lasso_points = []
+        self._paint_curve_points = []
+        self._paint_curve_dragging = False
+        self._paint_move_start = None
+        self._paint_move_base_np = None
+        self._paint_move_base_mask = None
+        self._clone_source = None
+        self._tablet_prev_tool = None
         self._repair_worker = None
         self._repair_engine = BackgroundRepair(
             self.config['lama_model'], device='cuda' if self.config.get('use_gpu') else 'cpu')
@@ -425,6 +454,22 @@ class EditorPage(QWidget):
         self._zoom_in_btn.setToolTip(tr('放大 · Ctrl+='))
         self._zoom_in_btn.clicked.connect(lambda: self.preview.zoom_by(1.25))
         toolbar.addWidget(self._zoom_in_btn)
+
+        paint_div = QFrame()
+        paint_div.setObjectName('toolbarDivider')
+        paint_div.setFrameShape(QFrame.VLine)
+        paint_div.setFixedSize(1, 18)
+        toolbar.addWidget(paint_div)
+
+        self._paint_mode_btn = QPushButton(tr('绘画修图'))
+        self._paint_mode_btn.setCheckable(True)
+        set_themed_icon(self._paint_mode_btn, 'paint-pen', size=14)
+        self._paint_mode_btn.setProperty('compact', True)
+        self._paint_mode_btn.setProperty('role', 'chip')
+        self._paint_mode_btn.setToolTip(tr('切换画布绘画与选区修图模式（画笔、选区、填充、滤镜）'))
+        self._paint_mode_btn.toggled.connect(self._toggle_paint_mode)
+        toolbar.addWidget(self._paint_mode_btn)
+
         toolbar.addStretch()
 
         self._export_pdf_btn = QPushButton(tr('导出 PDF'), self)
@@ -561,6 +606,15 @@ class EditorPage(QWidget):
         self.preview.bubble_created.connect(self._add_bubble_from_canvas)
         self.preview.color_picked.connect(self._accept_fill_color)
         self.preview.color_pick_canceled.connect(lambda: self._pick_fill_btn.setChecked(False))
+        self.preview.paint_stroke_started.connect(self._on_paint_stroke_started)
+        self.preview.paint_stroke_moved.connect(self._on_paint_stroke_moved)
+        self.preview.paint_stroke_ended.connect(self._on_paint_stroke_ended)
+        self.preview.paint_hover_moved.connect(self._on_paint_hover_moved)
+        self.preview.paint_alt_clicked.connect(self._on_paint_alt_clicked)
+        self.preview.paint_right_clicked.connect(self._on_paint_right_clicked)
+        self.preview.paint_double_clicked.connect(self._on_paint_double_clicked)
+        self.preview.paint_canceled.connect(self._on_paint_canceled)
+        self.preview.tablet_eraser_changed.connect(self._on_tablet_eraser_changed)
         self.preview.installEventFilter(self)
         self._zoom_tool_btn.toggled.connect(self.preview.set_zoom_tool)
         self._canvas_frame = canvas
@@ -785,7 +839,7 @@ class EditorPage(QWidget):
         self._brush_escape.activated.connect(self._stop_style_brush)
         self._style_brush_btn.toggled.connect(self._brush_escape.setEnabled)
         self._style_brush_btn.toggled.connect(self._sync_style_brush_ui)
-        for button in (self._repair_mode, self._add_bubble_btn, self._pick_fill_btn):
+        for button in (self._repair_mode, self._add_bubble_btn, self._pick_fill_btn, self._paint_mode_btn):
             button.toggled.connect(self._stop_style_brush_for_tool)
         install_list_motion(self.block_list)
         self._inspector_tabs = QTabWidget()
@@ -1117,6 +1171,27 @@ class EditorPage(QWidget):
         geo_layout.addWidget(drag_hint)
         props.addWidget(geo_card)
         props.addStretch(1)
+
+        paint_tab = QWidget()
+        paint_tab_root = QVBoxLayout(paint_tab)
+        paint_tab_root.setContentsMargins(0, 6, 0, 0)
+        paint_tab_root.setSpacing(0)
+        self._paint_tab_root = paint_tab_root
+        self._paint_scroll = QScrollArea()
+        self._paint_scroll.setObjectName('inspectorScroll')
+        self._paint_scroll.setWidgetResizable(True)
+        self._paint_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._paint_panel = PaintStudioPanel()
+        self._paint_scroll.setWidget(self._paint_panel)
+        paint_tab_root.addWidget(self._paint_scroll, 1)
+        self._inspector_tabs.addTab(paint_tab, tr('绘画修图'))
+        self._inspector_tabs.currentChanged.connect(self._on_inspector_tab_changed)
+        self._paint_panel.tool_changed.connect(self._on_paint_tool_changed)
+        self._paint_panel.settings_changed.connect(self._on_paint_settings_changed)
+        self._paint_panel.selection_action.connect(self._on_paint_selection_action)
+        self._paint_panel.view_changed.connect(self._on_paint_view_changed)
+        self._paint_panel.filter_requested.connect(self._on_paint_filter_requested)
+        self._paint_panel.status_message.connect(self._status.setText)
 
         self._apply_btn = QPushButton(tr('刷新预览'))
         self._apply_btn.setProperty('compact', True)
@@ -1573,6 +1648,8 @@ class EditorPage(QWidget):
             self._text_props_layout.setContentsMargins(0, 4 if compact_h else 8, 0, 0)
             self._text_props_layout.setSpacing(4 if compact_h else 6)
             self._layout_tab_root.setContentsMargins(0, 2 if compact_h else 6, 0, 0)
+            if hasattr(self, '_paint_tab_root'):
+                self._paint_tab_root.setContentsMargins(0, 2 if compact_h else 6, 0, 0)
             self._inspector_actions_layout.setContentsMargins(10 if compact_h else 12, 3 if compact_h else 8, 10 if compact_h else 12, 3 if compact_h else 8)
             self._break_hint.setVisible(not compact_h)
             self._inspector_hint.setVisible(not compact_h)
@@ -1869,8 +1946,12 @@ class EditorPage(QWidget):
         return item
 
     def eventFilter(self, watched, event):
+        if event.type() == QEvent.KeyPress and self._paint_hotkeys_available():
+            if self._handle_paint_key(event):
+                return True
         if (event.type() == QEvent.KeyPress and Qt.Key_1 <= event.key() <= Qt.Key_9
                 and event.modifiers() in (Qt.NoModifier, Qt.KeypadModifier)
+                and not self._paint_mode_btn.isChecked()
                 and self._font_hotkeys_available()):
             if not event.isAutoRepeat() and self._favorite_fonts.activate(event.key() - Qt.Key_1):
                 return True
@@ -2045,9 +2126,12 @@ class EditorPage(QWidget):
         self._thumbnail_loader.request([])
         self._requesting_page = False
         self._repair_history.clear()
+        self._repair_redo.clear()
         self._repair_box = None
         self._repair_mode.setChecked(False)
         self._add_bubble_btn.setChecked(False)
+        self._paint_mode_btn.setChecked(False)
+        self._reset_paint_state(clear_selection=True)
         self._style_history.clear()
         self._pending_style_keys.clear()
         self._style_brush_btn.setChecked(False)
@@ -2274,8 +2358,11 @@ class EditorPage(QWidget):
         self._page_jobs.invalidate()
         self._preview_timer.stop()
         self._repair_history.clear()
+        self._repair_redo.clear()
         self._repair_box = None
         self._repair_mode.setChecked(False)
+        self._paint_mode_btn.setChecked(False)
+        self._reset_paint_state(clear_selection=True)
         self._edit_revision = 0
         self._style_history.clear()
         self._pending_style_keys.clear()
@@ -2309,6 +2396,8 @@ class EditorPage(QWidget):
                 raise ValueError(_payload.error)
             self.items = _payload.items
             self._cleaned_image = _payload.cleaned
+            if self._cleaned_image is not None:
+                self._selection_engine.resize(*self._cleaned_image.size)
             self._prepare_regions()
             for index, item in enumerate(self.items):
                 block = QListWidgetItem(self._block_label(index))
@@ -2611,7 +2700,12 @@ class EditorPage(QWidget):
         self.preview.set_selected_regions(self.selected_blocks())
         self.preview.set_regions(
             [(index, tuple(self._mask_box(item))) for index, item in enumerate(self.items)],
-            visible=self._show_mask.isChecked() and not self._repair_mode.isChecked())
+            visible=self._show_mask.isChecked()
+            and not self._repair_mode.isChecked()
+            and not self._paint_mode_btn.isChecked())
+        if self._paint_mode_btn.isChecked():
+            self.preview.set_region(None)
+            return
         if self._repair_mode.isChecked():
             self.preview.set_region(self._repair_box, editable=self._repair_box is not None)
             return
@@ -2696,6 +2790,7 @@ class EditorPage(QWidget):
             self._repair_mode.setChecked(False)
             self._add_bubble_btn.setChecked(False)
             self._pick_fill_btn.setChecked(False)
+            self._paint_mode_btn.setChecked(False)
         self._update_region_guide()
 
     def _stop_style_brush_for_tool(self, enabled):
@@ -2809,6 +2904,8 @@ class EditorPage(QWidget):
             self._repair_mode.setChecked(False)
             self._repair_mode.blockSignals(False)
             self._toggle_repair_mode(False)
+        if enabled and self._paint_mode_btn.isChecked():
+            self._paint_mode_btn.setChecked(False)
         self.preview.set_bubble_creation(enabled)
         if enabled:
             self._status.setText(tr('在画布拖动矩形添加气泡框，添加后可直接输入译文。'))
@@ -3012,6 +3109,11 @@ class EditorPage(QWidget):
                  and not self._save_jobs.busy and not self._requesting_page
                  and not self._indexing and not self._import_jobs.busy)
         self._repair_mode.setEnabled(ready)
+        self._paint_mode_btn.setEnabled(ready)
+        if hasattr(self, '_paint_panel'):
+            self._paint_panel.setEnabled(ready)
+        if not ready and self._paint_mode_btn.isChecked():
+            self._paint_mode_btn.setChecked(False)
         self._favorite_fonts.set_apply_enabled(ready and self._style_combo.isEnabled())
         self._add_bubble_btn.setEnabled(ready)
         if not ready and self._add_bubble_btn.isChecked():
@@ -3019,15 +3121,21 @@ class EditorPage(QWidget):
             self._add_bubble_btn.setChecked(False)
             self._add_bubble_btn.blockSignals(False)
             self.preview.set_bubble_creation(False)
+        has_paint_sel = ready and not self._selection_engine.is_empty()
+        if hasattr(self, '_paint_panel'):
+            self._paint_panel.set_selection_active(has_paint_sel)
+        target_box = self._repair_box if self._repair_box is not None else (
+            self._selection_engine.bbox() if has_paint_sel else None
+        )
         protected = False
-        if ready and self._repair_box is not None:
+        if ready and target_box is not None:
             try:
-                protected = intersects_restored_region(self._repair_box, self.items, self._cleaned_image.size)
+                protected = intersects_restored_region(target_box, self.items, self._cleaned_image.size)
             except (ValueError, KeyError, TypeError, OSError):
                 protected = True
-        self._repair_btn.setEnabled(ready and self._repair_box is not None and not protected)
+        self._repair_btn.setEnabled(ready and target_box is not None and not protected)
         self._repair_btn.setToolTip(tr('选区包含已还原气泡，请先恢复该气泡的处理结果再修补。') if protected else '')
-        fills_enabled = ready and self._repair_box is not None and not protected
+        fills_enabled = ready and target_box is not None and not protected
         self._fill_white_btn.setEnabled(fills_enabled)
         self._fill_black_btn.setEnabled(fills_enabled)
         self._fill_custom_btn.setEnabled(fills_enabled)
@@ -3076,6 +3184,8 @@ class EditorPage(QWidget):
 
     def _toggle_repair_mode(self, enabled):
         self._pick_fill_btn.setChecked(False)
+        if enabled and self._paint_mode_btn.isChecked():
+            self._paint_mode_btn.setChecked(False)
         if enabled and self._add_bubble_btn.isChecked():
             self._add_bubble_btn.blockSignals(True)
             self._add_bubble_btn.setChecked(False)
@@ -3128,12 +3238,19 @@ class EditorPage(QWidget):
 
     def _start_background_repair(self):
         self._pick_fill_btn.setChecked(False)
-        if self._requesting_page or self._indexing or self._save_jobs.busy or self._repair_worker is not None or self._cleaned_image is None or self._repair_box is None:
+        if self._requesting_page or self._indexing or self._save_jobs.busy or self._repair_worker is not None or self._cleaned_image is None:
             return
         if self._export_worker is not None:
             return
+        repair_mask = None
+        repair_box = self._repair_box
+        if repair_box is None and not self._selection_engine.is_empty():
+            repair_box = self._selection_engine.bbox()
+            repair_mask = self._selection_engine.mask.copy() if self._selection_engine.mask is not None else None
+        if repair_box is None:
+            return
         try:
-            protected = intersects_restored_region(self._repair_box, self.items, self._cleaned_image.size)
+            protected = intersects_restored_region(repair_box, self.items, self._cleaned_image.size)
         except (ValueError, KeyError, TypeError, OSError) as exc:
             self._status.setText(tr('还原失败：{_0}', _0=exc))
             return
@@ -3142,7 +3259,7 @@ class EditorPage(QWidget):
             return
         if not self.apply_changes():
             return
-        worker = RepairWorker(self._repair_engine, self._cleaned_image, self._repair_box, self)
+        worker = RepairWorker(self._repair_engine, self._cleaned_image, repair_box, self, mask=repair_mask)
         self._repair_worker = worker
         worker.succeeded.connect(self._accept_background_repair)
         worker.failed.connect(self._background_repair_failed)
@@ -3152,11 +3269,30 @@ class EditorPage(QWidget):
         worker.start()
 
     def _fill_repair_region(self, color) -> None:
-        """Paint the selected rectangle with a flat colour on the cleaned base."""
+        """Paint the selected rectangle or paint selection with a flat colour on the cleaned base."""
         self._pick_fill_btn.setChecked(False)
         if (self._requesting_page or self._indexing or self._save_jobs.busy
                 or self._repair_worker is not None or self._cleaned_image is None
-                or self._repair_box is None or self._export_worker is not None):
+                or self._export_worker is not None):
+            return
+        if self._repair_box is None and not self._selection_engine.is_empty():
+            if not self.apply_changes():
+                return
+            canvas_np = self._ensure_paint_canvas_np()
+            if canvas_np is None:
+                return
+            prot = self._build_protected_mask()
+            res = SelectionEngine.fill_selection(canvas_np, tuple(color), self._selection_engine.mask, prot)
+            if res is None:
+                self._status.setText(tr('选区包含已还原气泡，请先恢复该气泡的处理结果再填色。'))
+                return
+            box, before_pil, after_pil = res
+            self._commit_paint_result(
+                box, before_pil, after_pil,
+                status_text=tr('已把选区填为 {color} · 未保存，可撤回修补。', color=QColor(*color).name().upper()),
+            )
+            return
+        if self._repair_box is None:
             return
         try:
             box = tuple(map(int, self._repair_box))
@@ -3180,10 +3316,13 @@ class EditorPage(QWidget):
             return
         before = self._cleaned_image.crop(box)
         self._cleaned_image.paste(tuple(color), box)
+        self._paint_canvas_np = None
         self._repair_history.append((box, before, self._dirty, self._edit_revision))
+        self._repair_redo.clear()
         self._layer_cache.clear()
         self._dirty = self._preview_dirty = True
         self._refresh_page_dirty_label()
+        self._update_repair_controls()
         if self.apply_changes():
             self._status.setText(tr('已把选区填为 {color} · 未保存，可撤回修补。',
                                     color=QColor(*color).name().upper()))
@@ -3191,7 +3330,9 @@ class EditorPage(QWidget):
     def _accept_background_repair(self, box, patch):
         before = self._cleaned_image.crop(box)
         self._cleaned_image.paste(patch, box)
+        self._paint_canvas_np = None
         self._repair_history.append((box, before, self._dirty, self._edit_revision))
+        self._repair_redo.clear()
         self._layer_cache.clear()
         self._dirty = self._preview_dirty = True
         self._refresh_page_dirty_label()
@@ -3222,7 +3363,11 @@ class EditorPage(QWidget):
             return self.toggle_bubble_original()
         self._store_properties()
         box, before, was_dirty, revision = self._repair_history.pop()
+        after = self._cleaned_image.crop(box)
+        self._repair_redo.append((box, after, self._dirty, self._edit_revision))
         self._cleaned_image.paste(before, box)
+        self._paint_canvas_np = None
+        self._rendered = None
         self._layer_cache.clear()
         self._dirty = was_dirty or revision != self._edit_revision
         self._preview_dirty = True
@@ -3230,6 +3375,27 @@ class EditorPage(QWidget):
         self._update_repair_controls()
         if self.apply_changes():
             self._status.setText(tr('已从缓存恢复修补前的背景，文字修改保留。'))
+        return True
+
+    def redo_background_repair(self):
+        if (self._requesting_page or self._indexing or self._save_jobs.busy
+                or self._repair_worker is not None or self._export_worker is not None
+                or self._cleaned_image is None or not self._repair_redo):
+            return False
+        self._store_properties()
+        box, after, _was_dirty, _revision = self._repair_redo.pop()
+        before = self._cleaned_image.crop(box)
+        self._repair_history.append((box, before, self._dirty, self._edit_revision))
+        self._cleaned_image.paste(after, box)
+        self._paint_canvas_np = None
+        self._rendered = None
+        self._layer_cache.clear()
+        self._dirty = True
+        self._preview_dirty = True
+        self._refresh_page_dirty_label()
+        self._update_repair_controls()
+        if self.apply_changes():
+            self._status.setText(tr('已重做画布背景修改。'))
         return True
 
     def _refresh_page_dirty_label(self):
@@ -3310,8 +3476,11 @@ class EditorPage(QWidget):
         self._rendered = image
         self._render_layers, self._render_mode = signatures, mode
         self._last_render_regions = regions
-        if full or self.preview._original.isNull():
-            from PIL.ImageQt import ImageQt
+        if self.preview._original.isNull():
+            self.preview.set_pixmap(QPixmap.fromImage(ImageQt(image)))
+        elif full and self._paint_mode_btn.isChecked() and self.preview._original.size() == QSize(*image.size):
+            self.preview.set_original_image(ImageQt(image))
+        elif full:
             self.preview.set_pixmap(QPixmap.fromImage(ImageQt(image)))
         else:
             self.preview.update_regions(image, regions)
@@ -3464,6 +3633,7 @@ class EditorPage(QWidget):
         # Edits made during PNG encoding stay dirty and are never cleared by an old save.
         self._dirty = revision != self._edit_revision
         self._repair_history.clear()
+        self._repair_redo.clear()
         self._refresh_page_dirty_label()
         self._update_repair_controls()
         self._status.setText(tr('已保存；后续修改仍未保存。') if self._dirty else
@@ -3567,6 +3737,8 @@ class EditorPage(QWidget):
             return
         self.shutdown_jobs()
         self._repair_history.clear()
+        self._repair_redo.clear()
+        self._reset_paint_state(clear_selection=True)
         self._preview_timer.stop()
         self.preview.cancel_region_drag()
         super().closeEvent(event)
@@ -3590,3 +3762,928 @@ class EditorPage(QWidget):
             self._apply_panel_layout(animate=animate)
             self._sync_inspector_split()
             self._reveal_timer.start(0)
+
+    # ---- Paint & retouch studio ----
+
+    def _on_inspector_tab_changed(self, index: int):
+        if self._loading or not hasattr(self, '_paint_mode_btn'):
+            return
+        if index == 2:
+            if self._paint_mode_btn.isEnabled() and not self._paint_mode_btn.isChecked():
+                self._paint_mode_btn.setChecked(True)
+        elif index in (0, 1) and self._paint_mode_btn.isChecked():
+            self._paint_mode_btn.setChecked(False)
+
+    def _toggle_paint_mode(self, enabled: bool):
+        enabled = bool(enabled)
+        if enabled and self._cleaned_image is None:
+            self._paint_mode_btn.blockSignals(True)
+            self._paint_mode_btn.setChecked(False)
+            self._paint_mode_btn.blockSignals(False)
+            return
+        if enabled:
+            if self._repair_mode.isChecked():
+                self._repair_mode.setChecked(False)
+            if self._add_bubble_btn.isChecked():
+                self._add_bubble_btn.setChecked(False)
+            if self._pick_fill_btn.isChecked():
+                self._pick_fill_btn.setChecked(False)
+            if self._style_brush_btn.isChecked():
+                self._style_brush_btn.setChecked(False)
+            if not self._properties_toggle.isChecked():
+                self._properties_toggle.setChecked(True)
+            if self._inspector_tabs.currentIndex() != 2:
+                self._inspector_tabs.setCurrentIndex(2)
+            if self._cleaned_image is not None:
+                self._selection_engine.resize(*self._cleaned_image.size)
+            self._sync_paint_preview_settings()
+            self._sync_selection_overlay()
+            self.preview.set_view_transform(
+                self._paint_panel.rotation_deg(),
+                self._paint_panel.flipped_h(),
+                self._paint_panel.show_grid(),
+            )
+            self._status.setText(tr('绘画修图模式：可直接涂抹修复背景；右键吸色，[ / ] 调笔径，Ctrl+Z/Y 撤销重做。'))
+        else:
+            self._on_paint_canceled()
+            self.preview.set_paint_mode(False)
+            self.preview.set_view_transform(0.0, False, False)
+        self._update_region_guide()
+        self._update_repair_controls()
+
+    def _reset_paint_state(self, *, clear_selection: bool = False):
+        self._on_paint_canceled()
+        self._paint_canvas_np = None
+        self._clone_source = None
+        self._tablet_prev_tool = None
+        if hasattr(self, 'preview'):
+            self.preview.set_clone_source_marker(None)
+            self.preview.set_paint_preview_overlay(None)
+            if clear_selection:
+                self._selection_engine.resize(0, 0)
+                self.preview.set_selection_overlay(None)
+
+    def _ensure_paint_canvas_np(self) -> np.ndarray | None:
+        if self._cleaned_image is None:
+            return None
+        if self._paint_canvas_np is None:
+            img = self._cleaned_image.convert('RGB') if self._cleaned_image.mode != 'RGB' else self._cleaned_image
+            self._paint_canvas_np = np.ascontiguousarray(np.array(img, dtype=np.uint8))
+        return self._paint_canvas_np
+
+    def _build_protected_mask(self) -> np.ndarray | None:
+        if self._cleaned_image is None:
+            return None
+        restored = [item for item in self.items if item.get('restore_original')]
+        if not restored:
+            return None
+        w, h = self._cleaned_image.size
+        mask = np.zeros((h, w), dtype=np.uint8)
+        for item in restored:
+            try:
+                bounds, region_mask = protected_region(item, self.items, (w, h))
+            except (ValueError, KeyError, TypeError, OSError):
+                box = item.get('box')
+                if box and len(box) >= 4:
+                    x1 = max(0, min(w, int(box[0])))
+                    y1 = max(0, min(h, int(box[1])))
+                    x2 = max(x1, min(w, int(box[2])))
+                    y2 = max(y1, min(h, int(box[3])))
+                    mask[y1:y2, x1:x2] = 255
+                continue
+            rx1, ry1, rx2, ry2 = bounds
+            arr = np.asarray(region_mask, dtype=np.uint8)
+            existing = mask[ry1:ry2, rx1:rx2]
+            mask[ry1:ry2, rx1:rx2] = np.maximum(existing, np.where(arr > 0, 255, 0).astype(np.uint8))
+        return mask if np.any(mask > 0) else None
+
+    def _get_original_canvas_np(self) -> np.ndarray | None:
+        if self._cleaned_image is None:
+            return None
+        orig = self._get_original_image()
+        if orig is None or orig.size != self._cleaned_image.size:
+            return None
+        rgb = orig.convert('RGB') if orig.mode != 'RGB' else orig
+        return np.ascontiguousarray(np.array(rgb, dtype=np.uint8))
+
+    def _sync_paint_preview_settings(self):
+        if not self._paint_mode_btn.isChecked():
+            return
+        settings = self._paint_panel.settings()
+        show_cursor = settings.tool in (
+            BrushTool.STROKE_TOOLS | BrushTool.SELECTION_STROKE_TOOLS
+        )
+        self.preview.set_paint_mode(
+            True,
+            brush_diameter=float(settings.size),
+            show_cursor=show_cursor,
+            right_click_pick=self._paint_panel.right_click_eyedropper_enabled(),
+            symmetry=settings.symmetry,
+        )
+
+    def _sync_selection_overlay(self):
+        if self._selection_engine.is_empty():
+            self.preview.set_selection_overlay(None)
+        else:
+            self.preview.set_selection_overlay(
+                self._selection_engine.mask,
+                self._selection_engine.contours(),
+            )
+
+    def _patch_live_canvas(self, box):
+        if box is None or self._paint_canvas_np is None or self.preview._original.isNull():
+            return
+        h, w = self._paint_canvas_np.shape[:2]
+        x1 = max(0, min(w, int(box[0])))
+        y1 = max(0, min(h, int(box[1])))
+        x2 = max(x1, min(w, int(box[2])))
+        y2 = max(y1, min(h, int(box[3])))
+        if x2 <= x1 or y2 <= y1:
+            return
+        roi = np.ascontiguousarray(self._paint_canvas_np[y1:y2, x1:x2])
+        rw, rh = x2 - x1, y2 - y1
+        qimg = QImage(roi.data, rw, rh, rw * 3, QImage.Format_RGB888).copy()
+        self.preview.update_canvas_patch((x1, y1, x2, y2), qimg)
+
+    def _commit_paint_result(self, box, before_pil, after_pil, status_text=''):
+        if self._cleaned_image is None:
+            return
+        self._store_properties()
+        self._cleaned_image.paste(after_pil, box)
+        self._repair_history.append((box, before_pil, self._dirty, self._edit_revision))
+        self._repair_redo.clear()
+        self._rendered = None
+        self._layer_cache.clear()
+        self._dirty = True
+        self._preview_dirty = True
+        self._refresh_page_dirty_label()
+        self._update_repair_controls()
+        if self.apply_changes() and status_text:
+            self._status.setText(status_text)
+
+    def _on_paint_tool_changed(self, tool_id: str):
+        if self._paint_poly_lasso_points or self._paint_curve_dragging:
+            self._paint_poly_lasso_points.clear()
+            self._paint_curve_points.clear()
+            self._paint_curve_dragging = False
+            self.preview.set_paint_preview_overlay(None)
+        self._sync_paint_preview_settings()
+        if tool_id == BrushTool.CLONE and self._clone_source is None:
+            self._status.setText(tr('仿制图章：请先按住 Alt + 点击画布设定取样源点。'))
+        elif tool_id == BrushTool.POLY_LASSO:
+            self._status.setText(tr('多边形套索：依次点击添加顶点，双击或按 Enter 闭合选区，Esc 取消。'))
+        elif tool_id == BrushTool.CURVE:
+            self._status.setText(tr('曲线工具：先拖动起点到终点，再移动并点击确定弯曲控制点。'))
+
+    def _on_paint_settings_changed(self, settings: BrushSettings):
+        if self._paint_mode_btn.isChecked():
+            show_cursor = settings.tool in (
+                BrushTool.STROKE_TOOLS | BrushTool.SELECTION_STROKE_TOOLS
+            )
+            self.preview.update_paint_cursor(
+                float(settings.size), show=show_cursor, symmetry=settings.symmetry,
+            )
+            self.preview._label.paint_right_click_pick = self._paint_panel.right_click_eyedropper_enabled()
+
+    def _on_paint_view_changed(self, rotation_deg: float, flipped_h: bool, show_grid: bool):
+        if self._paint_mode_btn.isChecked():
+            self.preview.set_view_transform(rotation_deg, flipped_h, show_grid)
+
+    def _on_tablet_eraser_changed(self, is_eraser: bool):
+        if not self._paint_mode_btn.isChecked():
+            return
+        if is_eraser:
+            cur = self._paint_panel.current_tool()
+            if cur != BrushTool.ERASER:
+                self._tablet_prev_tool = cur
+                self._paint_panel.select_tool(BrushTool.ERASER)
+        elif self._tablet_prev_tool is not None:
+            prev, self._tablet_prev_tool = self._tablet_prev_tool, None
+            self._paint_panel.select_tool(prev)
+
+    def _effective_select_mode(self, modifiers) -> str:
+        if modifiers & Qt.ShiftModifier:
+            return 'add'
+        if modifiers & Qt.AltModifier:
+            return 'subtract'
+        return self._paint_panel.settings().select_mode
+
+    def _sample_fg_at(self, x: float, y: float) -> bool:
+        canvas_np = self._ensure_paint_canvas_np()
+        if canvas_np is None:
+            return False
+        rgb = sample_color(canvas_np, int(x), int(y))
+        if rgb is None:
+            return False
+        qcol = QColor(*rgb)
+        self._paint_panel.set_fg_color(qcol, emit=True)
+        self._status.setText(tr('已吸取颜色：{color}', color=qcol.name().upper()))
+        return True
+
+    def _on_paint_stroke_started(self, x: float, y: float, pressure: float, modifiers):
+        if (self._cleaned_image is None or self.page_io_busy or self._repair_worker is not None
+                or self._export_worker is not None or self._save_jobs.busy):
+            return
+        settings = self._paint_panel.settings()
+        tool = settings.tool
+
+        if tool == BrushTool.EYEDROPPER:
+            self._sample_fg_at(x, y)
+            return
+
+        canvas_np = self._ensure_paint_canvas_np()
+        if canvas_np is None:
+            return
+        h, w = canvas_np.shape[:2]
+        self._selection_engine.resize(w, h)
+
+        if tool in BrushTool.STROKE_TOOLS:
+            if tool == BrushTool.CLONE and self._clone_source is None:
+                self._status.setText(tr('仿制图章：请先按住 Alt + 点击画布设定取样源点。'))
+                return
+            orig_np = None
+            if tool == BrushTool.ERASER and settings.eraser_mode == 'original':
+                orig_np = self._get_original_canvas_np()
+                if orig_np is None:
+                    self._status.setText(tr('缺少同尺寸原图，橡皮擦已退回背景色擦除。'))
+            self._stroke_session = self._brush_engine.start_stroke(
+                canvas_np,
+                settings,
+                selection_mask=self._selection_engine.mask,
+                original_canvas=orig_np,
+                protected_mask=self._build_protected_mask(),
+                clone_source=self._clone_source,
+            )
+            dirty = self._stroke_session.begin(x, y, pressure)
+            self._active_stroke_fps_ts = time.monotonic()
+            if dirty is not None:
+                self._patch_live_canvas(dirty)
+            return
+
+        if tool in BrushTool.SELECTION_STROKE_TOOLS:
+            self._paint_shape_points = [(x, y)]
+            self._selection_engine.paint_mask_stroke(
+                [(x, y)],
+                max(0.5, settings.size / 2.0),
+                erase=(tool == BrushTool.DESELECT_PEN),
+                antialias=settings.antialias,
+            )
+            self._active_stroke_fps_ts = time.monotonic()
+            self._sync_selection_overlay()
+            self._update_repair_controls()
+            return
+
+        if tool == BrushTool.RECT_SELECT:
+            self._paint_shape_points = [(x, y), (x, y)]
+            self.preview.set_paint_preview_overlay({'kind': 'rect', 'rect': (x, y, x, y)})
+            return
+
+        if tool == BrushTool.LASSO_SELECT:
+            self._paint_shape_points = [(x, y)]
+            self.preview.set_paint_preview_overlay({'kind': 'lasso', 'points': self._paint_shape_points, 'closed': False})
+            return
+
+        if tool == BrushTool.POLY_LASSO:
+            self._paint_poly_lasso_points.append((x, y))
+            self.preview.set_paint_preview_overlay({
+                'kind': 'poly',
+                'points': list(self._paint_poly_lasso_points),
+                'closed': False,
+            })
+            return
+
+        if tool == BrushTool.MAGIC_WAND:
+            mode = self._effective_select_mode(modifiers)
+            self._selection_engine.apply_magic_wand(
+                canvas_np,
+                int(x),
+                int(y),
+                tolerance=settings.tolerance,
+                contiguous=settings.contiguous,
+                antialias=settings.antialias,
+                mode=mode,
+            )
+            self._sync_selection_overlay()
+            self._update_repair_controls()
+            return
+
+        if tool == BrushTool.MOVE_SELECTION:
+            if self._selection_engine.is_empty():
+                self._status.setText(tr('请先创建选区后再移动选区内容。'))
+                return
+            self._paint_move_start = (x, y)
+            self._paint_move_base_np = canvas_np.copy()
+            self._paint_move_base_mask = self._selection_engine.mask.copy()
+            self._active_stroke_fps_ts = time.monotonic()
+            return
+
+        if tool == BrushTool.BUCKET:
+            res = SelectionEngine.bucket_fill(
+                canvas_np,
+                int(x),
+                int(y),
+                settings.color,
+                tolerance=settings.tolerance,
+                contiguous=settings.contiguous,
+                gap_close=settings.gap_close,
+                expand_px=settings.fill_expand,
+                selection_mask=self._selection_engine.mask,
+                protected_mask=self._build_protected_mask(),
+            )
+            if res is not None:
+                box, before_pil, after_pil = res
+                self._commit_paint_result(box, before_pil, after_pil)
+            else:
+                self._status.setText(tr('油漆桶未填充区域（可能在选区外或处于已还原气泡保护区内）。'))
+            return
+
+        if tool == BrushTool.CURVE and self._paint_curve_dragging and len(self._paint_curve_points) == 2:
+            self._finish_curve(x, y)
+            return
+
+        if tool in (BrushTool.GRADIENT, BrushTool.LINE, BrushTool.CURVE,
+                    BrushTool.RECT_SHAPE, BrushTool.ELLIPSE_SHAPE):
+            self._paint_shape_points = [(x, y), (x, y)]
+            kind = 'line' if tool in (BrushTool.GRADIENT, BrushTool.LINE, BrushTool.CURVE) else (
+                'rect' if tool == BrushTool.RECT_SHAPE else 'ellipse'
+            )
+            overlay = {'kind': kind, 'p0': (x, y), 'p1': (x, y)} if kind == 'line' else {'kind': kind, 'rect': (x, y, x, y)}
+            self.preview.set_paint_preview_overlay(overlay)
+
+    def _on_paint_stroke_moved(self, x: float, y: float, pressure: float, modifiers):
+        settings = self._paint_panel.settings()
+        tool = settings.tool
+
+        if tool == BrushTool.EYEDROPPER:
+            self._sample_fg_at(x, y)
+            return
+
+        if self._stroke_session is not None:
+            dirty = self._stroke_session.add_point(x, y, pressure)
+            now = time.monotonic()
+            if dirty is not None and now - self._active_stroke_fps_ts >= 0.016:
+                self._active_stroke_fps_ts = now
+                self._patch_live_canvas(dirty)
+            return
+
+        if tool in BrushTool.SELECTION_STROKE_TOOLS and self._paint_shape_points:
+            prev = self._paint_shape_points[-1]
+            if (x - prev[0]) ** 2 + (y - prev[1]) ** 2 >= 1.0:
+                self._paint_shape_points.append((x, y))
+                self._selection_engine.paint_mask_stroke(
+                    [prev, (x, y)],
+                    max(0.5, settings.size / 2.0),
+                    erase=(tool == BrushTool.DESELECT_PEN),
+                    antialias=settings.antialias,
+                )
+                now = time.monotonic()
+                if now - self._active_stroke_fps_ts >= 0.016:
+                    self._active_stroke_fps_ts = now
+                    self._sync_selection_overlay()
+            return
+
+        if tool == BrushTool.RECT_SELECT and len(self._paint_shape_points) >= 1:
+            x0, y0 = self._paint_shape_points[0]
+            self._paint_shape_points = [(x0, y0), (x, y)]
+            self.preview.set_paint_preview_overlay({'kind': 'rect', 'rect': (x0, y0, x, y)})
+            return
+
+        if tool == BrushTool.LASSO_SELECT and self._paint_shape_points:
+            prev = self._paint_shape_points[-1]
+            if (x - prev[0]) ** 2 + (y - prev[1]) ** 2 >= 4.0:
+                self._paint_shape_points.append((x, y))
+                self.preview.set_paint_preview_overlay({'kind': 'lasso', 'points': self._paint_shape_points, 'closed': False})
+            return
+
+        if tool == BrushTool.MOVE_SELECTION and self._paint_move_start is not None:
+            now = time.monotonic()
+            if now - self._active_stroke_fps_ts < 0.016:
+                return
+            self._active_stroke_fps_ts = now
+            dx = round(x - self._paint_move_start[0])
+            dy = round(y - self._paint_move_start[1])
+            work = self._paint_move_base_np.copy()
+            res = SelectionEngine.move_selection(
+                work,
+                self._paint_move_base_mask,
+                dx,
+                dy,
+                bg_color=settings.bg_color,
+                protected_mask=self._build_protected_mask(),
+            )
+            self._paint_canvas_np = work
+            if res is not None:
+                box, _before, _after, new_mask = res
+                self._selection_engine.mask = new_mask
+                self._patch_live_canvas(box)
+                self._sync_selection_overlay()
+            return
+
+        if tool in (BrushTool.GRADIENT, BrushTool.LINE, BrushTool.CURVE,
+                    BrushTool.RECT_SHAPE, BrushTool.ELLIPSE_SHAPE) and self._paint_shape_points:
+            p0 = self._paint_shape_points[0]
+            self._paint_shape_points = [p0, (x, y)]
+            if tool in (BrushTool.GRADIENT, BrushTool.LINE, BrushTool.CURVE):
+                self.preview.set_paint_preview_overlay({'kind': 'line', 'p0': p0, 'p1': (x, y)})
+            elif tool == BrushTool.RECT_SHAPE:
+                self.preview.set_paint_preview_overlay({'kind': 'rect', 'rect': (p0[0], p0[1], x, y)})
+            else:
+                self.preview.set_paint_preview_overlay({'kind': 'ellipse', 'rect': (p0[0], p0[1], x, y)})
+
+    def _on_paint_stroke_ended(self, x: float, y: float, pressure: float, modifiers):
+        settings = self._paint_panel.settings()
+        tool = settings.tool
+
+        if self._stroke_session is not None:
+            session, self._stroke_session = self._stroke_session, None
+            res = session.end()
+            if res is not None:
+                box, before_pil, after_pil = res
+                self._commit_paint_result(box, before_pil, after_pil)
+            elif self._rendered is not None:
+                self._paint_canvas_np = None
+                self.preview.set_original_image(ImageQt(self._rendered))
+            return
+
+        if tool in BrushTool.SELECTION_STROKE_TOOLS and self._paint_shape_points:
+            prev = self._paint_shape_points[-1]
+            self._selection_engine.paint_mask_stroke(
+                [prev, (x, y)],
+                max(0.5, settings.size / 2.0),
+                erase=(tool == BrushTool.DESELECT_PEN),
+                antialias=settings.antialias,
+            )
+            self._paint_shape_points = []
+            self._sync_selection_overlay()
+            self._update_repair_controls()
+            return
+
+        if tool == BrushTool.RECT_SELECT and self._paint_shape_points:
+            x0, y0 = self._paint_shape_points[0]
+            self._paint_shape_points = []
+            self.preview.set_paint_preview_overlay(None)
+            box = (round(min(x0, x)), round(min(y0, y)), round(max(x0, x)), round(max(y0, y)))
+            self._selection_engine.apply_rect(box, mode=self._effective_select_mode(modifiers))
+            self._sync_selection_overlay()
+            self._update_repair_controls()
+            return
+
+        if tool == BrushTool.LASSO_SELECT and self._paint_shape_points:
+            pts = self._paint_shape_points + [(x, y)]
+            self._paint_shape_points = []
+            self.preview.set_paint_preview_overlay(None)
+            self._selection_engine.apply_lasso(
+                pts, mode=self._effective_select_mode(modifiers), antialias=settings.antialias,
+            )
+            self._sync_selection_overlay()
+            self._update_repair_controls()
+            return
+
+        if tool == BrushTool.MOVE_SELECTION and self._paint_move_start is not None:
+            dx = round(x - self._paint_move_start[0])
+            dy = round(y - self._paint_move_start[1])
+            work = self._paint_move_base_np.copy()
+            base_mask = self._paint_move_base_mask
+            self._paint_move_start = None
+            self._paint_move_base_np = None
+            self._paint_move_base_mask = None
+            if dx == 0 and dy == 0:
+                self._paint_canvas_np = None
+                self._selection_engine.mask = base_mask
+                self._sync_selection_overlay()
+                if self._rendered is not None:
+                    self.preview.set_original_image(ImageQt(self._rendered))
+                return
+            res = SelectionEngine.move_selection(
+                work,
+                base_mask,
+                dx,
+                dy,
+                bg_color=settings.bg_color,
+                protected_mask=self._build_protected_mask(),
+            )
+            if res is not None:
+                box, before_pil, after_pil, new_mask = res
+                self._selection_engine.mask = new_mask
+                self._paint_canvas_np = work
+                self._sync_selection_overlay()
+                self._commit_paint_result(box, before_pil, after_pil)
+            else:
+                self._paint_canvas_np = None
+                self._selection_engine.mask = base_mask
+                self._sync_selection_overlay()
+            return
+
+        if tool == BrushTool.CURVE and self._paint_shape_points and not self._paint_curve_dragging:
+            p0 = self._paint_shape_points[0]
+            self._paint_shape_points = []
+            if (x - p0[0]) ** 2 + (y - p0[1]) ** 2 >= 4.0:
+                self._paint_curve_points = [p0, (x, y)]
+                self._paint_curve_dragging = True
+                self.preview.set_paint_preview_overlay({'kind': 'line', 'p0': p0, 'p1': (x, y)})
+            else:
+                self.preview.set_paint_preview_overlay(None)
+            return
+
+        if tool in (BrushTool.GRADIENT, BrushTool.LINE, BrushTool.RECT_SHAPE, BrushTool.ELLIPSE_SHAPE) and self._paint_shape_points:
+            p0 = self._paint_shape_points[0]
+            self._paint_shape_points = []
+            self.preview.set_paint_preview_overlay(None)
+            canvas_np = self._ensure_paint_canvas_np()
+            if canvas_np is None:
+                return
+            prot = self._build_protected_mask()
+            if tool == BrushTool.GRADIENT:
+                res = BrushEngine.draw_gradient(
+                    canvas_np, p0, (x, y), settings,
+                    selection_mask=self._selection_engine.mask, protected_mask=prot,
+                )
+            else:
+                res = BrushEngine.draw_shape(
+                    canvas_np, tool, [p0, (x, y)], settings,
+                    selection_mask=self._selection_engine.mask, protected_mask=prot,
+                )
+            if res is not None:
+                box, before_pil, after_pil = res
+                self._commit_paint_result(box, before_pil, after_pil)
+
+    def _on_paint_hover_moved(self, x: float, y: float):
+        if not self._paint_mode_btn.isChecked():
+            return
+        tool = self._paint_panel.current_tool()
+        if tool == BrushTool.POLY_LASSO and self._paint_poly_lasso_points:
+            self.preview.set_paint_preview_overlay({
+                'kind': 'poly',
+                'points': [*self._paint_poly_lasso_points, (x, y)],
+                'closed': False,
+            })
+        elif tool == BrushTool.CURVE and self._paint_curve_dragging and len(self._paint_curve_points) == 2:
+            p0, p1 = self._paint_curve_points
+            self.preview.set_paint_preview_overlay({
+                'kind': 'poly',
+                'points': [p0, (x, y), p1],
+                'closed': False,
+            })
+
+    def _on_paint_alt_clicked(self, x: float, y: float):
+        if not self._paint_mode_btn.isChecked():
+            return
+        if self._paint_panel.current_tool() == BrushTool.CLONE:
+            self._clone_source = (float(x), float(y))
+            self.preview.set_clone_source_marker(self._clone_source)
+            self._status.setText(tr('已设定图章源点：({x}, {y})', x=round(x), y=round(y)))
+        else:
+            self._sample_fg_at(x, y)
+
+    def _on_paint_right_clicked(self, x: float, y: float):
+        if not self._paint_mode_btn.isChecked():
+            return
+        if self._paint_panel.right_click_eyedropper_enabled():
+            self._sample_fg_at(x, y)
+
+    def _on_paint_double_clicked(self, x: float, y: float):
+        if not self._paint_mode_btn.isChecked():
+            return
+        tool = self._paint_panel.current_tool()
+        if tool == BrushTool.POLY_LASSO and len(self._paint_poly_lasso_points) >= 3:
+            self._finish_poly_lasso()
+        elif tool == BrushTool.CURVE and self._paint_curve_dragging and len(self._paint_curve_points) == 2:
+            self._finish_curve(x, y)
+
+    def _finish_poly_lasso(self):
+        pts = list(self._paint_poly_lasso_points)
+        self._paint_poly_lasso_points.clear()
+        self.preview.set_paint_preview_overlay(None)
+        if len(pts) < 3 or self._cleaned_image is None:
+            return
+        self._selection_engine.resize(*self._cleaned_image.size)
+        settings = self._paint_panel.settings()
+        self._selection_engine.apply_poly_lasso(
+            pts, mode=settings.select_mode, antialias=settings.antialias,
+        )
+        self._sync_selection_overlay()
+        self._update_repair_controls()
+
+    def _finish_curve(self, ctrl_x: float, ctrl_y: float):
+        pts = list(self._paint_curve_points)
+        self._paint_curve_points.clear()
+        self._paint_curve_dragging = False
+        self.preview.set_paint_preview_overlay(None)
+        if len(pts) != 2 or self._cleaned_image is None:
+            return
+        canvas_np = self._ensure_paint_canvas_np()
+        if canvas_np is None:
+            return
+        settings = self._paint_panel.settings()
+        res = BrushEngine.draw_shape(
+            canvas_np,
+            BrushTool.CURVE,
+            [pts[0], (ctrl_x, ctrl_y), pts[1]],
+            settings,
+            selection_mask=self._selection_engine.mask,
+            protected_mask=self._build_protected_mask(),
+        )
+        if res is not None:
+            box, before_pil, after_pil = res
+            self._commit_paint_result(box, before_pil, after_pil)
+
+    def _on_paint_canceled(self):
+        changed = False
+        if self._stroke_session is not None:
+            self._stroke_session = None
+            changed = True
+        if self._paint_move_base_mask is not None:
+            self._selection_engine.mask = self._paint_move_base_mask
+            self._paint_move_base_mask = None
+            self._paint_move_base_np = None
+            self._paint_move_start = None
+            self._sync_selection_overlay()
+            changed = True
+        self._paint_shape_points.clear()
+        self._paint_poly_lasso_points.clear()
+        self._paint_curve_points.clear()
+        self._paint_curve_dragging = False
+        self.preview.set_paint_preview_overlay(None)
+        if changed:
+            self._paint_canvas_np = None
+            if self._rendered is not None and not self.preview._original.isNull():
+                self.preview.set_original_image(ImageQt(self._rendered))
+
+    def _on_paint_selection_action(self, action: str):
+        if self._cleaned_image is None or self.page_io_busy or self._repair_worker is not None:
+            return
+        w, h = self._cleaned_image.size
+        self._selection_engine.resize(w, h)
+        if action == 'select_all':
+            self._selection_engine.select_all()
+            self._sync_selection_overlay()
+            self._update_repair_controls()
+        elif action == 'invert':
+            self._selection_engine.invert()
+            self._sync_selection_overlay()
+            self._update_repair_controls()
+        elif action == 'clear':
+            self._selection_engine.clear()
+            self._sync_selection_overlay()
+            self._update_repair_controls()
+        elif action == 'expand':
+            self._selection_engine.expand(2)
+            self._sync_selection_overlay()
+            self._update_repair_controls()
+        elif action == 'contract':
+            self._selection_engine.contract(2)
+            self._sync_selection_overlay()
+            self._update_repair_controls()
+        elif action == 'feather':
+            self._selection_engine.feather(3)
+            self._sync_selection_overlay()
+            self._update_repair_controls()
+        elif action in ('fill', 'clear_pixels'):
+            if self._selection_engine.is_empty():
+                return
+            if not self.apply_changes():
+                return
+            canvas_np = self._ensure_paint_canvas_np()
+            if canvas_np is None:
+                return
+            settings = self._paint_panel.settings()
+            col = settings.bg_color if action == 'clear_pixels' else settings.color
+            res = SelectionEngine.fill_selection(
+                canvas_np, col, self._selection_engine.mask, self._build_protected_mask(),
+            )
+            if res is not None:
+                box, before_pil, after_pil = res
+                self._commit_paint_result(box, before_pil, after_pil)
+        elif action == 'ai_repair':
+            if self._selection_engine.is_empty():
+                return
+            saved_box = self._repair_box
+            self._repair_box = None
+            try:
+                self._start_background_repair()
+            finally:
+                self._repair_box = saved_box
+
+    def _on_paint_filter_requested(self, kind: str):
+        if (self._cleaned_image is None or self.page_io_busy or self._repair_worker is not None
+                or self._export_worker is not None or self._save_jobs.busy):
+            return
+        if not self.apply_changes():
+            return
+        sel_mask = self._selection_engine.mask
+        prot_mask = self._build_protected_mask()
+
+        def _dispatch(src_np: np.ndarray, params: dict):
+            if kind == 'hsl':
+                return ImageFilters.adjust_hsl(
+                    src_np, params.get('hue_deg', 0.0), params.get('sat_pct', 0.0), params.get('lum_pct', 0.0),
+                    selection_mask=sel_mask, protected_mask=prot_mask,
+                )
+            if kind == 'bc':
+                return ImageFilters.adjust_brightness_contrast(
+                    src_np, params.get('brightness', 0.0), params.get('contrast', 0.0),
+                    selection_mask=sel_mask, protected_mask=prot_mask,
+                )
+            if kind == 'levels':
+                return ImageFilters.adjust_levels(
+                    src_np,
+                    int(params.get('in_black', 0)),
+                    float(params.get('gamma', 1.0)),
+                    int(params.get('in_white', 255)),
+                    selection_mask=sel_mask,
+                    protected_mask=prot_mask,
+                )
+            if kind == 'blur':
+                return ImageFilters.gaussian_blur(
+                    src_np, float(params.get('radius', 3.0)),
+                    selection_mask=sel_mask, protected_mask=prot_mask,
+                )
+            if kind == 'sharpen':
+                return ImageFilters.sharpen(
+                    src_np, float(params.get('amount', 100.0)), float(params.get('radius', 1.5)),
+                    selection_mask=sel_mask, protected_mask=prot_mask,
+                )
+            if kind == 'luma_white':
+                return ImageFilters.luminance_to_white(
+                    src_np, int(params.get('threshold', 215)), int(params.get('softness', 24)),
+                    selection_mask=sel_mask, protected_mask=prot_mask,
+                )
+            if kind == 'invert':
+                return ImageFilters.invert_colors(src_np, selection_mask=sel_mask, protected_mask=prot_mask)
+            if kind == 'desaturate':
+                return ImageFilters.desaturate(src_np, selection_mask=sel_mask, protected_mask=prot_mask)
+            return None
+
+        canvas_np = self._ensure_paint_canvas_np()
+        if canvas_np is None:
+            return
+        if kind in ('invert', 'desaturate'):
+            res = _dispatch(canvas_np, {})
+            if res is not None:
+                box, before_pil, after_pil = res
+                self._paint_canvas_np = None
+                self._commit_paint_result(box, before_pil, after_pil)
+            return
+
+        base_cleaned = self._cleaned_image.copy()
+        base_np = np.ascontiguousarray(np.array(
+            base_cleaned.convert('RGB') if base_cleaned.mode != 'RGB' else base_cleaned,
+            dtype=np.uint8,
+        ))
+        was_dirty = self._dirty
+        dialog = PaintFilterDialog(kind, self)
+
+        def _apply_preview(params: dict):
+            self._cleaned_image = base_cleaned.copy()
+            res = _dispatch(base_np, params)
+            if res is not None:
+                box, _before, after_pil = res
+                self._cleaned_image.paste(after_pil, box)
+            self._paint_canvas_np = None
+            self._rendered = None
+            self._layer_cache.clear()
+            self._preview_dirty = True
+            self.apply_changes()
+
+        def _cancel_preview():
+            self._cleaned_image = base_cleaned.copy()
+            self._paint_canvas_np = None
+            self._rendered = None
+            self._layer_cache.clear()
+            self._preview_dirty = True
+            self.apply_changes()
+
+        dialog.preview_requested.connect(_apply_preview)
+        dialog.preview_canceled.connect(_cancel_preview)
+        accepted = dialog.exec()
+        params = dialog.params()
+        dialog.deleteLater()
+
+        if accepted == QDialog.Accepted:
+            self._cleaned_image = base_cleaned.copy()
+            self._dirty = was_dirty
+            res = _dispatch(base_np, params)
+            self._paint_canvas_np = None
+            if res is not None:
+                box, before_pil, after_pil = res
+                self._commit_paint_result(box, before_pil, after_pil, tr('已应用图像滤镜 · 可撤回修补。'))
+            else:
+                self._rendered = None
+                self._layer_cache.clear()
+                self._preview_dirty = True
+                self.apply_changes()
+        else:
+            self._cleaned_image = base_cleaned
+            self._paint_canvas_np = None
+            self._dirty = was_dirty
+            if self._cleaned_image is not None:
+                self._rendered = None
+                self._layer_cache.clear()
+                self._preview_dirty = True
+                self.apply_changes()
+            self._refresh_page_dirty_label()
+            self._update_repair_controls()
+
+    def _paint_hotkeys_available(self) -> bool:
+        focus = QApplication.focusWidget()
+        return (
+            self.isVisible()
+            and self._cleaned_image is not None
+            and QApplication.activeModalWidget() is None
+            and QApplication.activeWindow() is self.window()
+            and focus is not None
+            and (focus is self or self.isAncestorOf(focus))
+            and not self.page_io_busy
+            and self._repair_worker is None
+            and self._export_worker is None
+            and not self._save_jobs.busy
+            and not isinstance(focus, (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox, QComboBox))
+        )
+
+    def _handle_paint_key(self, event) -> bool:
+        mods = event.modifiers() & ~Qt.KeypadModifier
+        key = event.key()
+        in_paint = self._paint_mode_btn.isChecked()
+        focus = QApplication.focusWidget()
+        on_canvas = focus is self.preview._label
+
+        if mods == Qt.ControlModifier and key == Qt.Key_Z:
+            if in_paint or on_canvas:
+                return self.undo_background_repair()
+            return False
+        if (mods == Qt.ControlModifier and key == Qt.Key_Y) or (
+            mods == (Qt.ControlModifier | Qt.ShiftModifier) and key == Qt.Key_Z
+        ):
+            if in_paint or on_canvas:
+                return self.redo_background_repair()
+            return False
+
+        if not in_paint:
+            return False
+
+        if mods == Qt.ControlModifier and key == Qt.Key_A:
+            self._on_paint_selection_action('select_all')
+            return True
+        if mods == Qt.ControlModifier and key == Qt.Key_D:
+            self._on_paint_selection_action('clear')
+            return True
+        if mods == (Qt.ControlModifier | Qt.ShiftModifier) and key == Qt.Key_I:
+            self._on_paint_selection_action('invert')
+            return True
+        if mods == Qt.NoModifier and key in (Qt.Key_Delete, Qt.Key_Backspace):
+            if not self._selection_engine.is_empty():
+                self._on_paint_selection_action('clear_pixels')
+                return True
+            return False
+        if mods == Qt.NoModifier and key in (Qt.Key_Return, Qt.Key_Enter):
+            if self._paint_panel.current_tool() == BrushTool.POLY_LASSO and len(self._paint_poly_lasso_points) >= 3:
+                self._finish_poly_lasso()
+                return True
+            return False
+        if mods == Qt.NoModifier and key == Qt.Key_Escape:
+            if (self._stroke_session is not None or self._paint_poly_lasso_points
+                    or self._paint_curve_dragging or self._paint_shape_points
+                    or self._paint_move_base_mask is not None):
+                self._on_paint_canceled()
+                return True
+            if not self._selection_engine.is_empty():
+                self._on_paint_selection_action('clear')
+                return True
+            return False
+
+        if mods == Qt.NoModifier and not event.isAutoRepeat():
+            tool_map = {
+                Qt.Key_P: BrushTool.PENCIL,
+                Qt.Key_B: BrushTool.PEN,
+                Qt.Key_A: BrushTool.AIRBRUSH,
+                Qt.Key_W: BrushTool.WATERCOLOR,
+                Qt.Key_E: BrushTool.ERASER,
+                Qt.Key_S: BrushTool.CLONE,
+                Qt.Key_I: BrushTool.EYEDROPPER,
+                Qt.Key_M: BrushTool.RECT_SELECT,
+                Qt.Key_L: BrushTool.LASSO_SELECT,
+                Qt.Key_K: BrushTool.SELECT_PEN,
+                Qt.Key_G: BrushTool.BUCKET,
+            }
+            if key in tool_map:
+                self._paint_panel.select_tool(tool_map[key])
+                return True
+            if key == Qt.Key_BracketLeft:
+                self._paint_panel.step_size(-1)
+                return True
+            if key == Qt.Key_BracketRight:
+                self._paint_panel.step_size(1)
+                return True
+            if key == Qt.Key_X:
+                self._paint_panel.swap_colors()
+                return True
+            if key == Qt.Key_D:
+                self._paint_panel.reset_colors()
+                return True
+            if key == Qt.Key_H:
+                self._paint_panel.toggle_flip_h()
+                return True
+        elif mods == Qt.NoModifier and key in (Qt.Key_BracketLeft, Qt.Key_BracketRight):
+            self._paint_panel.step_size(-1 if key == Qt.Key_BracketLeft else 1)
+            return True
+        return False

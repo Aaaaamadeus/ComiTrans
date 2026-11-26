@@ -107,6 +107,7 @@ class StripPreview(ImagePreview):
             label.regions_selected.connect(self.regions_selected)
             label.region_context_menu.connect(self.region_context_menu)
             label.bubble_created.connect(self.bubble_created)
+            self._connect_canvas_paint_signals(label)
         label.setToolTip(Path(key).name)
         self._pages[key][0] = label
         self._canvas_keys[label] = key
@@ -116,8 +117,13 @@ class StripPreview(ImagePreview):
         key = self._canvas_keys.pop(label)
         self._pages[key][0] = None
         label.cancel_region_drag()
+        label.cancel_paint_drag()
         label.region = None
         label.region_editable = label.region_creation = label.bubble_creation = False
+        label.paint_active = False
+        label.set_selection_overlay(None)
+        label.set_paint_preview_overlay(None)
+        label.set_clone_source_marker(None)
         label.clear()
         label.hide()
         self._spares.append(label)
@@ -145,14 +151,32 @@ class StripPreview(ImagePreview):
         previous = self._label
         region, editable, creation = previous.region, previous.region_editable, previous.region_creation
         bubble_creation = previous.bubble_creation
+        paint_active = previous.paint_active
+        brush_d = previous.paint_brush_diameter
+        show_cursor = previous.paint_show_brush_cursor
+        right_pick = previous.paint_right_click_pick
+        symmetry = previous.paint_symmetry
+        rot_deg = previous.rotation_deg
+        flipped_h = previous.flipped_h
+        show_grid = previous.show_grid
+        previous.cancel_paint_drag()
         previous.region = None
         previous.region_editable = previous.region_creation = previous.bubble_creation = False
+        previous.paint_active = False
         previous.update()
         self._continuous = enabled
         self._label = self._mount(self._active_path) if enabled and self._active_path else self._single_label
         self._label.image_size = self._original.size()
         self._label.region_creation = creation
         self._label.bubble_creation = bubble_creation
+        self._label.paint_active = paint_active
+        self._label.paint_brush_diameter = brush_d
+        self._label.paint_show_brush_cursor = show_cursor
+        self._label.paint_right_click_pick = right_pick
+        self._label.paint_symmetry = symmetry
+        self._label.rotation_deg = rot_deg
+        self._label.flipped_h = flipped_h
+        self._label.show_grid = show_grid
         self.set_region(region, editable=editable)
         self._apply_regions()
         if not self._original.isNull():

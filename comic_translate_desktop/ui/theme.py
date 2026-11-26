@@ -518,6 +518,63 @@ QMenu::separator { height: 1px; background: @rule; margin: 4px 8px; }
 QMenu::indicator { width: 14px; height: 14px; margin-left: 6px; }
 QMenu::indicator:checked { background: @ink; border-radius: 3px; image: url("@icons/check.svg"); }
 QMenu::indicator:unchecked { border: 1px solid @ruleStrong; border-radius: 3px; background: @paper; }
+QWidget#paintStudioPanel { background: transparent; }
+QPushButton[paintTool="true"] {
+    min-width: 0px;
+    min-height: 0px;
+    padding: 0px;
+    border: 1px solid @rule;
+    border-radius: 7px;
+    background: @workspace;
+}
+QPushButton[paintTool="true"]:hover {
+    background: @muted;
+    border-color: @ruleStrong;
+}
+QPushButton[paintTool="true"]:checked {
+    background: @ink;
+    border-color: @ink;
+}
+QPushButton[paintTool="true"]:disabled {
+    background: transparent;
+    border-color: @rule;
+}
+QPushButton[paintPreset="true"] {
+    min-width: 28px;
+    min-height: 20px;
+    padding: 2px 5px;
+    border-radius: 6px;
+}
+QPushButton[paintPreset="true"]:checked {
+    background: @ink;
+    color: @paper;
+    border-color: @ink;
+    font-weight: 700;
+}
+QWidget#paintStudioPanel QSlider::groove:horizontal,
+QDialog QSlider::groove:horizontal {
+    height: 4px;
+    background: @rule;
+    border-radius: 2px;
+}
+QWidget#paintStudioPanel QSlider::sub-page:horizontal,
+QDialog QSlider::sub-page:horizontal {
+    background: @ink;
+    border-radius: 2px;
+}
+QWidget#paintStudioPanel QSlider::handle:horizontal,
+QDialog QSlider::handle:horizontal {
+    width: 12px;
+    height: 12px;
+    margin: -4px 0;
+    border-radius: 6px;
+    background: @paper;
+    border: 1.5px solid @ink;
+}
+QWidget#paintStudioPanel QSlider::handle:horizontal:hover,
+QDialog QSlider::handle:horizontal:hover {
+    background: @ink;
+}
 '''
 
 APP_STYLESHEET = build_stylesheet(PALETTES['light'])

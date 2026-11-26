@@ -3,9 +3,22 @@ from ..i18n import tr
 
 from pathlib import Path
 from functools import lru_cache
+import math
 import time
+import numpy as np
 from PySide6.QtCore import Qt, QElapsedTimer, QRectF, QPointF, QSize, QTimer, Signal, QEvent
-from PySide6.QtGui import QColor, QPainter, QPen, QPixmap, QImageReader, QRegion
+from PySide6.QtGui import (
+    QColor,
+    QImage,
+    QImageReader,
+    QPainter,
+    QPen,
+    QPixmap,
+    QPointingDevice,
+    QPolygonF,
+    QRegion,
+    QTransform,
+)
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QStackedLayout, QPushButton, QSizePolicy, QProgressBar
 from ..pdf_utils import render_pdf_preview
 from ..cbz import render_cbz_preview
@@ -83,6 +96,15 @@ class PageCanvas(QLabel):
     regions_selected = Signal(object, str)
     region_context_menu = Signal(int, object)
     bubble_created = Signal(object)
+    paint_stroke_started = Signal(float, float, float, object)
+    paint_stroke_moved = Signal(float, float, float, object)
+    paint_stroke_ended = Signal(float, float, float, object)
+    paint_hover_moved = Signal(float, float)
+    paint_alt_clicked = Signal(float, float)
+    paint_right_clicked = Signal(float, float)
+    paint_double_clicked = Signal(float, float)
+    paint_canceled = Signal()
+    tablet_eraser_changed = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -92,6 +114,14 @@ class PageCanvas(QLabel):
         self.bubble_creation = False
         self.stretch_pixmap = False
         self.space_pan = False
+        self.paint_active = False
+        self.paint_brush_diameter = 12.0
+        self.paint_show_brush_cursor = True
+        self.paint_right_click_pick = True
+        self.paint_symmetry = 'none'
+        self.rotation_deg = 0.0
+        self.flipped_h = False
+        self.show_grid = False
         self.regions = []
         self.regions_visible = True
         self._hover_index = -1
@@ -104,9 +134,17 @@ class PageCanvas(QLabel):
         self._fx_timer.setInterval(16)
         self._fx_timer.timeout.connect(self._step_fx)
         self._region_drag = None
+        self._paint_dragging = False
+        self._tablet_down = False
+        self._hover_img_pt = None
+        self._selection_overlay_img = None
+        self._selection_contours = []
+        self._paint_preview = None
+        self._clone_source_pt = None
         self._view_pixmap = None
         self._view_scale = 1.0
         self.setMouseTracking(True)
+        self.setAttribute(Qt.WA_TabletTracking, True)
         self.setAccessibleName(tr('漫画画布'))
 
     def _ensure_fx_timer(self):
@@ -164,13 +202,105 @@ class PageCanvas(QLabel):
         self._view_scale = max(0.01, float(scale))
         self.image_size = pixmap.size()
         self.setMinimumSize(0, 0)
-        self.setFixedSize(max(viewport.width(), round(pixmap.width() * self._view_scale)),
-                          max(viewport.height(), round(pixmap.height() * self._view_scale)))
+        pw = pixmap.width() * self._view_scale
+        ph = pixmap.height() * self._view_scale
+        if self.rotation_deg != 0.0:
+            rad = math.radians(self.rotation_deg)
+            bw = abs(pw * math.cos(rad)) + abs(ph * math.sin(rad))
+            bh = abs(pw * math.sin(rad)) + abs(ph * math.cos(rad))
+        else:
+            bw, bh = pw, ph
+        self.setFixedSize(max(viewport.width(), round(bw)),
+                          max(viewport.height(), round(bh)))
         self.update()
 
     def clear_view(self):
         self._view_pixmap = None
         self._view_scale = 1.0
+
+    def view_transform(self) -> QTransform:
+        t = QTransform()
+        if self.rotation_deg == 0.0 and not self.flipped_h:
+            return t
+        page = self.page_rect()
+        if page.isEmpty():
+            return t
+        center = page.center()
+        t.translate(center.x(), center.y())
+        if self.rotation_deg != 0.0:
+            t.rotate(self.rotation_deg)
+        if self.flipped_h:
+            t.scale(-1.0, 1.0)
+        t.translate(-center.x(), -center.y())
+        return t
+
+    def _untransform_point(self, point: QPointF) -> QPointF:
+        if self.rotation_deg == 0.0 and not self.flipped_h:
+            return QPointF(point)
+        inv, ok = self.view_transform().inverted()
+        return inv.map(QPointF(point)) if ok else QPointF(point)
+
+    def widget_to_image(self, point: QPointF, *, clamp: bool = False) -> QPointF | None:
+        page = self.page_rect()
+        if page.isEmpty() or self.image_size is None or self.image_size.isEmpty():
+            return None
+        untransformed = self._untransform_point(point)
+        if not clamp and not page.contains(untransformed):
+            return None
+        ix = (untransformed.x() - page.left()) * self.image_size.width() / page.width()
+        iy = (untransformed.y() - page.top()) * self.image_size.height() / page.height()
+        if clamp:
+            ix = max(0.0, min(float(self.image_size.width() - 1e-3), ix))
+            iy = max(0.0, min(float(self.image_size.height() - 1e-3), iy))
+        return QPointF(ix, iy)
+
+    def image_to_widget(self, img_pt: QPointF) -> QPointF:
+        page = self.page_rect()
+        if page.isEmpty() or self.image_size is None or self.image_size.isEmpty():
+            return QPointF(img_pt)
+        wx = page.left() + img_pt.x() * page.width() / self.image_size.width()
+        wy = page.top() + img_pt.y() * page.height() / self.image_size.height()
+        pos = QPointF(wx, wy)
+        if self.rotation_deg != 0.0 or self.flipped_h:
+            pos = self.view_transform().map(pos)
+        return pos
+
+    def set_selection_overlay(self, mask: np.ndarray | None, contours: list | None = None):
+        if mask is None or mask.size == 0 or not np.any(mask > 0):
+            self._selection_overlay_img = None
+            self._selection_contours = []
+        else:
+            h, w = mask.shape[:2]
+            rgba = np.zeros((h, w, 4), dtype=np.uint8)
+            rgba[..., 0] = 44
+            rgba[..., 1] = 110
+            rgba[..., 2] = 150
+            rgba[..., 3] = np.clip((mask.astype(np.float32) * (60.0 / 255.0)), 0, 60).astype(np.uint8)
+            buf = np.ascontiguousarray(rgba)
+            self._selection_overlay_img = QImage(buf.data, w, h, w * 4, QImage.Format_RGBA8888).copy()
+            polys = []
+            for cnt in (contours or ()):
+                if len(cnt) >= 2:
+                    pts = [QPointF(float(pt[0][0]), float(pt[0][1])) for pt in cnt]
+                    polys.append(QPolygonF(pts))
+            self._selection_contours = polys
+        self.update()
+
+    def set_paint_preview_overlay(self, overlay: dict | None):
+        self._paint_preview = overlay
+        self.update()
+
+    def set_clone_source_marker(self, point: tuple[float, float] | None):
+        self._clone_source_pt = QPointF(point[0], point[1]) if point is not None else None
+        self.update()
+
+    def cancel_paint_drag(self):
+        self._paint_dragging = False
+        self._tablet_down = False
+        if self.mouseGrabber() is self:
+            self.releaseMouse()
+        self._paint_preview = None
+        self.update()
 
     def page_rect(self):
         if self._view_pixmap is not None and not self._view_pixmap.isNull():
@@ -207,6 +337,7 @@ class PageCanvas(QLabel):
         """Topmost text box under the cursor; inner (smaller) boxes win."""
         if not self.regions_visible or not self.regions or self.image_size is None:
             return None
+        point = self._untransform_point(point)
         page = self.page_rect()
         if page.isEmpty() or not page.adjusted(-4, -4, 4, 4).contains(point):
             return None
@@ -231,6 +362,7 @@ class PageCanvas(QLabel):
     def _region_hit(self, point):
         if not self.region_editable or not self.isEnabled():
             return None
+        point = self._untransform_point(point)
         rect, page = self.region_rect(), self.page_rect()
         if rect.isEmpty() or not page.adjusted(-8, -8, 8, 8).contains(point):
             return None
@@ -258,7 +390,7 @@ class PageCanvas(QLabel):
                    'n': Qt.SizeVerCursor, 's': Qt.SizeVerCursor,
                    'w': Qt.SizeHorCursor, 'e': Qt.SizeHorCursor, 'move': Qt.OpenHandCursor}
         if hit is None:
-            if self.region_creation or self.bubble_creation:
+            if self.region_creation or self.bubble_creation or self.paint_active:
                 self.setCursor(Qt.CrossCursor)
             else:
                 self.unsetCursor()
@@ -272,10 +404,86 @@ class PageCanvas(QLabel):
             self.releaseMouse()
         self.unsetCursor()
 
+    def tabletEvent(self, event):
+        if not (self.paint_active and not self.space_pan and not self.region_creation
+                and not self.bubble_creation and self.isEnabled()):
+            super().tabletEvent(event)
+            return
+        etype = event.type()
+        pressure = max(0.0, min(1.0, float(event.pressure())))
+        if etype == QEvent.TabletPress:
+            if event.button() == Qt.RightButton:
+                if self.paint_right_click_pick:
+                    pt = self.widget_to_image(event.position(), clamp=False)
+                    if pt is not None:
+                        self.paint_right_clicked.emit(pt.x(), pt.y())
+                event.accept()
+                return
+            self.tablet_eraser_changed.emit(event.pointerType() == QPointingDevice.PointerType.Eraser)
+            pt = self.widget_to_image(event.position(), clamp=False)
+            if pt is not None:
+                if event.modifiers() & Qt.AltModifier:
+                    self.paint_alt_clicked.emit(pt.x(), pt.y())
+                    event.accept()
+                    return
+                self._tablet_down = True
+                self._paint_dragging = True
+                self._hover_img_pt = pt
+                self.setFocus(Qt.MouseFocusReason)
+                self.paint_stroke_started.emit(pt.x(), pt.y(), pressure, event.modifiers())
+            event.accept()
+            return
+        if etype == QEvent.TabletMove:
+            pt = self.widget_to_image(event.position(), clamp=self._paint_dragging)
+            if pt is not None:
+                self._hover_img_pt = pt
+                if self._tablet_down and self._paint_dragging:
+                    self.paint_stroke_moved.emit(pt.x(), pt.y(), pressure, event.modifiers())
+                else:
+                    self.paint_hover_moved.emit(pt.x(), pt.y())
+                    self.update()
+            event.accept()
+            return
+        if etype == QEvent.TabletRelease:
+            if self._tablet_down:
+                self._tablet_down = False
+                if self._paint_dragging:
+                    self._paint_dragging = False
+                    pt = self.widget_to_image(event.position(), clamp=True)
+                    if pt is not None:
+                        self.paint_stroke_ended.emit(pt.x(), pt.y(), pressure, event.modifiers())
+            event.accept()
+            return
+        super().tabletEvent(event)
+
     def mousePressEvent(self, event):
+        if self.paint_active and not self.space_pan and not self.region_creation and not self.bubble_creation:
+            if self._tablet_down:
+                event.accept()
+                return
+            if event.button() == Qt.RightButton and self.paint_right_click_pick:
+                pt = self.widget_to_image(event.position(), clamp=False)
+                if pt is not None:
+                    self.paint_right_clicked.emit(pt.x(), pt.y())
+                event.accept()
+                return
+            if event.button() == Qt.LeftButton:
+                pt = self.widget_to_image(event.position(), clamp=False)
+                if pt is not None:
+                    self._hover_img_pt = pt
+                    if event.modifiers() & Qt.AltModifier:
+                        self.paint_alt_clicked.emit(pt.x(), pt.y())
+                        event.accept()
+                        return
+                    self._paint_dragging = True
+                    self.setFocus(Qt.MouseFocusReason)
+                    self.grabMouse()
+                    self.paint_stroke_started.emit(pt.x(), pt.y(), 1.0, event.modifiers())
+                    event.accept()
+                    return
         hit = self._region_hit(event.position())
         if (event.button() == Qt.LeftButton and not self.region_creation and not self.bubble_creation
-                and self.page_rect().contains(event.position())):
+                and self.page_rect().contains(self._untransform_point(event.position()))):
             if event.modifiers() & Qt.ShiftModifier:
                 self._selection_start = QPointF(event.position())
                 self._selection_rect = QRectF(self._selection_start, self._selection_start)
@@ -290,14 +498,14 @@ class PageCanvas(QLabel):
                     event.accept()
                     return
         if (self.bubble_creation and event.button() == Qt.LeftButton
-                and self.page_rect().contains(event.position())):
+                and self.page_rect().contains(self._untransform_point(event.position()))):
             self._region_drag = ('bubble_create', QPointF(event.position()), self.region)
             self.setFocus(Qt.MouseFocusReason)
             self.grabMouse()
             event.accept()
             return
         if (self.region_creation and event.button() == Qt.LeftButton
-                and self.page_rect().contains(event.position()) and hit is None):
+                and self.page_rect().contains(self._untransform_point(event.position())) and hit is None):
             self._region_drag = ('create', QPointF(event.position()), self.region)
             self.setFocus(Qt.MouseFocusReason)
             self.grabMouse()
@@ -323,8 +531,8 @@ class PageCanvas(QLabel):
         super().mousePressEvent(event)
 
     def contextMenuEvent(self, event):
-        if self._region_drag is not None or self.region_creation or self.bubble_creation:
-            event.ignore()
+        if self.paint_active or self._region_drag is not None or self.region_creation or self.bubble_creation:
+            event.accept() if self.paint_active else event.ignore()
             return
         index = self._region_at(QPointF(event.pos()))
         if index is not None:
@@ -335,6 +543,8 @@ class PageCanvas(QLabel):
 
     def _drag_region_to(self, point):
         hit, start, original = self._region_drag
+        start = self._untransform_point(start)
+        point = self._untransform_point(point)
         page = self.page_rect()
         dx = round((point.x() - start.x()) * self.image_size.width() / page.width())
         dy = round((point.y() - start.y()) * self.image_size.height() / page.height())
@@ -374,6 +584,23 @@ class PageCanvas(QLabel):
             self.region_edited.emit(box)
 
     def mouseMoveEvent(self, event):
+        if self.paint_active and not self.space_pan and not self.region_creation and not self.bubble_creation:
+            if self._tablet_down:
+                event.accept()
+                return
+            pt = self.widget_to_image(event.position(), clamp=self._paint_dragging)
+            self._hover_img_pt = pt
+            if self._paint_dragging and pt is not None:
+                self.paint_stroke_moved.emit(pt.x(), pt.y(), 1.0, event.modifiers())
+                self.update()
+                event.accept()
+                return
+            if pt is not None:
+                self.paint_hover_moved.emit(pt.x(), pt.y())
+            self._region_cursor(None)
+            self.update()
+            event.accept()
+            return
         if getattr(self, '_selection_start', None) is not None:
             self._selection_rect = QRectF(self._selection_start, event.position()).normalized().intersected(self.page_rect())
             self.update()
@@ -400,6 +627,19 @@ class PageCanvas(QLabel):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self.paint_active and not self.space_pan and event.button() == Qt.LeftButton and self._paint_dragging:
+            if self._tablet_down:
+                event.accept()
+                return
+            self._paint_dragging = False
+            if self.mouseGrabber() is self:
+                self.releaseMouse()
+            pt = self.widget_to_image(event.position(), clamp=True)
+            if pt is not None:
+                self.paint_stroke_ended.emit(pt.x(), pt.y(), 1.0, event.modifiers())
+            self._region_cursor(None)
+            event.accept()
+            return
         if event.button() == Qt.LeftButton and getattr(self, '_selection_start', None) is not None:
             rect = self._selection_rect
             indices = [index for index, box in self.regions if rect.intersects(self._box_rect(box))]
@@ -428,7 +668,21 @@ class PageCanvas(QLabel):
             return
         super().mouseReleaseEvent(event)
 
+    def mouseDoubleClickEvent(self, event):
+        if self.paint_active and event.button() == Qt.LeftButton and not self.space_pan:
+            pt = self.widget_to_image(event.position(), clamp=True)
+            if pt is not None:
+                self.paint_double_clicked.emit(pt.x(), pt.y())
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
     def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape and self.paint_active:
+            self.cancel_paint_drag()
+            self.paint_canceled.emit()
+            event.accept()
+            return
         if event.key() == Qt.Key_Escape and getattr(self, '_selection_start', None) is not None:
             self._selection_start = self._selection_rect = None
             if self.mouseGrabber() is self:
@@ -454,11 +708,15 @@ class PageCanvas(QLabel):
         super().keyPressEvent(event)
 
     def leaveEvent(self, event):
+        if self._hover_img_pt is not None:
+            self._hover_img_pt = None
+            if self.paint_active:
+                self.update()
         if self._hover_index != -1:
             self._hover_index = -1
             self._hover_strength = 0.0
             self.update()
-        if self._region_drag is None:
+        if self._region_drag is None and not self._paint_dragging:
             self.unsetCursor()
         super().leaveEvent(event)
 
@@ -466,17 +724,23 @@ class PageCanvas(QLabel):
         self._fx_timer.stop()
         self._select_pulse_until = 0
         self.cancel_region_drag()
+        self.cancel_paint_drag()
         super().hideEvent(event)
 
     def event(self, event):
-        if event.type() == QEvent.UngrabMouse and getattr(self, '_region_drag', None) is not None:
-            self._region_drag = None
-            self.unsetCursor()
+        if event.type() == QEvent.UngrabMouse:
+            if getattr(self, '_region_drag', None) is not None:
+                self._region_drag = None
+                self.unsetCursor()
+            if getattr(self, '_paint_dragging', False):
+                self._paint_dragging = False
+                self._tablet_down = False
         return super().event(event)
 
     def changeEvent(self, event):
         if event.type() == QEvent.EnabledChange and not self.isEnabled():
             self.cancel_region_drag()
+            self.cancel_paint_drag()
         super().changeEvent(event)
 
     def paintEvent(self, event):
@@ -484,13 +748,17 @@ class PageCanvas(QLabel):
             painter = QPainter(self)
             painter.setRenderHint(QPainter.SmoothPixmapTransform)
             page = self.page_rect()
-            clip = QRectF(event.rect()).intersected(page)
-            if not clip.isEmpty() and self._view_scale > 0:
-                source = QRectF((clip.left() - page.left()) / self._view_scale,
-                                (clip.top() - page.top()) / self._view_scale,
-                                clip.width() / self._view_scale,
-                                clip.height() / self._view_scale)
-                painter.drawPixmap(clip, self._view_pixmap, source)
+            if self.rotation_deg != 0.0 or self.flipped_h:
+                painter.setTransform(self.view_transform())
+                painter.drawPixmap(page, self._view_pixmap, QRectF(self._view_pixmap.rect()))
+            else:
+                clip = QRectF(event.rect()).intersected(page)
+                if not clip.isEmpty() and self._view_scale > 0:
+                    source = QRectF((clip.left() - page.left()) / self._view_scale,
+                                    (clip.top() - page.top()) / self._view_scale,
+                                    clip.width() / self._view_scale,
+                                    clip.height() / self._view_scale)
+                    painter.drawPixmap(clip, self._view_pixmap, source)
             painter.end()
         elif self.stretch_pixmap:
             pixmap = self.pixmap()
@@ -505,18 +773,26 @@ class PageCanvas(QLabel):
         self._paint_canvas_overlay()
 
     def _paint_canvas_overlay(self):
-        if self.image_size is None:
+        if self.image_size is None or self.image_size.isEmpty():
             return
         bounds = self.contentsRect()
         page = self.page_rect()
         if page.isEmpty():
             return
         painter = QPainter(self)
-        margin = QRegion(bounds).subtracted(QRegion(page.adjusted(-12, -12, 12, 12).toAlignedRect()))
+        transform = self.view_transform()
+        has_xform = self.rotation_deg != 0.0 or self.flipped_h
+        margin_rect = (
+            transform.mapRect(page) if has_xform else page
+        ).adjusted(-12, -12, 12, 12).toAlignedRect()
+        margin = QRegion(bounds).subtracted(QRegion(margin_rect))
         painter.setClipRegion(margin)
         draw_corner_tones(painter, QRectF(bounds),
                           compact=self.window().width() < COMPACT_BREAKPOINT)
         painter.setClipping(False)
+        if has_xform:
+            painter.save()
+            painter.setTransform(transform, True)
         shadow = QColor(color('black'))
         for spread, alpha in ((3, 18), (6, 10), (10, 5)):
             shadow.setAlpha(alpha)
@@ -530,6 +806,141 @@ class PageCanvas(QLabel):
         painter.setPen(edge)
         painter.setBrush(Qt.NoBrush)
         painter.drawRect(page.adjusted(.5, .5, -.5, -.5))
+
+        sx = page.width() / self.image_size.width()
+        sy = page.height() / self.image_size.height()
+
+        if self.show_grid and self.paint_active:
+            painter.save()
+            painter.setClipRect(page)
+            grid_step = 1
+            if self._view_scale < 8.0:
+                for cand in (8, 16, 32, 64, 128, 256):
+                    if cand * self._view_scale >= 24.0:
+                        grid_step = cand
+                        break
+                else:
+                    grid_step = 256
+            grid_color = QColor(color('guide'))
+            grid_color.setAlpha(38)
+            grid_pen = QPen(grid_color, 1)
+            grid_pen.setCosmetic(True)
+            painter.setPen(grid_pen)
+            w_img, h_img = self.image_size.width(), self.image_size.height()
+            for ix in range(grid_step, w_img, grid_step):
+                wx = page.left() + ix * sx
+                painter.drawLine(QPointF(wx, page.top()), QPointF(wx, page.bottom()))
+            for iy in range(grid_step, h_img, grid_step):
+                wy = page.top() + iy * sy
+                painter.drawLine(QPointF(page.left(), wy), QPointF(page.right(), wy))
+            painter.restore()
+
+        if self._selection_overlay_img is not None and not self._selection_overlay_img.isNull():
+            painter.save()
+            painter.setClipRect(page)
+            painter.drawImage(page, self._selection_overlay_img)
+            if self._selection_contours:
+                painter.setRenderHint(QPainter.Antialiasing)
+                white_pen = QPen(QColor('#FFFFFF'), 1.2, Qt.SolidLine)
+                white_pen.setCosmetic(True)
+                dash_pen = QPen(QColor('#111111'), 1.2, Qt.CustomDashLine)
+                dash_pen.setDashPattern([4, 4])
+                dash_pen.setCosmetic(True)
+                for poly in self._selection_contours:
+                    mapped = QPolygonF([
+                        QPointF(page.left() + pt.x() * sx, page.top() + pt.y() * sy)
+                        for pt in poly
+                    ])
+                    painter.setPen(white_pen)
+                    painter.drawPolygon(mapped)
+                    painter.setPen(dash_pen)
+                    painter.drawPolygon(mapped)
+            painter.restore()
+
+        if self._paint_preview:
+            painter.save()
+            painter.setClipRect(page)
+            painter.setRenderHint(QPainter.Antialiasing)
+            preview = self._paint_preview
+            kind = preview.get('kind')
+            w_pen = QPen(QColor('#FFFFFF'), 1.6, Qt.SolidLine)
+            w_pen.setCosmetic(True)
+            b_pen = QPen(QColor('#111111'), 1.1, Qt.DashLine)
+            b_pen.setCosmetic(True)
+            if kind == 'line':
+                p0 = preview.get('p0')
+                p1 = preview.get('p1')
+                if p0 and p1:
+                    q0 = QPointF(page.left() + p0[0] * sx, page.top() + p0[1] * sy)
+                    q1 = QPointF(page.left() + p1[0] * sx, page.top() + p1[1] * sy)
+                    painter.setPen(w_pen)
+                    painter.drawLine(q0, q1)
+                    painter.setPen(b_pen)
+                    painter.drawLine(q0, q1)
+            elif kind in ('rect', 'ellipse'):
+                r = preview.get('rect')
+                if r:
+                    x0, y0, x1, y1 = r
+                    qrect = QRectF(
+                        page.left() + min(x0, x1) * sx,
+                        page.top() + min(y0, y1) * sy,
+                        abs(x1 - x0) * sx,
+                        abs(y1 - y0) * sy,
+                    )
+                    painter.setBrush(Qt.NoBrush)
+                    for pen in (w_pen, b_pen):
+                        painter.setPen(pen)
+                        if kind == 'ellipse':
+                            painter.drawEllipse(qrect)
+                        else:
+                            painter.drawRect(qrect)
+            elif kind in ('poly', 'polygon', 'lasso', 'polyline'):
+                pts = preview.get('points') or ()
+                if len(pts) >= 2:
+                    poly = QPolygonF([
+                        QPointF(page.left() + pt[0] * sx, page.top() + pt[1] * sy)
+                        for pt in pts
+                    ])
+                    painter.setBrush(Qt.NoBrush)
+                    for pen in (w_pen, b_pen):
+                        painter.setPen(pen)
+                        if preview.get('closed'):
+                            painter.drawPolygon(poly)
+                        else:
+                            painter.drawPolyline(poly)
+            painter.restore()
+
+        if self._clone_source_pt is not None and self.paint_active:
+            painter.save()
+            painter.setClipRect(page)
+            painter.setRenderHint(QPainter.Antialiasing)
+            cx = page.left() + self._clone_source_pt.x() * sx
+            cy = page.top() + self._clone_source_pt.y() * sy
+            c_pen = QPen(QColor('#FFFFFF'), 1.8)
+            c_pen.setCosmetic(True)
+            k_pen = QPen(QColor('#111111'), 1.1)
+            k_pen.setCosmetic(True)
+            for pen in (c_pen, k_pen):
+                painter.setPen(pen)
+                painter.setBrush(Qt.NoBrush)
+                painter.drawEllipse(QPointF(cx, cy), 6.0, 6.0)
+                painter.drawLine(QPointF(cx - 9.0, cy), QPointF(cx + 9.0, cy))
+                painter.drawLine(QPointF(cx, cy - 9.0), QPointF(cx, cy + 9.0))
+            painter.restore()
+
+        if self.paint_active and self.paint_symmetry != 'none':
+            painter.save()
+            painter.setClipRect(page)
+            sym_pen = QPen(QColor(color('guide')), 1.2, Qt.DashDotLine)
+            sym_pen.setCosmetic(True)
+            painter.setPen(sym_pen)
+            if self.paint_symmetry in ('horizontal', 'both'):
+                mid_x = page.center().x()
+                painter.drawLine(QPointF(mid_x, page.top()), QPointF(mid_x, page.bottom()))
+            if self.paint_symmetry in ('vertical', 'both'):
+                mid_y = page.center().y()
+                painter.drawLine(QPointF(page.left(), mid_y), QPointF(page.right(), mid_y))
+            painter.restore()
         rubber = getattr(self, '_selection_rect', None)
         if rubber is not None:
             painter.setPen(QPen(QColor(color('guide')), 1, Qt.DashLine))
@@ -626,6 +1037,30 @@ class PageCanvas(QLabel):
                 painter.setBrush(QColor(color('paper')))
                 for handle in self._region_handles().values():
                     painter.drawRect(QRectF(handle.x() - 4, handle.y() - 4, 8, 8))
+        if has_xform:
+            painter.restore()
+        if (self.paint_active and self.paint_show_brush_cursor
+                and self._hover_img_pt is not None and not self.space_pan
+                and self.isEnabled()):
+            center = self.image_to_widget(self._hover_img_pt)
+            radius = max(1.5, float(self.paint_brush_diameter) * self._view_scale * 0.5)
+            painter.setClipping(False)
+            painter.setRenderHint(QPainter.Antialiasing)
+            painter.setBrush(Qt.NoBrush)
+            outer_pen = QPen(QColor(0, 0, 0, 195), 1.4)
+            outer_pen.setCosmetic(True)
+            painter.setPen(outer_pen)
+            painter.drawEllipse(center, radius + 0.6, radius + 0.6)
+            inner_pen = QPen(QColor(255, 255, 255, 220), 1.1)
+            inner_pen.setCosmetic(True)
+            painter.setPen(inner_pen)
+            painter.drawEllipse(center, max(0.8, radius - 0.3), max(0.8, radius - 0.3))
+            if radius >= 5.0:
+                dot_pen = QPen(QColor(0, 0, 0, 170), 1.0)
+                dot_pen.setCosmetic(True)
+                painter.setPen(dot_pen)
+                painter.drawLine(QPointF(center.x() - 2.0, center.y()), QPointF(center.x() + 2.0, center.y()))
+                painter.drawLine(QPointF(center.x(), center.y() - 2.0), QPointF(center.x(), center.y() + 2.0))
         painter.end()
 
 
@@ -637,6 +1072,15 @@ class ImagePreview(QWidget):
     regions_selected = Signal(object, str)
     region_context_menu = Signal(int, object)
     bubble_created = Signal(object)
+    paint_stroke_started = Signal(float, float, float, object)
+    paint_stroke_moved = Signal(float, float, float, object)
+    paint_stroke_ended = Signal(float, float, float, object)
+    paint_hover_moved = Signal(float, float)
+    paint_alt_clicked = Signal(float, float)
+    paint_right_clicked = Signal(float, float)
+    paint_double_clicked = Signal(float, float)
+    paint_canceled = Signal()
+    tablet_eraser_changed = Signal(bool)
     zoom_changed = Signal(object)
     color_picked = Signal(object)
     color_pick_canceled = Signal()
@@ -731,6 +1175,7 @@ class ImagePreview(QWidget):
         self._label.region_context_menu.connect(self.region_context_menu)
         self._label.bubble_created.connect(self.bubble_created)
         self._label.regions_selected.connect(self.regions_selected)
+        self._connect_canvas_paint_signals(self._label)
         self._label.installEventFilter(self)
         self._label.setObjectName('previewLabel')
         self._label.setAlignment(Qt.AlignCenter)
@@ -753,7 +1198,8 @@ class ImagePreview(QWidget):
         elif watched is not self._label:
             return super().eventFilter(watched, event)
         if event.type() == QEvent.ContextMenu and (
-                self._color_picking or time.monotonic() <= self._suppress_context_until):
+                self._color_picking or self._label.paint_active
+                or time.monotonic() <= self._suppress_context_until):
             self._suppress_context_until = 0.0
             event.accept()
             return True
@@ -767,11 +1213,9 @@ class ImagePreview(QWidget):
             if (event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton
                     and not self._space_pan):
                 if watched is self._label:
-                    page = self._label.page_rect()
-                    point = event.position()
-                    if not page.isEmpty() and page.contains(point):
-                        x = int((point.x() - page.left()) * self._original.width() / page.width())
-                        y = int((point.y() - page.top()) * self._original.height() / page.height())
+                    pt = self._label.widget_to_image(event.position())
+                    if pt is not None:
+                        x, y = int(pt.x()), int(pt.y())
                         if 0 <= x < self._original.width() and 0 <= y < self._original.height():
                             # Sample native page pixels, excluding guides and display interpolation.
                             picked = self._original.toImage().pixelColor(x, y)
@@ -794,6 +1238,7 @@ class ImagePreview(QWidget):
             return True
         if event.type() == QEvent.MouseButtonDblClick and event.button() == Qt.LeftButton:
             if watched is self._label and (self._label.region_creation
+                                           or self._label.paint_active
                                            or self._label._region_hit(event.position()) is not None):
                 return super().eventFilter(watched, event)
             self.set_zoom(None if self._zoom is not None or self._fit_width else 1.0)
@@ -888,6 +1333,10 @@ class ImagePreview(QWidget):
 
     def clear(self, text=tr('等待预览')):
         self.cancel_color_picking()
+        self._label.cancel_paint_drag()
+        self._label.set_selection_overlay(None)
+        self._label.set_paint_preview_overlay(None)
+        self._label.set_clone_source_marker(None)
         self._original = QPixmap()
         self.set_region(None)
         self._label.set_regions([])
@@ -945,6 +1394,9 @@ class ImagePreview(QWidget):
         if self._pan is not None:
             return
         if (self._color_picking or self._zoom_tool) and not self._space_pan:
+            self._scroll.viewport().setCursor(Qt.CrossCursor)
+            self._label.setCursor(Qt.CrossCursor)
+        elif self._label.paint_active and not self._space_pan:
             self._scroll.viewport().setCursor(Qt.CrossCursor)
             self._label.setCursor(Qt.CrossCursor)
         elif self._space_pan:
@@ -1030,7 +1482,7 @@ class ImagePreview(QWidget):
         self._label.region_editable = editable and box is not None
         self._label.setFocusPolicy(Qt.StrongFocus if (self._label.region_editable
                                or self._label.region_creation or self._label.bubble_creation
-                               or self._color_picking)
+                               or self._color_picking or self._label.paint_active)
                                else Qt.NoFocus)
         self._label.setToolTip(tr(tr('拖动边角调整蒙版大小，框内拖动位置；Esc 恢复本次拖动前的范围')
                                if self._label.region_editable else ''))
@@ -1065,3 +1517,90 @@ class ImagePreview(QWidget):
             scale = max(self.MIN_ZOOM, scale)
         self._scale = scale
         self._label.set_view(self._original, scale, viewport)
+
+    def _connect_canvas_paint_signals(self, canvas: PageCanvas):
+        canvas.paint_stroke_started.connect(self.paint_stroke_started)
+        canvas.paint_stroke_moved.connect(self.paint_stroke_moved)
+        canvas.paint_stroke_ended.connect(self.paint_stroke_ended)
+        canvas.paint_hover_moved.connect(self.paint_hover_moved)
+        canvas.paint_alt_clicked.connect(self.paint_alt_clicked)
+        canvas.paint_right_clicked.connect(self.paint_right_clicked)
+        canvas.paint_double_clicked.connect(self.paint_double_clicked)
+        canvas.paint_canceled.connect(self.paint_canceled)
+        canvas.tablet_eraser_changed.connect(self.tablet_eraser_changed)
+
+    def set_paint_mode(
+        self,
+        active: bool,
+        *,
+        brush_diameter: float = 12.0,
+        show_cursor: bool = True,
+        right_click_pick: bool = True,
+        symmetry: str = 'none',
+    ):
+        active = bool(active)
+        if not active:
+            self._label.cancel_paint_drag()
+        else:
+            self.cancel_region_drag()
+        self._label.paint_active = active
+        self._label.paint_brush_diameter = max(1.0, float(brush_diameter))
+        self._label.paint_show_brush_cursor = bool(show_cursor)
+        self._label.paint_right_click_pick = bool(right_click_pick)
+        self._label.paint_symmetry = str(symmetry or 'none')
+        self.set_region(self._label.region, editable=self._label.region_editable and not active)
+        self._update_canvas_cursor()
+        self._label.update()
+
+    def update_paint_cursor(self, diameter: float, *, show: bool = True, symmetry: str = 'none'):
+        self._label.paint_brush_diameter = max(1.0, float(diameter))
+        self._label.paint_show_brush_cursor = bool(show)
+        self._label.paint_symmetry = str(symmetry or 'none')
+        self._label.update()
+
+    def set_selection_overlay(self, mask: np.ndarray | None, contours: list | None = None):
+        self._label.set_selection_overlay(mask, contours)
+
+    def set_paint_preview_overlay(self, overlay: dict | None):
+        self._label.set_paint_preview_overlay(overlay)
+
+    def set_clone_source_marker(self, point: tuple[float, float] | None):
+        self._label.set_clone_source_marker(point)
+
+    def set_view_transform(self, rotation_deg: float = 0.0, flipped_h: bool = False, show_grid: bool = False):
+        rot = float(rotation_deg)
+        flip = bool(flipped_h)
+        grid = bool(show_grid)
+        changed_geom = (self._label.rotation_deg != rot) or (self._label.flipped_h != flip)
+        self._label.rotation_deg = rot
+        self._label.flipped_h = flip
+        self._label.show_grid = grid
+        if changed_geom:
+            self._update_scaled()
+        self._label.update()
+
+    def set_original_image(self, image: QImage):
+        """Fast in-place canvas refresh without clearing overlays or resetting zoom."""
+        if image.isNull():
+            return
+        self._original = QPixmap.fromImage(image)
+        self._label.image_size = self._original.size()
+        if self._stack.currentWidget() is not self._scroll:
+            self._stack.setCurrentWidget(self._scroll)
+        self._update_scaled()
+
+    def update_canvas_patch(self, box, image_patch: QImage):
+        """Composite an incremental ROI QImage onto the live canvas pixmap at 60fps."""
+        if self._original.isNull() or image_patch.isNull():
+            return
+        displayed = self._label.pixmap()
+        if displayed is not None and displayed.cacheKey() == self._original.cacheKey():
+            self._label.clear()
+        del displayed
+        painter = QPainter(self._original)
+        try:
+            painter.drawImage(int(box[0]), int(box[1]), image_patch)
+        finally:
+            painter.end()
+        self._label._view_pixmap = self._original
+        self._label.update()
